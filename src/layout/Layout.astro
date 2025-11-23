@@ -1,11 +1,8 @@
 ---
 import './colors.css';
-import AppBar from './AppBar.astro';
-import Cache from './Cache.astro'
 import SideMenu from './SideMenu.astro';
-import ClientNavMenu from './ClientNavMenu.astro';
 import { section_from_pathname } from '@/libs/assets.js';
-import { get_menu_hash,get_generated_section_menu,process_toc_list } from "./layout_utils";
+import { process_toc_list } from "./layout_utils";
 import {config} from '@/config'
 
 
@@ -17,10 +14,7 @@ export interface Props {
 const { headings } = Astro.props;
 const { title } = Astro.props.frontmatter || Astro.props;
 const toc_menu_items = process_toc_list(headings)
-const pages_menu_items = await get_generated_section_menu(Astro.url.pathname)
 const section = section_from_pathname(Astro.url.pathname)
-const menu_hash = get_menu_hash()
-const left_menu_open = (pages_menu_items.length > 0)
 
 console.log(`Layout> sectiom = '${section}'`)
 ---
@@ -36,26 +30,17 @@ console.log(`Layout> sectiom = '${section}'`)
 		<div id="fixed-left" class="fixed-nav active" />
 		<div class="appbar-nav_content-footer">
 			<header>
-				<AppBar/>
+				Appbar placeholder
 			</header>
 			<main>
 				<div id="wide-nav" class="scroll">
-					{config.client_menu?
-						<ClientNavMenu open={left_menu_open} hash={menu_hash}/>:
-						<Cache name={section}>
-							<SideMenu items={pages_menu_items} category="pages_menu"/>
-						</Cache>
-					}
+					menu placeholder
 				</div>
 				<div id="resize-left" class="nav-resize active"/>
 				<article class="content scroll">
 					<div id="mobile-nav">
-						{config.client_menu?
-							<ClientNavMenu open={left_menu_open} hash={menu_hash}/>:
-							<Cache name={section}>
-								<SideMenu items={pages_menu_items} category="pages_menu"/>
-							</Cache>
-						}
+						menu placeholder
+					</div>
 					</div>
 					<div class="article-slot">
 						<slot/>

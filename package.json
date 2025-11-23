@@ -20,7 +20,7 @@
     "@svgdotjs/svg.js": "^3.2.4",
     "adm-zip": "^0.5.16",
     "astro": "^5.16.0",
-    "content-structure": "2.0.1",
+    "content-structure": "2.0.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "datatables.net-dt": "^1.13.7",

@@ -77,9 +77,9 @@ function get_active_submenu(raw_menu,section,pathname){
     })
 }
 
-const generated_menu = await load_json(config.collect_content.out_menu)
 
 async function get_generated_section_menu(pathname){
+    const generated_menu = await load_json(config.collect_content.out_menu)
     const section = section_from_pathname(pathname);
     let section_menu = generated_menu.sections[section]
     if(!Object.hasOwn(generated_menu.sections,section)){
@@ -97,11 +97,13 @@ function get_active_appbar_menu(raw_menu,pathname){
     })
 }
 
-function get_menu_hash(){
+async function get_menu_hash(){
+    const generated_menu = await load_json(config.collect_content.out_menu)
     return generated_menu.hash
 }
 
-function get_base_menu(){
+async function get_base_menu(){
+    const generated_menu = await load_json(config.collect_content.out_menu)
     return generated_menu.base_menu
 }
 
