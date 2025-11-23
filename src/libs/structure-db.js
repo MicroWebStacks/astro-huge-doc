@@ -45,18 +45,6 @@ function normalizeDocumentRow(row) {
     };
 }
 
-function getDocuments(options = {}) {
-    const db = ensureDb();
-    const rows = db.prepare('SELECT * FROM documents ORDER BY level, "order", url').all();
-    const normalized = rows.map(normalizeDocumentRow).filter(Boolean);
-    const {format} = options;
-    if (!format) {
-        return normalized;
-    }
-    const target = String(format);
-    return normalized.filter((row) => (row.format ?? 'markdown') === target);
-}
-
 function getDocument(match) {
     const db = ensureDb();
     if (match?.uid) {
@@ -446,4 +434,4 @@ function getCodeAssetSummaries() {
     });
 }
 
-export {getDocuments, getEntry, getFileAssets, getCodeAssetSummaries, getAssetInfo};
+export { getEntry, getFileAssets, getCodeAssetSummaries, getAssetInfo};
