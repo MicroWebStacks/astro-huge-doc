@@ -1,0 +1,6 @@
+fetch:
+  github:
+    repo: MicroWebStacks/astro-big-doc
+    branch: main
+    folders: [content]
+    dest: content

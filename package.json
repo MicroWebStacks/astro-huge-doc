@@ -1,0 +1,53 @@
+{
+  "name": "@microwebstacks/astro-huge-doc",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "fetch": "node scripts/fetch.js",
+    "server": "node server/server.js",
+    "structure": "node integrations/run-structure.js"
+  },
+  "dependencies": {
+    "@google/model-viewer": "^4.1.0",
+    "@octokit/rest": "^21.0.2",
+    "@svgdotjs/svg.js": "^3.2.4",
+    "adm-zip": "^0.5.16",
+    "astro": "^5.0.3",
+    "content-structure": "2.0.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "datatables.net-dt": "^1.13.7",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "glob": "^11.0.0",
+    "gray-matter": "^4.0.3",
+    "hast-util-to-html": "^9.0.3",
+    "js-yaml": "^4.1.0",
+    "marked": "^15.0.3",
+    "mdast-util-to-hast": "^13.2.0",
+    "panzoom": "^9.4.3",
+    "passport": "^0.7.0",
+    "passport-github": "^1.1.0",
+    "photoswipe": "^5.4.4",
+    "remark": "^15.0.1",
+    "sharp": "^0.33.5",
+    "shiki": "^3.15.0",
+    "swiper": "^11.1.15",
+    "three": "^0.172.0",
+    "unist-util-visit": "^5.0.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "engines": {
+    "pnpm": ">=8.0.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-yaml": "^4.1.2"
+  }
+}
