@@ -1,6 +1,4 @@
 ---
-import {config} from '@/config.js'
-import { diagram_cache } from './diagram.js'
 import DiagramCode from './DiagramCode.astro'
 
 export interface Props {
@@ -8,25 +6,10 @@ export interface Props {
     code: string;
     params: object;
     meta: object;
+    diagramUid: string | null | undefined;
 }
 
-const { language, code, params, meta } = Astro.props as Props;
-
-async function generator(code){
-  const response = await fetch(`${config.kroki_server}/${language}/svg/`,{
-    method: 'POST',
-    body: code,
-    headers: {
-      'Content-Type': 'text/plain',
-    },
-  })
-  
-  const  svg_text = await response.text()
-  return svg_text
-}
-
-const hash = await diagram_cache(code, generator)
-console.log(` => kroki '${hash}'`)
+const { language, code, params, meta, diagramUid } = Astro.props as Props;
 
 ---
-<DiagramCode hash={hash} code={code} params={params} meta={meta} />
+{diagramUid && <DiagramCode uid={diagramUid} code={code} params={params} meta={meta} />}

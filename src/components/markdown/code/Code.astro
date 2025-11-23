@@ -18,6 +18,8 @@ const { node, dirpath } = Astro.props as Props;
 const code = node.value
 const language = node.lang
 const params = node.meta?node.meta.split(' '):[]
+const asset_uid = node.asset_uid ?? null
+const diagram_uid = node.diagram_uid ?? (asset_uid ? `${asset_uid}.svg` : null)
 
 const yaml_glb      = ((language == "yaml") && (node.meta?.startsWith("glb")))
 const yaml_cards    = ((language == "yaml") && (node.meta?.startsWith("cards")))
@@ -34,7 +36,7 @@ if((is_diagram)&(params.length > 0)){
 }
 ---
 {(is_diagram)&&
-    <Kroki language={language} code={code} params={params} meta={meta}/>
+    <Kroki language={language} code={code} params={params} meta={meta} diagramUid={diagram_uid}/>
 }
 {yaml_glb &&
     <ModelViewerCode code={code} dirpath={dirpath}/>

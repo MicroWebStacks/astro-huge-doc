@@ -4,14 +4,14 @@ import Panzoom from '@/components/panzoom/panzoom.astro'
 import { config } from '@/config.js';
 
 export interface Props {
-    hash:string;
+    uid:string;
     code: string;
     params: object;
     meta: object;
 }
 
-const {hash, code, params, meta} = Astro.props as Props;
-const diagram_url = `${config.base}/codes/${hash}/diagram.svg`
+const {uid, code, params, meta} = Astro.props as Props;
+const diagram_url = `${config.base}/assets/${encodeURIComponent(uid)}`
 let alt = ""
 let title = ""
 if(params && (params.length > 0)){
@@ -20,11 +20,11 @@ if(params && (params.length > 0)){
 }
 
 ---
-<button class="toggler" data-hash={hash}>code/diagram</button>
-<div class="diagram visible" data-hash={hash}>
-    <Panzoom src={diagram_url} alt={alt} title={title} meta={meta} hash={hash}/>
+<button class="toggler" data-uid={uid}>code/diagram</button>
+<div class="diagram visible" data-uid={uid}>
+    <Panzoom src={diagram_url} alt={alt} title={title} meta={meta} hash={uid}/>
 </div>
-<div class="code hidden" data-hash={hash}>
+<div class="code hidden" data-uid={uid}>
     <Highlighter code={code} language={"javascript"} params={params} />
 </div>
 
@@ -45,9 +45,9 @@ const buttons = document.querySelectorAll('button.toggler');
 
 buttons.forEach(button => {
     button.addEventListener('click', () => {
-        const hash = button.getAttribute('data-hash');
-        const diagramDiv = document.querySelector(`.diagram[data-hash="${hash}"]`);
-        const codeDiv = document.querySelector(`.code[data-hash="${hash}"]`);
+        const uid = button.getAttribute('data-uid');
+        const diagramDiv = document.querySelector(`.diagram[data-uid="${uid}"]`);
+        const codeDiv = document.querySelector(`.code[data-uid="${uid}"]`);
 
         // Toggle classes to switch visibility
         if (codeDiv.classList.contains('hidden')) {

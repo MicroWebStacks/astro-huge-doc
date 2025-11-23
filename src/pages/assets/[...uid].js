@@ -5,10 +5,20 @@ import {file_mime} from '@/libs/assets.js';
 import {getAssetWithBlob} from '@/libs/structure-db.js';
 
 function normalizeUid(raw) {
+    let value = '';
     if (Array.isArray(raw)) {
-        return raw.join('/');
+        value = raw.join('/');
+    } else if (raw) {
+        value = raw;
     }
-    return raw ?? '';
+    if (!value) {
+        return '';
+    }
+    try {
+        return decodeURIComponent(value);
+    } catch {
+        return value;
+    }
 }
 
 function streamFromPath(relativePath) {

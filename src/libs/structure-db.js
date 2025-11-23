@@ -365,6 +365,8 @@ function buildNodes(items, assets, docUid, documentPath) {
                     lang: parsed.lang ?? undefined,
                     meta: parsed.meta ?? undefined,
                     value: parsed.value ?? '',
+                    asset_uid: asset?.uid ?? undefined,
+                    diagram_uid: asset?.uid ? `${asset.uid}.svg` : undefined,
                     position: {start: {line}}
                 });
                 break;
