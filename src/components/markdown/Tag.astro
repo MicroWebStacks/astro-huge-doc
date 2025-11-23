@@ -1,0 +1,35 @@
+---
+import {getEntry} from '@/libs/structure-db.js'
+
+export interface Props {
+    node: object;
+}
+
+const {node} = Astro.props;
+
+const entry = await getEntry({uid:node.tag_value})
+const url = entry ? `/${entry.data.url}` : null
+
+---
+{(node.tag_type == "page")&&
+    <>
+        {url
+            ? <a href={url}>{node.tag_value}</a>
+            : <span>{node.tag_value}</span>
+        }
+    </>
+}
+
+<style>
+a{
+    text-decoration: none;
+    color: black;
+    background-color: #ddd;
+    padding: 3px;
+    padding-top: 1px;
+    border-radius: 5px;
+}
+a:hover{
+    box-shadow: 2px 2px 3px 3px #ccc;
+}
+</style>

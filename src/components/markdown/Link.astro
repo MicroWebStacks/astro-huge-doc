@@ -1,0 +1,72 @@
+---
+import {assetToUrl, file_ext} from '@/libs/assets.js'
+import {toHast} from 'mdast-util-to-hast'
+import {toHtml} from 'hast-util-to-html'
+import ModelViewer from './model/ModelViewer.astro';
+import TableXLSX from './table/TableXLSX.astro';
+import LinkCode from './code/LinkCode.astro';
+import kroki from './code/kroki.yaml'
+
+export interface Props {
+    node: object;
+    dirpath: string;
+}
+
+const { node, dirpath} = Astro.props as Props;
+
+const external = node.url.startsWith('http')
+console.log(`* link '${node.url}' (external:${external}) `)
+let src = node.url
+if(!external){
+  if(!node.url.startsWith("/")){
+    src = await assetToUrl(node.url,dirpath)
+  }
+}
+
+const ext = file_ext(node.url)
+
+const is_model3d = (ext === "glb") && !external
+const is_table = (ext === "xlsx") && !external
+const is_diagram = Object.keys(kroki.formats).includes(ext) && !external
+const is_link = !is_model3d && !is_table && !is_diagram
+let title = ""
+if((node.children.length>0)&&(node.children[0].type == "text")){
+  title = node.children[0].value
+}
+
+---
+{is_model3d &&
+  <ModelViewer src={src} title={title} />
+}
+{is_table &&
+  <TableXLSX src={node.url} title={title} dirpath={dirpath} />
+}
+{is_link &&
+  <a href={src} class={`link ${external?"external":""}`} target={external?"_blank":"_self"}>
+        {node.children.map((node)=>(
+          <Fragment set:html={toHtml(toHast(node))}></Fragment>
+        ))}
+  </a>
+}
+{is_diagram &&
+  <LinkCode ext={ext} url={node.url} dirpath={dirpath} />
+}
+<style>
+a{
+    color:rgb(38, 102, 166)
+}
+.link {
+  position: relative;
+  display: inline-block;
+}
+.external{
+  margin-right: 0.6em;
+}
+.external::after {
+  content: '\2197';
+  position: absolute;
+  scale:0.6;
+  top: -0.2em;  /* Adjust this value to move the arrow up or down */
+  right: -0.6em;  /* Adjust this value to move the arrow left or right */
+}
+</style>

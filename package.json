@@ -14,11 +14,12 @@
     "collect": "node scripts/collect.js"
   },
   "dependencies": {
+    "@astrojs/node": "^9.5.1",
     "@google/model-viewer": "^4.1.0",
     "@octokit/rest": "^21.0.2",
     "@svgdotjs/svg.js": "^3.2.4",
     "adm-zip": "^0.5.16",
-    "astro": "^5.0.3",
+    "astro": "^5.16.0",
     "content-structure": "2.0.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",

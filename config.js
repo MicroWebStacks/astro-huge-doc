@@ -1,16 +1,11 @@
 import * as dotenv from 'dotenv'
 import {join} from 'path'
-import { fileURLToPath } from "node:url";
 import path from "node:path";
 import fsp from "node:fs/promises";
 import yaml from "js-yaml";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const ROOT_DIR = path.resolve(__dirname);
-
 async function loadManifest() {
-  const manifestPath = path.join(ROOT_DIR, "manifest.yaml");
+  const manifestPath = path.join(process.cwd(), "manifest.yaml");
   const raw = await fsp.readFile(manifestPath, "utf8");
   return yaml.load(raw);
 }

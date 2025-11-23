@@ -1,0 +1,217 @@
+---
+import './colors.css';
+import AppBar from './AppBar.astro';
+import Cache from './Cache.astro'
+import SideMenu from './SideMenu.astro';
+import ClientNavMenu from './ClientNavMenu.astro';
+import { section_from_pathname } from '@/libs/assets.js';
+import { get_menu_hash,get_generated_section_menu,process_toc_list } from "./layout_utils";
+import {config} from '@/config'
+
+
+export interface Props {
+	title: string;
+	headings: Array<Object>;
+}
+
+const { headings } = Astro.props;
+const { title } = Astro.props.frontmatter || Astro.props;
+const toc_menu_items = process_toc_list(headings)
+const pages_menu_items = await get_generated_section_menu(Astro.url.pathname)
+const section = section_from_pathname(Astro.url.pathname)
+const menu_hash = get_menu_hash()
+const left_menu_open = (pages_menu_items.length > 0)
+
+console.log(`Layout> sectiom = '${section}'`)
+---
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width" />
+		<meta name="generator" content={Astro.generator} />
+		<title>{title}</title>
+		<link rel="icon" type="image/x-icon" href={`${config.base}/favicon.ico`}>
+	</head>
+	<body >
+		<div id="fixed-left" class="fixed-nav active" />
+		<div class="appbar-nav_content-footer">
+			<header>
+				<AppBar/>
+			</header>
+			<main>
+				<div id="wide-nav" class="scroll">
+					{config.client_menu?
+						<ClientNavMenu open={left_menu_open} hash={menu_hash}/>:
+						<Cache name={section}>
+							<SideMenu items={pages_menu_items} category="pages_menu"/>
+						</Cache>
+					}
+				</div>
+				<div id="resize-left" class="nav-resize active"/>
+				<article class="content scroll">
+					<div id="mobile-nav">
+						{config.client_menu?
+							<ClientNavMenu open={left_menu_open} hash={menu_hash}/>:
+							<Cache name={section}>
+								<SideMenu items={pages_menu_items} category="pages_menu"/>
+							</Cache>
+						}
+					</div>
+					<div class="article-slot">
+						<slot/>
+					</div>
+				</article>
+				<div id="resize-right" class="nav-resize active"/>
+				<div id="toc-nav-div">
+					{toc_menu_items.visible && 
+						<SideMenu items={toc_menu_items.items} category="toc_menu"/>
+					}
+				</div>
+			</main>
+			<footer>
+				<p>footer</p>
+			</footer>
+		</div>
+		<div id="fixed-right" class={`fixed-nav ${toc_menu_items.visible?"active":""}`}/>
+	</body>
+</html>
+
+
+<style>
+body{
+	margin:0;
+	font-family: Arial, Helvetica, sans-serif;
+	display:flex;
+	flex-direction: row;
+}
+/* Body => #fixed-left, .appbar-nav_content-footer, #fixed-right */
+.appbar-nav_content-footer{
+	flex-grow:1;
+	display:flex;
+	flex-direction: column;
+	height:100vh;
+}
+/* appbar-nav_content-footer => header, main, footer */
+header{
+    flex-grow:0;
+	background-color: var(--header-bg-color);
+    width:100%;
+    user-select: none;
+}
+main{
+	flex-grow:1;
+	display:flex;
+	flex-direction: row;
+	height:80vh;
+	max-width: calc(100vw - 6em);
+}
+footer{
+	flex-grow:0;
+	background-color: var(--front-blue);
+	color:white;
+	text-align: center;
+	overflow: hidden;
+}
+/* main => #wide-nav, resize-left, article.content, #resize-right, #toc-nav-div */
+
+#wide-nav{
+	background: var(--nav-bg-color);
+}
+#mobile-nav{
+	display: none;
+}
+.content{
+	color:var(--content-color);
+	background-color: var(--content-bg-color);
+	width:100%;
+	flex-grow: 0;
+	overflow:auto;
+	padding:10px;
+    scroll-behavior: smooth;
+    scroll-padding-top: 10px;
+}
+#toc-nav-div{
+	background: var(--nav-bg-color);
+	flex-grow: 1;
+}
+
+
+footer p{
+	margin:6px;
+}
+
+.fixed-nav{
+	width:3em;
+	background-color: var(--fixed-nav-bg-color);
+	height:100vh;
+    flex-shrink: 0;
+	display:flex;
+	flex-direction: column;
+	justify-content: start;
+	align-items: center;
+	overflow: hidden;
+}
+.active.fixed-nav{
+	cursor:pointer;
+}
+.active.fixed-nav:hover{
+	background-color: var(--fixed-nav-hover-color);
+	transition: background-color 0.3s;
+}
+.nav-resize{
+	width:0.5rem;
+	background-color: var(--content-bg-color);
+}
+.active.nav-resize{
+	cursor:col-resize;
+}
+.active.nav-resize:hover{
+	background-color: var(--front-blue);
+	transition: background-color 0.5s;
+}
+.scroll::-webkit-scrollbar {
+	width: 1rem;
+}
+.scroll::-webkit-scrollbar-track {
+	background: var(--content-bg-color); 
+}
+.scroll::-webkit-scrollbar-thumb {
+	background: var(--scroll-thumb-color); 
+}
+.scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover-color); 
+}
+
+@media only screen and (max-width: 700px) {
+	#fixed-left, #fixed-right, #resize-right, #resize-left, #toc-nav-div {
+		display:none;
+	}
+	.content{
+		display:flex;
+		flex-direction: column;
+	}
+	#wide-nav{
+		display:none;
+	}
+	#mobile-nav{
+		display: block;
+	}
+	.article-slot{
+
+	}
+
+}
+
+.article-slot :global(a){
+	color:var(--article-anchor-color);
+}
+
+.article-slot :global(.paragraph.text){
+	max-width: 80ch;
+	margin-bottom: 1em;
+	line-height: 120%;
+}
+
+</style>
+
+<script src="./menu_interactions_activation.js" />

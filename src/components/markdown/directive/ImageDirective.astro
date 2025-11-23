@@ -1,0 +1,39 @@
+---
+import {assetToUrl} from '@/libs/assets.js'
+export interface Props {
+  node: object;
+  dirpath: string;
+}
+
+const { node, dirpath } = Astro.props as Props;
+
+const asseturl = await assetToUrl(node.attributes.src, dirpath)
+
+const alt = node.attributes.alt
+
+const title = Object.hasOwn(node.attributes,"title")?node.attributes.title:alt
+let style = ""
+if(node.attributes.width){
+  style += `width:${node.attributes.width}px;`
+}
+if(node.attributes.height){
+  style += `height:${node.attributes.height}px;`
+}
+
+let add_class = ""
+if(Object.hasOwn(node.attributes,"center")){
+  add_class = "center"
+}
+---
+<img class={add_class} src={asseturl} title={title} alt={alt} style={style}/>
+
+<style>
+img{
+  margin-bottom: 1em;
+}
+.center{
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>

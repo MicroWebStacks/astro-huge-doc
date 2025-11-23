@@ -1,0 +1,60 @@
+---
+import {getEntry} from '@/libs/structure-db.js'
+import CardMeta from './CardsMeta.astro'
+import AstroMarkdown from '@/components/markdown/AstroMarkdown.astro'
+import yaml from 'js-yaml'
+
+export interface Props {
+  code: string;
+  dirpath: string;
+}
+
+const { code, dirpath } = Astro.props as Props;
+
+const cards = yaml.load(code)
+
+const promises = cards.map(entry => getEntry({ uid: entry.uid }));
+const entries = await Promise.all(promises);
+const resolvedCards = entries
+  .map((entry, index) => ({entry, config: cards[index]}))
+  .filter(({entry}) => entry);
+---
+<div class="cards container">
+    {
+        resolvedCards.map(({entry,config})=>(
+            <div class="card" style={`width:${config.width_rem}rem`}>
+                {!config.body&&
+                    <CardMeta data={entry.data} dirpath={dirpath} />
+                }
+                {config.body&&
+                    <h1 class="title">{entry.data.title}</h1>
+                    <AstroMarkdown node={entry.tree} data={entry.data} />
+                }
+            </div>
+        ))
+    }
+</div>
+
+<style>
+.title{
+    width:100%;
+    text-align:center;
+    
+}
+.cards.container{
+    padding-top: 10px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:20px;
+}
+.card{
+    background-color: #222;
+    box-shadow: 2px 2px 3px 3px #333;
+    border-radius:10px;
+    width:15rem;
+    padding:10px;
+}
+.card :global(.paragraph:has(>img)) {
+    text-align: center;
+}
+</style>

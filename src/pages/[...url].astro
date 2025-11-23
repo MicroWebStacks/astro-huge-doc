@@ -1,0 +1,17 @@
+---
+import Layout from "@/layout/Layout.astro"
+import AstroMarkdown from '@/components/markdown/AstroMarkdown.astro'
+import { getEntry} from '@/libs/structure-db.js'
+
+let {url} = Astro.params;
+console.log(`in [...path] > path = ${url}`)
+const entry = await getEntry({url:url})
+if(!entry){
+    throw new Error(`entry not found for url '${url}'`)
+}
+
+const headings = (Object.hasOwn(entry.data,"toc")&&entry.data.toc == false)?[]:entry.data.headings
+---
+<Layout title={entry.data.title} headings={headings} >
+    <AstroMarkdown node={entry.tree} data={entry.data} />
+</Layout>

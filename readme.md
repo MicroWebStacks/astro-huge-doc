@@ -43,3 +43,22 @@ True content based ISR (Incremental Static Regenration) with cache warmup.
 - `folders` pulls those subfolders and flattens their contents into `dest`; omit `folders` to copy the whole repo. `dest` defaults to the repo name and is cleared before copying.
 - Set `GITHUB_TOKEN` to avoid GitHub rate limits.
 - Run `pnpm fetch` (or `node scripts/fetch.js`) after installing dependencies.
+
+## collection
+- All configs are optional and have defaults
+- Configure `collect` in `manifest.yaml`. Example:
+    ```yaml
+    collect:
+    folder_single_doc: false
+    file_link_ext: ["svg","webp","png","jpeg","jpg","xlsx","glb"]
+    file_compress_ext: ['txt','md','json','csv','tsv','yaml','yml']
+    external_storage_kb: 512
+    inline_compression_kb: 32
+    ```
+    - `folder_single_doc` default is false for one document per file, when true, generates one document per folder merging its markdown files.
+    - `file_link_ext` : only these extensions will be considered as assets to manage
+    - `file_compress_ext` : files subject to compressions in blobs storage
+    - `external_storage_kb` : threshold to manage blobs in folders and not in db
+    - `inline_compression_kb` : threshold above which db blobs get compressed
+- Run `pnpm collect` to parse the `.content` directory Markdown and referenced assets and store them in `.structure/structure.db`
+

@@ -1,0 +1,78 @@
+---
+import {toHast} from 'mdast-util-to-hast'
+import {toHtml} from 'hast-util-to-html'
+import Svgicons from '../svgicons.astro';
+export interface Props {
+    node: object;
+    headings: object;
+}
+
+const { node, headings } = Astro.props as Props;
+
+const HeadingLevel = `h${node.depth ?? 1}`
+const heading_line = node?.position?.start?.line
+const entry = headings.find((entry)=>(entry.line == heading_line))
+
+function slugify(value){
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g,'-')
+    .replace(/^-+|-+$/g,'') || 'heading'
+}
+
+const fallbackSlug = slugify(toHtml(toHast(node)).replace(/<[^>]*>/g,' '))
+const safeSlug = entry?.slug ?? fallbackSlug
+const safeSid = entry?.sid ?? ''
+---
+<HeadingLevel id={safeSlug} class="heading bar">
+  <div class="text">
+    {node.children.map((node)=>(
+      <Fragment set:html={toHtml(toHast(node))}></Fragment>
+      ))}
+  </div>
+  <div class="icon link">
+      <a href={`#${safeSlug}`} class="link">
+        <Svgicons filename="link"/>
+      </a>
+      <div class="icon copy" title="copy short link" data-sid={safeSid}>
+        <Svgicons filename="copy"/>
+      </div>
+    </div>
+</HeadingLevel>
+
+<style>
+.heading.bar{
+  width: fit-content;
+  display: flex;
+  gap: 10px;
+}
+.icon{
+  opacity: 0;
+}
+.heading.bar:hover .icon.link{
+  opacity: 1;
+}
+.icon.link:hover .icon.copy{
+  opacity: 1;
+}
+.icon.copy{
+    cursor: pointer;
+    position: relative; /* Needed to position the 'Copied!' message correctly */
+}
+.link{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.icon :global(svg){
+  width:16px;
+  height:16px;
+    fill:rgb(101, 96, 96);
+}
+.heading.bar :global(a){
+  text-decoration: none;
+  color: inherit;
+}
+</style>
+
+<script src="./heading.js" />

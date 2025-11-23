@@ -1,0 +1,48 @@
+---
+import {assetToUrl} from '@/libs/assets.js'
+import { Image } from "astro:assets"
+import sharp from 'sharp';
+import {relAssetToPath} from '@/libs/assets.js'
+
+export interface Props {
+  node: object;
+  dirpath: string;
+}
+
+const { node, dirpath } = Astro.props as Props;
+
+const asseturl = await assetToUrl(node.attributes.src, dirpath)
+
+const alt = node.attributes.alt?node.attributes.alt:node.attributes.src
+
+const image_path = relAssetToPath(node.attributes.src, dirpath)
+
+const image = sharp(image_path);
+const metadata = await image.metadata();
+
+const optionalWidth = node.attributes.width;
+const optionalHeight = node.attributes.height;
+
+let width = metadata.width
+let height = metadata.height
+if(optionalWidth && !optionalHeight) {
+    width = optionalWidth;
+    height = Math.round((metadata.height / metadata.width) * optionalWidth);
+} else if (!optionalWidth && optionalHeight) {
+    height = optionalHeight;
+    width = Math.round((metadata.width / metadata.height) * optionalHeight);
+} else if(optionalWidth && optionalHeight) {
+    width = optionalWidth
+    height = optionalHeight
+}
+
+const imported_image_src = {
+  src:asseturl,
+  width:width,
+  height:height,
+  format:metadata.format
+}
+
+const title = Object.hasOwn(node.attributes,"title")?node.attributes.title:alt
+---
+<Image src={imported_image_src} title={title} alt={alt} />

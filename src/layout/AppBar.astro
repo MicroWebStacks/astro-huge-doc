@@ -1,0 +1,81 @@
+---
+import './colors.css';
+import Icon from "@/components/icon.astro"
+import { get_base_menu,get_active_appbar_menu } from './layout_utils.js';
+
+let base_menu = get_base_menu()
+const menu = get_active_appbar_menu(base_menu,Astro.url.pathname)
+const left_side  = menu.filter((item)=>(!Object.hasOwn(item,"align") || !(item.align=="right")))
+const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.align=="right")))
+
+---
+<div class="navbar">
+    <ul class="navbar-left">
+        {left_side.map((item)=>(
+        <li>
+            <a href={item.link} class={item.active_class}>
+                {item.label}
+                {item.icon && <Icon filename={item.icon} />}
+            </a>
+        </li>
+        ))}
+    </ul>
+    <ul class="navbar-right">
+        {right_side.map((item)=>(
+            <li>
+                <a href={item.link} target={item.link.startsWith('/')?"":"_blank"}>
+                    {item.icon && <Icon filename={item.icon} />}
+                </a>
+            </li>
+        ))}
+    </ul>
+</div>
+
+<style>
+.navbar{
+    display:flex;
+    justify-content: space-between;
+    min-width: 400px;
+}
+.navbar-left {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+.navbar-right {
+    padding-right: 50px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+ul{
+    margin:0px;
+}
+li{
+    list-style: none;
+}
+
+a{
+    float:left;
+    font-size: 17px;
+    padding: 14px 16px;
+    text-align:center;
+    color: var(--content-color);
+	text-decoration: none;
+
+}
+a:hover{
+    background-color: var(--header-active-color);
+}
+a.active{
+    border:0px;
+    border-bottom:  3px solid rgb(88, 88, 88);
+    background-color: var(--header-active-color);
+}
+
+.navbar-right > li > a{
+    float:right;
+    padding: 6px;
+}
+</style>
