@@ -148,26 +148,48 @@ function section_from_pathname(pathname){
     }
 }
 
+function normalize_ext(value){
+    if(!value){
+        return ''
+    }
+    const extFromPath = extname(value);
+    if(extFromPath){
+        return extFromPath.startsWith('.') ? extFromPath.slice(1) : extFromPath;
+    }
+    const trimmed = String(value).trim();
+    if(trimmed.startsWith('.')){
+        return trimmed.slice(1);
+    }
+    return trimmed;
+}
+
 function file_mime(path){
-    const ext = extname(path)
-    if(ext == ".svg"){
+    const ext = normalize_ext(path).toLowerCase()
+    if(ext == "svg"){
         return 'image/svg+xml'
     }
-    else if(ext == ".png"){
+    else if(ext == "png"){
         return 'image/png'
     }
-    else if(ext == ".jpg"){
+    else if(ext == "jpg"){
         return 'image/jpeg'
     }
-    else if(ext == ".jpeg"){
+    else if(ext == "jpeg"){
         return 'image/jpeg'
     }
-    else if(ext == ".webp"){
+    else if(ext == "webp"){
         return 'image/webp'
     }
-    else if(ext == ".txt"){
+    else if(ext == "gif"){
+        return 'image/gif'
+    }
+    else if(ext == "bmp"){
+        return 'image/bmp'
+    }
+    else if((ext == "txt") || (ext == "md") || (ext == "json") || (ext == "yaml") || (ext == "yml") || (ext == "csv") || (ext == "tsv")){
         return 'text/plain'
     }
+    return 'application/octet-stream'
 }
 
 function file_ext(url){

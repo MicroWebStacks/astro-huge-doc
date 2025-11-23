@@ -120,6 +120,44 @@ function loadBlobBuffer(asset) {
     return buffer;
 }
 
+function normalizeAssetRow(row) {
+    if (!row) {
+        return null;
+    }
+    const {info_blob_uid, asset_blob_uid, blob_uid: infoBlobUid, ...rest} = row;
+    return {
+        ...rest,
+        blob_uid: asset_blob_uid ?? info_blob_uid ?? infoBlobUid ?? null
+    };
+}
+
+function getAsset(uid) {
+    if (!uid) {
+        return null;
+    }
+    const db = ensureDb();
+    const row = db
+        .prepare(
+            `
+        SELECT ai.*, ai.blob_uid AS info_blob_uid, a.blob_uid AS asset_blob_uid
+        FROM asset_info ai
+        LEFT JOIN assets a ON ai.uid = a.asset_uid
+        WHERE ai.uid = ?
+    `
+        )
+        .get(uid);
+    return normalizeAssetRow(row);
+}
+
+function getAssetWithBlob(uid) {
+    const asset = getAsset(uid);
+    if (!asset) {
+        return {asset: null, buffer: null};
+    }
+    const buffer = loadBlobBuffer(asset);
+    return {asset, buffer};
+}
+
 function slugifyText(text) {
     const normalized = String(text ?? '')
         .trim()
@@ -434,4 +472,4 @@ function getCodeAssetSummaries() {
     });
 }
 
-export { getEntry, getFileAssets, getCodeAssetSummaries, getAssetInfo};
+export { getEntry, getFileAssets, getCodeAssetSummaries, getAssetInfo, getAsset, getAssetWithBlob};

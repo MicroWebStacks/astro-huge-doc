@@ -11,7 +11,8 @@
     "astro": "astro",
     "fetch": "node scripts/fetch.js",
     "server": "node server/server.js",
-    "collect": "node scripts/collect.js"
+    "collect": "node scripts/collect.js",
+    "diagrams": "node scripts/diagrams.js"
   },
   "dependencies": {
     "@astrojs/node": "^9.5.1",
