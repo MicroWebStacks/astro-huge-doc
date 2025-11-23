@@ -27,10 +27,7 @@ if(mas == null){
             itemtype="http://schema.org/ImageGallery"
             data-pswp-width={image.width} 
             data-pswp-height={image.height} >
-            {(image.ext == ".svg")?
-                <object data={image.url} />:
                 <img src={image.url} />
-            }
         </a>
     ))}
 </div>

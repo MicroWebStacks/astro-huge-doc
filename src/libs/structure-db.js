@@ -191,16 +191,6 @@ function parseAssetLink(body) {
     };
 }
 
-function guessLanguageFromAsset(asset, fallback) {
-    if (asset?.ext) {
-        return asset.ext;
-    }
-    const uid = asset?.uid ?? '';
-    const slugPart = uid.split('#')[1] ?? uid;
-    const ext = slugPart.includes('.') ? slugPart.substring(slugPart.lastIndexOf('.') + 1) : '';
-    return ext || fallback || null;
-}
-
 function inferMetaFromAsset(asset) {
     const slugPart = (asset?.uid ?? '').split('#')[1] ?? '';
     const base = slugPart.includes('.') ? slugPart.slice(0, slugPart.lastIndexOf('.')) : slugPart;
@@ -216,18 +206,9 @@ function inferMetaFromAsset(asset) {
 
 function parseCodePayload(text, asset) {
     const content = String(text ?? '');
-    const fenceMatch = content.match(/^```([^\s`]+)?(?:\s+([^\n`][^\n]*))?\n([\s\S]*?)\n```$/s);
-    const inferredMeta = inferMetaFromAsset(asset);
-    if (fenceMatch) {
-        return {
-            lang: fenceMatch[1] ?? guessLanguageFromAsset(asset, null),
-            meta: fenceMatch[2] ?? inferredMeta ?? null,
-            value: fenceMatch[3] ?? ''
-        };
-    }
     return {
-        lang: guessLanguageFromAsset(asset, null),
-        meta: inferredMeta ?? null,
+        lang: asset?.ext ?? null,
+        meta: inferMetaFromAsset(asset) ?? null,
         value: content
     };
 }
