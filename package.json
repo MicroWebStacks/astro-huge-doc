@@ -11,7 +11,7 @@
     "astro": "astro",
     "fetch": "node scripts/fetch.js",
     "server": "node server/server.js",
-    "structure": "node integrations/run-structure.js"
+    "collect": "node scripts/collect.js"
   },
   "dependencies": {
     "@google/model-viewer": "^4.1.0",

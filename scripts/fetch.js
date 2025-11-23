@@ -2,10 +2,10 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { config } from '../config.js';
 
 import AdmZip from "adm-zip";
 import { Octokit } from "@octokit/rest";
-import yaml from "js-yaml";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,62 +23,70 @@ async function fileExists(targetPath) {
   }
 }
 
-async function loadManifest() {
-    const manifestPath = path.join(ROOT_DIR, "manifest.yaml");
-    const raw = await fsp.readFile(manifestPath, "utf8");
-    const data = yaml.load(raw);
-    return { path: manifestPath, data };
-}
-
-function normalizeGithubConfig(manifest) {
-  if (!manifest?.fetch?.github) {
+function normalizeGithubConfigs(fetchConfig) {
+  const githubConfig = fetchConfig?.github;
+  if (!githubConfig) {
     throw new Error("Missing fetch.github configuration in manifest");
   }
 
-  const { repo, branch = "main", folders, dest } = manifest.fetch.github;
-  if (!repo || typeof repo !== "string" || !repo.includes("/")) {
-    throw new Error('fetch.github.repo must be a string in the format "owner/name"');
-  }
+  const entries = Array.isArray(githubConfig) ? githubConfig : [githubConfig];
+  const seenDestPaths = new Set();
 
-  const [owner, repoName] = repo.split("/");
+  return entries.map((entry, index) => {
+    if (!entry || typeof entry !== "object") {
+      throw new Error(`fetch.github[${index}] must be an object`);
+    }
 
-  let folderList = folders ?? [];
-  if (!Array.isArray(folderList)) {
-    folderList = [folderList];
-  }
+    const { repo, branch = "main", folders, dest } = entry;
 
-  folderList = folderList
-    .filter((entry) => entry !== undefined && entry !== null && `${entry}`.trim().length > 0)
-    .map((entry) => {
-      if (typeof entry !== "string") {
-        throw new Error("fetch.github.folders entries must be strings");
-      }
+    if (!repo || typeof repo !== "string" || !repo.includes("/")) {
+      throw new Error('fetch.github.repo must be a string in the format "owner/name"');
+    }
 
-      const trimmed = entry.trim().replace(/^[./\\]+/, "");
-      if (path.isAbsolute(trimmed)) {
-        throw new Error("fetch.github.folders must be relative paths");
-      }
-      if (trimmed.split(path.sep).includes("..")) {
-        throw new Error("fetch.github.folders cannot contain '..'");
-      }
-      return trimmed;
-    });
+    const [owner, repoName] = repo.split("/");
 
-  const destPath = path.resolve(ROOT_DIR, dest ?? repoName);
-  if (!destPath.startsWith(ROOT_DIR)) {
-    throw new Error(`Destination "${destPath}" must be inside the project root`);
-  }
-  if (destPath === ROOT_DIR) {
-    throw new Error("Refusing to use project root as destination");
-  }
+    let folderList = folders ?? [];
+    if (!Array.isArray(folderList)) {
+      folderList = [folderList];
+    }
 
-  return {
-    owner,
-    repoName,
-    branch,
-    folders: folderList,
-    destPath,
-  };
+    folderList = folderList
+      .filter((item) => item !== undefined && item !== null && `${item}`.trim().length > 0)
+      .map((item) => {
+        if (typeof item !== "string") {
+          throw new Error("fetch.github.folders entries must be strings");
+        }
+
+        const trimmed = item.trim().replace(/^[./\\]+/, "");
+        if (path.isAbsolute(trimmed)) {
+          throw new Error("fetch.github.folders must be relative paths");
+        }
+        if (trimmed.split(path.sep).includes("..")) {
+          throw new Error("fetch.github.folders cannot contain '..'");
+        }
+        return trimmed;
+      });
+
+    const destPath = path.resolve(ROOT_DIR, dest ?? repoName);
+    if (!destPath.startsWith(ROOT_DIR)) {
+      throw new Error(`Destination "${destPath}" must be inside the project root`);
+    }
+    if (destPath === ROOT_DIR) {
+      throw new Error("Refusing to use project root as destination");
+    }
+    if (seenDestPaths.has(destPath)) {
+      throw new Error(`Duplicate destination "${destPath}" detected across fetch.github entries`);
+    }
+    seenDestPaths.add(destPath);
+
+    return {
+      owner,
+      repoName,
+      branch,
+      folders: folderList,
+      destPath,
+    };
+  });
 }
 
 async function ensureDir(dirPath) {
@@ -167,30 +175,39 @@ async function moveRequestedContent({ extractedRoot, folders, destPath }) {
 
 async function main() {
   try {
-    const manifest = await loadManifest();
-    console.log(`Using manifest at ${manifest.path}`);
-    const config = normalizeGithubConfig(manifest.data);
-
+    const fetch_config = config.fetch;
+    const configs = normalizeGithubConfigs(fetch_config);
     const octokit = createOctokit();
     const tempDir = await prepareTempDir();
-    const archivePath = path.join(tempDir, `${config.repoName}.zip`);
 
     try {
-      await downloadArchive({
-        octokit,
-        owner: config.owner,
-        repo: config.repoName,
-        ref: config.branch,
-        targetPath: archivePath,
-      });
+      for (const config of configs) {
+        console.log(
+          `\nProcessing ${config.owner}/${config.repoName}@${config.branch} -> ${path.relative(
+            ROOT_DIR,
+            config.destPath,
+          )}`,
+        );
 
-      const extractedRoot = await extractArchive(archivePath, tempDir, config.repoName);
-      await moveRequestedContent({
-        extractedRoot,
-        folders: config.folders,
-        destPath: config.destPath,
-      });
-      console.log("Fetch complete.");
+        const archivePath = path.join(tempDir, `${config.repoName}-${Date.now()}.zip`);
+        await downloadArchive({
+          octokit,
+          owner: config.owner,
+          repo: config.repoName,
+          ref: config.branch,
+          targetPath: archivePath,
+        });
+
+        const extractedRoot = await extractArchive(archivePath, tempDir, config.repoName);
+        await moveRequestedContent({
+          extractedRoot,
+          folders: config.folders,
+          destPath: config.destPath,
+        });
+
+        await fsp.rm(archivePath, { force: true });
+      }
+      console.log("\nFetch complete.");
     } finally {
       await fsp.rm(tempDir, { recursive: true, force: true });
     }

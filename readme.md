@@ -31,3 +31,15 @@ True content based ISR (Incremental Static Regenration) with cache warmup.
 
 # Usage
 ## fetching
+- Configure `fetch.github` in `manifest.yaml` (single object or list). Example:
+  ```yaml
+  fetch:
+    github:
+      - repo: MicroWebStacks/astro-big-doc
+        branch: main
+        folders: [content]
+        dest: content
+  ```
+- `folders` pulls those subfolders and flattens their contents into `dest`; omit `folders` to copy the whole repo. `dest` defaults to the repo name and is cleared before copying.
+- Set `GITHUB_TOKEN` to avoid GitHub rate limits.
+- Run `pnpm fetch` (or `node scripts/fetch.js`) after installing dependencies.
