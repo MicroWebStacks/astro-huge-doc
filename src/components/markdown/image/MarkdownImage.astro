@@ -1,18 +1,18 @@
 ---
-import {assetToUrl, getMetaData} from '@/libs/assets.js'
 import Panzoom from '@/components/panzoom/panzoom.astro'
 
 export interface Props {
-    node: object;
-    dirpath: string;
+    item: {
+        slug: string;
+        asset_uid: string;
+    };
 }
 
-const { node, dirpath} = Astro.props as Props;
-const {title, url, alt} = node;
+const {item} = Astro.props as Props;
 
-console.log(`url / dirpath = ${url} / ${dirpath}`)
-const asseturl = await assetToUrl(url, dirpath)
-const meta = await getMetaData(url, dirpath)
-console.log(`asseturl = ${asseturl}`)
+const alt = item.slug;
+const asseturl = `/assets/${item.asset_uid}`;
+const meta = {};
+console.log(`MarkdownImage> asseturl: ${asseturl}`);
 ---
-<Panzoom src={asseturl} alt={alt} title={title} meta={meta}/>
+<Panzoom src={asseturl} alt={alt} title={""} meta={meta}/>

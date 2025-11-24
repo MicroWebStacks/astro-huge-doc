@@ -39,11 +39,11 @@ export async function GET({params}) {
     if (config.copy_assets) {
         return new Response('Not supported and not needed with copy_assets = true', {status: 404});
     }
-    const uid = normalizeUid(params?.uid);
+    const uid = params?.uid;
     if (!uid) {
         return new Response('Missing asset uid', {status: 400});
     }
-
+    console.log(`Asset request for uid: ${uid}`);
     const {asset, buffer} = getAssetWithBlob(uid);
     if (asset && buffer) {
         const contentType = file_mime(asset.ext ?? asset.path ?? uid);

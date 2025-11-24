@@ -12,85 +12,78 @@ import {toHtml} from 'hast-util-to-html'
 import {dirname} from 'path'
 import {text_only_children,has_image} from './node_check.js'
 export interface Props {
-    node: object;
+    items: object[];
     data: object;
+    headings?: object[];
 }
 
-const {node, data} = Astro.props;
-const handled_types = [ "root","heading","table","paragraph",
-                        "image","code","tag","link",
-                        "list", "listItem","textDirective",
-                        "containerDirective"
-                    ]
-const other_type = !handled_types.includes(node.type)
-const dirpath = dirname(data.path)
-data.dirpath = (dirpath === ".")?"":dirpath
-let paragraph_style = "paragraph"
-if(node.type == "paragraph"){
+const {items = [], data, headings = []} = Astro.props as Props;
+
+function renderAstToHtml(astNode){
+    try{
+        return toHtml(toHast(astNode));
+    }catch{
+        return '';
+    }
+}
+
+function paragraphStyle(node){
+    if(node.type !== 'paragraph'){
+        return 'paragraph';
+    }
     if(text_only_children(node)){
-        paragraph_style = "paragraph text"
+        return 'paragraph text';
     }
     if(has_image(node)){
-        paragraph_style = "paragraph image"
+        return 'paragraph image';
     }
+    return 'paragraph';
 }
 ---
-{(node.type == "root") &&
-    <>
-        {node.children.map((node)=>(
-            <Astro.self node={node} data={data} />
-        ))}
-    </>
-}
-{(node.type == "paragraph") &&
-<div class={paragraph_style}>
-    {node.children.map((node)=>(
-        <Astro.self node={node} data={data}/>
-    ))}
-</div>
-}
-{(node.type == "containerDirective") &&
-<ContainerDirective name={node.name} attributes={node.attributes}>
-    {node.children.map((node)=>(
-        <Astro.self node={node} data={data}/>
-    ))}
-</ContainerDirective>
-}
-{(node.type == "list") &&
-<ul>
-    {node.children.map((node)=>(
-        <Astro.self node={node} data={data}/>
-    ))}
-</ul>
-}
-{(node.type == "listItem") &&
-<li>
-    {node.children.map((node)=>(
-        <Astro.self node={node} data={data}/>
-    ))}
-</li>
-}
-{(node.type == "heading") &&
-    <Heading node={node} headings={data.headings}/>
-}
-{(node.type == "table") &&
-    <DataTable node={node} />
-}
-{(node.type == "image") &&
-    <MarkdownImage node={node}  dirpath={data.dirpath}/>
-}
-{(node.type == "code") &&
-    <Code node={node}  dirpath={data.dirpath}/>
-}
-{(node.type == "tag") &&
-    <Tag node={node}  />
-}
-{(node.type == "link") &&
-    <Link node={node}  dirpath={data.dirpath}/>
-}
-{(node.type == "textDirective") &&
-    <Directive node={node}  dirpath={data.dirpath}/>
-}
-{other_type &&
-    <Fragment set:html={toHtml(toHast(node))}></Fragment>
-}
+{items.map((item) => {
+    const astHtml = item.ast ? renderAstToHtml(item.ast) : null;
+    if (astHtml) {
+        return <Fragment set:html={astHtml}></Fragment>;
+    }
+    if (item.type === 'heading') {
+        return <Heading item={item} data={data}/>;
+    }
+    if (item.type === 'image') {
+        return <MarkdownImage item={item} />;
+    }
+    //if (item.type === 'table') {
+    //    return <DataTable node={item} />;
+    //}
+    //if (item.type === 'code') {
+    //    return <Code node={item} dirpath={safeDirpath} />;
+    //}
+    //if (item.type === 'tag') {
+    //    return <Tag node={item} />;
+    //}
+    //if (item.type === 'link') {
+    //    return <Link node={item} dirpath={safeDirpath} />;
+    //}
+    //if (item.type === 'textDirective') {
+    //    return <Directive node={item} dirpath={safeDirpath} />;
+    //   }
+    //if (item.type === 'containerDirective') {
+    //    return (
+    //        <ContainerDirective name={item.name} attributes={item.attributes}>
+    //            {item.children?.map((child) => (
+    //                <Fragment set:html={renderAstToHtml(child)}></Fragment>
+    //            ))}
+    //        </ContainerDirective>
+    //    );
+    //}
+    //if (item.type === 'paragraph') {
+    //    const style = paragraphStyle(item);
+    //    return (
+    //        <div class={style}>
+    //            {item.children?.map((child) => (
+    //                <Fragment set:html={renderAstToHtml(child)}></Fragment>
+    //            )) ?? item.value}
+    //        </div>
+    //    );
+    //}
+    return <Fragment set:html={renderAstToHtml(item)}></Fragment>;
+})}

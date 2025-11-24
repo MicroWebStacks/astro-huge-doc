@@ -28,7 +28,7 @@ const resolvedCards = entries
                 }
                 {config.body&&
                     <h1 class="title">{entry.data.title}</h1>
-                    <AstroMarkdown node={entry.tree} data={entry.data} />
+                    <AstroMarkdown items={entry.items} data={entry.data} />
                 }
             </div>
         ))

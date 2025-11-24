@@ -10,7 +10,7 @@ export interface Props {
   hash: string;
 }
 
-const { src, alt, title, meta, hash="" } = Astro.props as Props;
+const { src, alt, title, meta } = Astro.props as Props;
 const asseturl = src;
 const assetname = asseturl.substring(asseturl.lastIndexOf('/') + 1)
 let data_name: string;
@@ -18,8 +18,6 @@ if(title){
   data_name = title
 }else if(assetname != "diagram.svg"){
   data_name = assetname
-}else if(hash){
-  data_name = hash
 }else{
   data_name = "diagram.svg"
 }

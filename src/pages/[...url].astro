@@ -10,8 +10,8 @@ if(!entry){
     throw new Error(`entry not found for url '${url}'`)
 }
 
-const headings = (Object.hasOwn(entry.data,"toc")&&entry.data.toc == false)?[]:entry.data.headings
+const headings = (Object.hasOwn(entry.data,"toc")&&entry.data.toc == false)?[]:entry.headings
 ---
-<Layout title={entry.data.title} headings={headings} >
-    <AstroMarkdown node={entry.tree} data={entry.data} />
+<Layout title={entry.title} headings={headings} >
+    <AstroMarkdown items={entry.items} data={entry.data} />
 </Layout>

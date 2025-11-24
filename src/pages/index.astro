@@ -4,16 +4,16 @@ import AstroMarkdown from '@/components/markdown/AstroMarkdown.astro'
 import {getEntry} from '@/libs/structure-db.js'
 
 console.log(`index> home page`)
-let entry = await getEntry({url:""})
-if(!entry){
+const {title, headings, items, data} = getEntry({url:""})
+let empty = false
+if(!title){
+    empty = true
     throw new Error("entry not found for home page")
 }
-let empty = (Object.keys(entry.tree).length == 0)
-const headings = (Object.hasOwn(entry.data,"toc")&&entry.data.toc == false)?[]:entry.data.headings
 
 ---
-<Layout title={entry.data.title} headings={headings} >
+<Layout title={title} headings={[]} >
     {!empty&&
-        <AstroMarkdown node={entry.tree} data={entry.data} />
+        <AstroMarkdown items={items} data={data} headings={headings} />
     }
 </Layout>

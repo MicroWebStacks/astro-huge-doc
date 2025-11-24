@@ -51,16 +51,45 @@ function getDocument(match) {
         const row = db.prepare('SELECT * FROM documents WHERE uid = ?').get(match.uid);
         return normalizeDocumentRow(row);
     }
+    if (match?.sid) {
+        const row = db.prepare('SELECT * FROM documents WHERE sid = ?').get(match.sid);
+        return normalizeDocumentRow(row);
+    }
     const urlValue = typeof match?.url === 'string' ? match.url : '';
     const row = db.prepare('SELECT * FROM documents WHERE url = ?').get(urlValue);
     return normalizeDocumentRow(row);
 }
 
-function getItemsForDocument(docSid) {
+function getItemsForDocument(docSid, type) {
     const db = ensureDb();
-    return db
-        .prepare('SELECT type, level, order_index, body_text, ast FROM items WHERE doc_sid = ? ORDER BY order_index')
-        .all(docSid);
+    const params = [docSid];
+    let sql = 'SELECT * FROM items WHERE doc_sid = ?';
+    if (type) {
+        sql += ' AND type = ?';
+        params.push(type);
+    }
+    sql += ' ORDER BY order_index';
+    return db.prepare(sql).all(...params);
+}
+
+function getItems(match, type) {
+    if (match?.doc_sid) {
+        return getItemsForDocument(match.doc_sid, type);
+    }
+    const document = getDocument(match);
+    if (!document?.sid) {
+        return [];
+    }
+    const items = getItemsForDocument(document.sid, type);
+    return items.map((item) => {
+        if (!item?.ast) {
+            return item;
+        }
+        return {
+            ...item,
+            ast: safeParseAst(item.ast)
+        };
+    });
 }
 
 function getAssetsForDocument(docUid) {
@@ -191,24 +220,11 @@ function parseAssetLink(body) {
     };
 }
 
-function inferMetaFromAsset(asset) {
-    const slugPart = (asset?.uid ?? '').split('#')[1] ?? '';
-    const base = slugPart.includes('.') ? slugPart.slice(0, slugPart.lastIndexOf('.')) : slugPart;
-    if (!base.startsWith('code-')) {
-        return null;
-    }
-    const remainder = base.slice('code-'.length);
-    if (!remainder || /^\d+$/.test(remainder)) {
-        return null;
-    }
-    return remainder;
-}
-
 function parseCodePayload(text, asset) {
     const content = String(text ?? '');
     return {
         lang: asset?.ext ?? null,
-        meta: inferMetaFromAsset(asset) ?? null,
+        meta: asset?.meta ?? null,
         value: content
     };
 }
@@ -269,13 +285,47 @@ function normalizeAssetPath(assetPath, documentPath) {
     return assetPath;
 }
 
-function buildNodes(items, assets, docUid, documentPath) {
-    const nodes = [];
+function safeParseAst(astValue) {
+    if (!astValue) {
+        return null;
+    }
+    try {
+        return JSON.parse(astValue);
+    } catch {
+        return null;
+    }
+}
+
+function buildItems(items, assets, docUid, documentPath) {
+    const renderItems = [];
     const headings = [];
     const slugTracker = new Map();
     let lineCounter = 1;
     for (const item of items) {
         const line = lineCounter++;
+        const parsedAst = safeParseAst(item.ast);
+        if (parsedAst) {
+            if (item.type === 'heading') {
+                const text = item.body_text ?? '';
+                const slug = uniqueSlug(slugifyText(text), slugTracker);
+                const uid = `${docUid}#${slug}`;
+                headings.push({
+                    label: text,
+                    slug,
+                    uid,
+                    sid: shortMD5(uid),
+                    depth: item.level ?? 1,
+                    line
+                });
+            }
+            renderItems.push({
+                type: item.type,
+                ast: parsedAst,
+                position: {start: {line}}
+            });
+            continue;
+        }
+
         switch (item.type) {
             case 'heading': {
                 const text = item.body_text ?? '';
@@ -289,7 +339,7 @@ function buildNodes(items, assets, docUid, documentPath) {
                     depth: item.level ?? 1,
                     line
                 });
-                nodes.push({
+                renderItems.push({
                     type: 'heading',
                     depth: item.level ?? 1,
                     children: [{type: 'text', value: text}],
@@ -298,24 +348,11 @@ function buildNodes(items, assets, docUid, documentPath) {
                 break;
             }
             case 'paragraph': {
-                let node = null;
-                if (item.ast) {
-                    try {
-                        node = JSON.parse(item.ast);
-                    } catch {
-                        node = null;
-                    }
-                }
-                if (!node) {
-                    node = {
-                        type: 'paragraph',
-                        children: [{type: 'text', value: item.body_text ?? ''}]
-                    };
-                }
-                if (!node.position) {
-                    node.position = {start: {line}};
-                }
-                nodes.push(node);
+                renderItems.push({
+                    type: 'paragraph',
+                    children: [{type: 'text', value: item.body_text ?? ''}],
+                    position: {start: {line}}
+                });
                 break;
             }
             case 'image': {
@@ -326,7 +363,7 @@ function buildNodes(items, assets, docUid, documentPath) {
                     const buffer = loadBlobBuffer(asset);
                     url = bufferToDataUrl(buffer, asset.ext ?? (asset.path ? extname(asset.path) : null));
                 }
-                nodes.push({
+                renderItems.push({
                     type: 'image',
                     url: url ?? '',
                     alt: link?.alt ?? 'image',
@@ -341,7 +378,7 @@ function buildNodes(items, assets, docUid, documentPath) {
                 const buffer = asset ? loadBlobBuffer(asset) : null;
                 const codeText = buffer ? buffer.toString('utf-8') : '';
                 const parsed = parseCodePayload(codeText, asset);
-                nodes.push({
+                renderItems.push({
                     type: 'code',
                     lang: parsed.lang ?? undefined,
                     meta: parsed.meta ?? undefined,
@@ -361,7 +398,7 @@ function buildNodes(items, assets, docUid, documentPath) {
                     url = bufferToDataUrl(buffer, asset.ext ?? (asset.path ? extname(asset.path) : null)) ?? '';
                 }
                 const label = link?.alt ?? asset?.path ?? asset?.uid ?? '';
-                nodes.push({
+                renderItems.push({
                     type: 'link',
                     url,
                     title: asset?.title ?? null,
@@ -385,7 +422,7 @@ function buildNodes(items, assets, docUid, documentPath) {
                 const tableNode = buildTableNode(data);
                 if (tableNode) {
                     tableNode.position = {start: {line}};
-                    nodes.push(tableNode);
+                    renderItems.push(tableNode);
                 }
                 break;
             }
@@ -393,66 +430,48 @@ function buildNodes(items, assets, docUid, documentPath) {
                 break;
         }
     }
-    return {
-        tree: {type: 'root', children: nodes},
-        headings
-    };
+    return {items: renderItems, headings};
 }
 
-function getEntry(match) {
+function getEntryDeprecated(match) {
     const document = getDocument(match);
     if (!document) {
         return null;
     }
-    const items = getItemsForDocument(document.sid);
+    const itemsRaw = getItems(match);
     const assets = getAssetsForDocument(document.uid);
-    const {tree, headings} = buildNodes(items, assets, document.uid, document.path);
+    const {items: renderItems, headings} = buildItems(itemsRaw, assets, document.uid, document.path);
     const data = {
         ...document.meta_data,
         ...document,
         headings
     };
     return {
-        data,
-        tree
+        title: document.title ?? '',
+        headings,
+        items: renderItems,
+        data
     };
 }
 
-function getAssetInfo(options = {}) {
-    const db = ensureDb();
-    const conditions = [];
-    const params = [];
-    if (options.type) {
-        conditions.push('type = ?');
-        params.push(options.type);
+function getEntry(match){
+    const document = getDocument(match);
+    console.log("getEntry> document.sid=",document.sid);
+    if (!document) {
+        return {title: '', headings: [], items: [], data: {}};
     }
-    if (options.hasPath) {
-        conditions.push('path IS NOT NULL');
+    const items = getItems(match);
+    let headings = document?.toc;
+    if (!headings) {
+        headings = items.filter((i) => i.type === 'heading');
     }
-    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const query = `SELECT * FROM asset_info ${whereClause}`;
-    return db.prepare(query).all(...params);
+    console.log("getEntry> headings.length=",headings.length);
+    const data = {
+        ...document,
+        ...document.meta_data
+    }
+
+    return {title: document.title, headings, items, data}
 }
 
-function getFileAssets() {
-    return getAssetInfo({hasPath: true});
-}
-
-function getCodeAssetSummaries() {
-    const assets = getAssetInfo({type: 'codeblock'});
-    return assets.map((asset) => {
-        const buffer = loadBlobBuffer(asset);
-        const content = buffer ? buffer.toString('utf-8') : '';
-        const parsed = parseCodePayload(content, asset);
-        const hash = shortMD5(content);
-        return {
-            ...asset,
-            content,
-            hash,
-            language: parsed.lang ?? null,
-            meta: parsed.meta ?? null
-        };
-    });
-}
-
-export { getEntry, getFileAssets, getCodeAssetSummaries, getAssetInfo, getAsset, getAssetWithBlob};
+export {getEntry, getAsset, getAssetWithBlob, getDocument, getItems, parseAssetLink};

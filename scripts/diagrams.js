@@ -116,7 +116,7 @@ async function main() {
         'INSERT INTO asset_info (uid, type, blob_uid, parent_doc_uid, path, ext, first_seen, last_seen) VALUES (?, ?, ?, ?, NULL, ?, ?, ?)'
     );
     const insertAssetLink = db.prepare(
-        'INSERT INTO assets (asset_uid, version_id, doc_sid, blob_uid, role) VALUES (?, ?, ?, ?, ?)'
+        'INSERT INTO assets (asset_uid, version_id, doc_sid, blob_uid, type) VALUES (?, ?, ?, ?, ?)'
     );
     const writeDiagram = db.transaction((payload) => {
         if (payload.insertBlob) {
