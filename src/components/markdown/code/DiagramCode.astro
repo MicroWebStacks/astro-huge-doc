@@ -6,12 +6,13 @@ import { config } from '@/config.js';
 export interface Props {
     uid:string;
     code: string;
+    language: string;
     params: object;
     meta: object;
 }
 
-const {uid, code, params, meta} = Astro.props as Props;
-const diagram_url = `${config.base}/assets/${encodeURIComponent(uid)}`
+const {uid, code, language, params, meta} = Astro.props as Props;
+const diagram_url = `${config.base}/assets/${encodeURIComponent(uid)}.svg`
 let alt = ""
 let title = ""
 if(params && (params.length > 0)){
@@ -25,7 +26,7 @@ if(params && (params.length > 0)){
     <Panzoom src={diagram_url} alt={alt} title={title} meta={meta} hash={uid}/>
 </div>
 <div class="code hidden" data-uid={uid}>
-    <Highlighter code={code} language={"javascript"} params={params} />
+    <Highlighter code={code} language={language} params={params} />
 </div>
 
 <style>

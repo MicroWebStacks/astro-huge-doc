@@ -7,49 +7,37 @@ import Gallery from '../../gallery/gallery.astro';
 import Swiper from '../../swiper/swiper.astro'
 import kroki from './kroki.yaml'
 import {getMetaData} from '@/libs/assets.js'
+import { getAssetWithBlob } from '@/libs/structure-db';
+import DiagramCode from './DiagramCode.astro';
 
 export interface Props {
-    node: object;
-    dirpath: object;
+    item: {
+        asset_uid: string;
+    }
 }
 
-const { node, dirpath } = Astro.props as Props;
+const { item } = Astro.props as Props;
+const {asset, buffer} = getAssetWithBlob(item.asset_uid)
+const code = new TextDecoder().decode(buffer)
 
-const code = node.value
-const language = node.lang
-const params = node.meta?node.meta.split(' '):[]
-const asset_uid = node.asset_uid ?? null
-const diagram_uid = node.diagram_uid ?? (asset_uid ? `${asset_uid}.svg` : null)
+const language = asset.ext ?? 'plaintext'
+const params = asset.params?asset.params.split(' '):[]
+const asset_uid = item.asset_uid
 
-const yaml_glb      = ((language == "yaml") && (node.meta?.startsWith("glb")))
-const yaml_cards    = ((language == "yaml") && (node.meta?.startsWith("cards")))
-const yaml_gallery  = ((language == "yaml") && (node.meta?.startsWith("gallery")))
-const yaml_swiper  = ((language == "yaml") && (node.meta?.startsWith("swiper")))
+const yaml_glb      = ((language == "yaml") && (asset.params?.startsWith("glb")))
+const yaml_cards    = ((language == "yaml") && (asset.params?.startsWith("cards")))
+const yaml_gallery  = ((language == "yaml") && (asset.params?.startsWith("gallery")))
+const yaml_swiper  = ((language == "yaml") && (asset.params?.startsWith("swiper")))
 
 const is_diagram = kroki.languages.includes(language)
 const custom_yaml = yaml_glb || yaml_cards || yaml_gallery || yaml_swiper
 const other_language = (!is_diagram && !custom_yaml)
 
-let meta = {}
-if((is_diagram)&(params.length > 0)){
-    meta = await getMetaData(params[0], dirpath)
-}
 ---
 {(is_diagram)&&
-    <Kroki language={language} code={code} params={params} meta={meta} diagramUid={diagram_uid}/>
+    <DiagramCode uid={asset_uid} code={code} language={language} params={params} meta={asset.params} />
 }
 {yaml_glb &&
-    <ModelViewerCode code={code} dirpath={dirpath}/>
+    <ModelViewerCode uid={asset_uid} code={code} ast={item.ast}/>
 }
-{yaml_cards &&
-    <Cards code={code} dirpath={dirpath}/>
-}
-{yaml_gallery &&
-    <Gallery code={code} dirpath={dirpath}/>
-}
-{yaml_swiper &&
-    <Swiper code={code} dirpath={dirpath}/>
-}
-{other_language&&
-    <Highlighter code={code} language={language} params={params} />
-}
+

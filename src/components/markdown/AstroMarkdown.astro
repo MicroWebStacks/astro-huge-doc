@@ -43,11 +43,14 @@ function paragraphStyle(node){
     }
     return 'paragraph';
 }
+
 ---
 {items.map((item) => {
-    const astHtml = item.ast ? renderAstToHtml(item.ast) : null;
-    if (astHtml) {
-        return <Fragment set:html={astHtml}></Fragment>;
+    if (item.type === 'paragraph' && item.ast) {
+        const astHtml = item.ast ? renderAstToHtml(item.ast) : null;
+        if (astHtml) {
+            return <Fragment set:html={astHtml}></Fragment>;
+        }
     }
     if (item.type === 'heading') {
         return <Heading item={item} data={data}/>;
@@ -58,9 +61,9 @@ function paragraphStyle(node){
     if (item.type === 'table') {
         return <DataTable item={item} />;
     }
-    //if (item.type === 'code') {
-    //    return <Code node={item} dirpath={safeDirpath} />;
-    //}
+    if (item.type === 'code') {
+        return <Code item={item} />;
+    }
     //if (item.type === 'tag') {
     //    return <Tag node={item} />;
     //}
@@ -79,15 +82,15 @@ function paragraphStyle(node){
     //        </ContainerDirective>
     //    );
     //}
-    //if (item.type === 'paragraph') {
-    //    const style = paragraphStyle(item);
-    //    return (
-    //        <div class={style}>
-    //            {item.children?.map((child) => (
-    //                <Fragment set:html={renderAstToHtml(child)}></Fragment>
-    //            )) ?? item.value}
-    //        </div>
-    //    );
-    //}
+    if (item.type === 'paragraph') {
+        const style = paragraphStyle(item);
+        return (
+            <div class={style}>
+                {item.children?.map((child) => (
+                    <Fragment set:html={renderAstToHtml(child)}></Fragment>
+                )) ?? item.value}
+            </div>
+        );
+    }
     return <Fragment set:html={renderAstToHtml(item)}></Fragment>;
 })}

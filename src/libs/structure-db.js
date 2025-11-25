@@ -102,6 +102,15 @@ function getAssetsForDocument(docUid) {
     return map;
 }
 
+function getAssetInfo(match) {
+    if (!match?.asset_uid) {
+        return null;
+    }
+    const db = ensureDb();
+    const row = db.prepare('SELECT * FROM asset_info WHERE uid = ?').get(match.asset_uid);
+    return row ?? null;
+}
+
 function loadBlob(blobUid) {
     if (!blobUid) {
         return null;
@@ -224,7 +233,7 @@ function parseCodePayload(text, asset) {
     const content = String(text ?? '');
     return {
         lang: asset?.ext ?? null,
-        meta: asset?.meta ?? null,
+        meta: asset?.params ?? null,
         value: content
     };
 }
@@ -474,4 +483,4 @@ function getEntry(match){
     return {title: document.title, headings, items, data}
 }
 
-export {getEntry, getAsset, getAssetWithBlob, getDocument, getItems, parseAssetLink};
+export {getEntry, getAsset, getAssetWithBlob, getDocument, getItems, getAssetInfo, parseAssetLink};
