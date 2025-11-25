@@ -1,69 +1,79 @@
 import { load_json } from '@/libs/utils.js'
 import { section_from_pathname } from '@/libs/assets.js'
 import { config } from '@/config.js'
-import {join} from 'path'
 
-function find_parent(index,headings){
-    const element_depth = headings[index].depth
-    if(index == 0){
-        return null
-    }else{
-        for(let rev_i = index-1;rev_i>=0;rev_i--){
-            if(headings[rev_i].depth<element_depth){
-                return headings[rev_i]
-            }
+function cloneHeading(heading) {
+    return {
+        label: heading.label ?? heading.body_text ?? '',
+        slug: heading.slug,
+        depth: heading.depth ?? heading.level ?? 1,
+        link: heading.link ?? '',
+        uid: heading.uid ?? null
+    };
+}
+
+function find_parent(index, headings) {
+    const element_depth = headings[index].depth ?? 1;
+    if (index === 0) {
+        return null;
+    }
+    for (let rev_i = index - 1; rev_i >= 0; rev_i--) {
+        if ((headings[rev_i].depth ?? 1) < element_depth) {
+            return headings[rev_i];
         }
     }
+    return null;
 }
 
 /* not recursive o(n²)
 */
-function headings_list_to_tree(headings,is_toc){
-    for(let element of headings){
-        element.items=[]
-        element.parent=true
-        element.expanded=true
-        if(is_toc){
-            element.link = `#${element.slug}`
-        }else{
-            element.link = element.link
+function headings_list_to_tree(headings, is_toc) {
+    const copies = headings.map((heading) => ({
+        ...cloneHeading(heading),
+        order_index: heading.order_index ?? 0
+    }));
+    for (const element of copies) {
+        element.items = [];
+        element.parent = true;
+        element.expanded = true;
+        if (is_toc) {
+            element.link = `#${element.slug ?? ''}`;
         }
     }
 
-    let tree = []
+    const tree = [];
 
-    for(let index=0; index<headings.length;index++){
-        let element = headings[index]
-        let parent = find_parent(index,headings)
-        if(parent){
-            parent.items.push(element)
-        }else{
-            tree.push(element)
+    for (let index = 0; index < copies.length; index++) {
+        const element = copies[index];
+        const parent = find_parent(index, copies);
+        if (parent) {
+            parent.items.push(element);
+        } else {
+            tree.push(element);
         }
     }
 
-    for(let element of headings){
-        if (element.items.length == 0){
-            element.parent = false
-            delete element.items
-            delete element.expanded
+    for (const element of copies) {
+        if (element.items.length === 0) {
+            element.parent = false;
+            delete element.items;
+            delete element.expanded;
+        } else {
+            element.items.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
         }
     }
-    return tree
+    return tree.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 }
 
 /** headings start at Sidemenu
  * 
  */
 function process_toc_list(headings){
-    if(typeof headings == 'undefined' || headings.length == 0){
+    if(!Array.isArray(headings) || headings.length === 0){
         return {items:[],visible:false}
     }
-
-    let side_menu = {items:[],visible:false}
-    side_menu.items = headings_list_to_tree(headings,true)//also .slug=>.link
-    side_menu.visible = true
-    return side_menu
+    const tree = headings_list_to_tree(headings,true)
+    return {items:tree,visible:true}
 }
 
 function get_active_submenu(raw_menu,section,pathname){
