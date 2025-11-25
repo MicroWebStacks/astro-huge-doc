@@ -12,7 +12,11 @@ import {toHtml} from 'hast-util-to-html'
 import {dirname} from 'path'
 import {text_only_children,has_image} from './node_check.js'
 export interface Props {
-    items: object[];
+    items: {
+        ast?: string;
+        type?: string;
+        [key: string]: unknown;
+    }[];
     data: object;
     headings?: object[];
 }
@@ -51,9 +55,9 @@ function paragraphStyle(node){
     if (item.type === 'image') {
         return <MarkdownImage item={item} />;
     }
-    //if (item.type === 'table') {
-    //    return <DataTable node={item} />;
-    //}
+    if (item.type === 'table') {
+        return <DataTable item={item} />;
+    }
     //if (item.type === 'code') {
     //    return <Code node={item} dirpath={safeDirpath} />;
     //}

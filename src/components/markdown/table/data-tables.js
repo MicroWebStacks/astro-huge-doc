@@ -20,14 +20,28 @@ async function init(){
 
     const DataTable = (await import('datatables.net-dt')).default;
 
-    containers_els.forEach(table_element => {
-        const data_table_text = table_element.getAttribute("data-table")
-        const data_table = JSON.parse(data_table_text)
+    containers_els.forEach(async table_element => {
+        const data_table_uid = table_element.getAttribute("data-table-uid")
+        const response = await fetch(`/assets/${data_table_uid}`);
+        if (!response.ok) {
+            throw new Error(`Failed to load /assets/${data_table_uid}`);
+        }
+        const data_table = await response.json();
+        if (!Array.isArray(data_table) || data_table.length === 0) {
+            console.warn(`No data available for table ${data_table_uid}`);
+            return;
+        }
+
+        const columns = Object.keys(data_table[0]).map(key => ({
+            title: key,
+            data: key
+        }));
 
         const table = new DataTable(table_element,{
-            order:[]
+            order:[],
+            data: data_table,
+            columns
         });
-        table.rows.add(data_table).draw();
         checkEntries(table, table_element);
     })
   }

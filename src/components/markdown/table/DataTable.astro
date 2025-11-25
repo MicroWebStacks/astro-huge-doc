@@ -1,28 +1,15 @@
 ---
-import {astToDataTable} from './table.js'
 
 export interface Props {
-    node: object;
+    item: object;
 }
 
-const { node } = Astro.props as Props;
+const { item } = Astro.props as Props;
 
-const data = astToDataTable(node)
-const [table_head, ...table_rows] = data;
-const table_string = JSON.stringify(table_rows)
 ---
 <div class="container">
-    <table class="data-table" data-table={table_string}>
-        <thead>
-            <tr>
-            {table_head.map((cell)=>(
-                <th>{cell}</th>
-            ))}
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Data will be populated dynamically using JavaScript -->
-        </tbody>
+    <table class="data-table" data-table-uid={item.asset_uid}>
+        <!-- Data will be populated dynamically using JavaScript -->
     </table>
 </div>
 
