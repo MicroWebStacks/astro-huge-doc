@@ -1,20 +1,21 @@
 ---
-import {assetToUrl} from '@/libs/assets.js'
 import Button from '@/components/markdown/directive/ButtonDirective.astro'
-import {dirname} from 'path'
 export interface Props {
-  data: object;
-  dirpath: string;
+  data: {
+    title: string;
+    url: string;
+    image?: string;
+    features?: string[];
+    tags?: string[];};
 }
 
-const { data, dirpath } = Astro.props as Props;
-
+const { data } = Astro.props as Props;
 
 let isSvg = false
 let isImg = false
 let asseturl = ""
 if(data.image){
-    asseturl = await assetToUrl(data.image, dirname(data.path))
+    asseturl = `/assets/${data.image}`
     isSvg = data.image.endsWith(".svg")
     isImg = !isSvg
 }

@@ -61,12 +61,39 @@ async function yaml_to_grid_images(code,dirpath){
     return imagesUrls
 }
 
+function calculate_span(aspectRatio){
+    let spanWidth = 1, spanHeight = 1
+    if(aspectRatio > 1) { // Wider image
+        spanWidth = Math.round(aspectRatio) // Adjust this logic as per your grid layout needs
+    } else if(aspectRatio < 1) { // Taller image
+        spanHeight = Math.round(1 / aspectRatio) // Adjust this logic as per your grid layout needs
+    }
+    return {spanWidth,spanHeight}
+}
+
+function add_spanSize(imageUrls){
+    return imageUrls.map((image)=>{
+        let spanWidth = 1, spanHeight = 1
+        const aspectRatio = image.ratio
+        if(aspectRatio > 1) { // Wider image
+            spanWidth = Math.round(aspectRatio) // Adjust this logic as per your grid layout needs
+        } else if(aspectRatio < 1) { // Taller image
+            spanHeight = Math.round(1 / aspectRatio) // Adjust this logic as per your grid layout needs
+        }
+        return {
+            ...image,
+            spanWidth,
+            spanHeight
+        }
+    })
+}
+
 function select_masonry(imageUrls){
     const countGreaterOrEqualOne = imageUrls.filter(item => item.ratio >= 1).length;
     return countGreaterOrEqualOne > imageUrls.length / 2;
 }
 
 export {
-    yaml_to_grid_images,
+    calculate_span,
     select_masonry
 }

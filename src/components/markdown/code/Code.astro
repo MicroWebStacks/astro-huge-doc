@@ -1,18 +1,19 @@
 ---
 import Highlighter from './Highlighter.astro'
-import Kroki from './Kroki.astro'
 import ModelViewerCode from '../model/ModelViewerCode.astro';
 import Cards from '../cards/Cards.astro'
 import Gallery from '../../gallery/gallery.astro';
-import Swiper from '../../swiper/swiper.astro'
 import kroki from './kroki.yaml'
-import {getMetaData} from '@/libs/assets.js'
 import { getAssetWithBlob } from '@/libs/structure-db';
 import DiagramCode from './DiagramCode.astro';
 
 export interface Props {
     item: {
         asset_uid: string;
+        ast:{
+            model?: object;
+            gallery?: object;
+        }
     }
 }
 
@@ -27,17 +28,27 @@ const asset_uid = item.asset_uid
 const yaml_glb      = ((language == "yaml") && (asset.params?.startsWith("glb")))
 const yaml_cards    = ((language == "yaml") && (asset.params?.startsWith("cards")))
 const yaml_gallery  = ((language == "yaml") && (asset.params?.startsWith("gallery")))
-const yaml_swiper  = ((language == "yaml") && (asset.params?.startsWith("swiper")))
 
 const is_diagram = kroki.languages.includes(language)
-const custom_yaml = yaml_glb || yaml_cards || yaml_gallery || yaml_swiper
+const custom_yaml = yaml_glb || yaml_cards || yaml_gallery
 const other_language = (!is_diagram && !custom_yaml)
+
+console.log(item.asset_uid,yaml_gallery)
 
 ---
 {(is_diagram)&&
     <DiagramCode uid={asset_uid} code={code} language={language} params={params} meta={asset.params} />
 }
 {yaml_glb &&
-    <ModelViewerCode uid={asset_uid} code={code} ast={item.ast}/>
+    <ModelViewerCode uid={asset_uid} code={code} model={item.ast.model}/>
+}
+{yaml_cards &&
+    <Cards code={code} />
+}
+{yaml_gallery &&
+    <Gallery model={item.ast.gallery} />
+}
+{other_language&&
+    <Highlighter code={code} language={language} params={params} />
 }
 

@@ -5,12 +5,12 @@ import yaml from 'js-yaml'
 export interface Props {
   uid: string;
   code: string;
-  ast: {
+  model: {
       [key: string]: any;
     };
   };
 
-const { uid, code, ast } = Astro.props as Props;
+const { uid, code, model } = Astro.props as Props;
 
 const code_data = yaml.load(code) as object;
 let should_render = true
@@ -20,8 +20,8 @@ let poster = ""
 let environment_image = ""
 let error_text = ""
 //mandatory params
-if(Object.hasOwn(ast,"src")){
-  src = `/assets/${ast.src}`
+if(Object.hasOwn(model,"src")){
+  src = `/assets/${model.src}`
   console.log("ModelViewerCode src param:",src)
 }else{
   should_render = false
@@ -38,19 +38,12 @@ if(Object.hasOwn(code_data,"title")){
   error_text += err
 }
 //optional params
-if(Object.hasOwn(ast,"poster")){
-  poster = `/assets/${ast.poster}`
+if(Object.hasOwn(model,"poster")){
+  poster = `/assets/${model.poster}`
 }
-if(Object.hasOwn(ast,"environment-image")){
-  environment_image = `/assets/${ast["environment-image"]}`
+if(Object.hasOwn(model,"environment-image")){
+  environment_image = `/assets/${model["environment-image"]}`
 }
-
-console.log("ModelViewerCode params:",{
-  src,
-  title,
-  poster,
-  environment_image
-});
 
 //potential additional params
 //camera-orbit="-10.92deg 80.06deg 58.4m"

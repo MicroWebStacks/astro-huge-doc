@@ -1,25 +1,37 @@
 ---
-import {yaml_to_grid_images,select_masonry} from './grid_utils.js'
-import PhotoGallery from '../photoswipe/Gallery.astro'
+import {calculate_span,select_masonry} from './grid_utils.js'
+import {getImageInfo} from '../../libs/structure-db.js';
+
+interface GalleryItem {
+    uid: string;
+}
 
 export interface Props {
-    code: string;
-    dirpath: string;
-    expanded: boolean;
+    model: GalleryItem[];
     masonry: boolean;
 }
 
-const { code, dirpath, expanded=true, masonry=null } = Astro.props as Props;
+const { model, masonry=null } = Astro.props as Props;
+console.log(model)
+const images_uids = model.map((item)=>(item.uid));
+const imagesInfo = images_uids.map((uid)=>{
+    const info = getImageInfo(uid);
+    return {
+        url: `/assets/${uid}`,
+        ...info,
+        ...calculate_span(info.ratio)
+    }
+});
 
-const imagesUrls = await yaml_to_grid_images(code,dirpath)
 let mas = masonry
 if(mas == null){
-    mas = select_masonry(imagesUrls)
+    mas = select_masonry(imagesInfo)
 }
+
 ---
 
 <div class={`pswp-gallery container ${mas?'masonry':'grid'}`} id="my-gallery">
-    {imagesUrls.map((image)=>(
+    {imagesInfo.map((image)=>(
         <a  href={image.url}
             class={`item  ${mas?'masonry':'grid'}`}
             style={`grid-area: span ${image.spanHeight} / span ${image.spanWidth};`}

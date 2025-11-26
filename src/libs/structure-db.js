@@ -60,6 +60,12 @@ function getDocument(match) {
     return normalizeDocumentRow(row);
 }
 
+function getImageInfo(uid) {
+    const db = ensureDb();
+    const row = db.prepare('SELECT * FROM images WHERE uid = ?').get(uid);
+    return row;
+}
+
 function getItemsForDocument(docSid, type) {
     const db = ensureDb();
     const params = [docSid];
@@ -483,4 +489,13 @@ function getEntry(match){
     return {title: document.title, headings, items, data}
 }
 
-export {getEntry, getAsset, getAssetWithBlob, getDocument, getItems, getAssetInfo, parseAssetLink};
+export {
+    getEntry, 
+    getAsset, 
+    getAssetWithBlob, 
+    getDocument, 
+    getItems, 
+    getAssetInfo, 
+    parseAssetLink,
+    getImageInfo
+};
