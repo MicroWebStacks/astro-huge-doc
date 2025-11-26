@@ -33,8 +33,6 @@ const is_diagram = kroki.languages.includes(language)
 const custom_yaml = yaml_glb || yaml_cards || yaml_gallery
 const other_language = (!is_diagram && !custom_yaml)
 
-console.log(item.asset_uid,yaml_gallery)
-
 ---
 {(is_diagram)&&
     <DiagramCode uid={asset_uid} code={code} language={language} params={params} meta={asset.params} />

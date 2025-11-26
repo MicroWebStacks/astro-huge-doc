@@ -64,12 +64,9 @@ function paragraphStyle(node){
     if (item.type === 'code') {
         return <Code item={item} />;
     }
-    //if (item.type === 'tag') {
-    //    return <Tag node={item} />;
-    //}
-    //if (item.type === 'link') {
-    //    return <Link node={item} dirpath={safeDirpath} />;
-    //}
+    if (item.type === 'link') {
+        return <Link item={item}  />;
+    }
     //if (item.type === 'textDirective') {
     //    return <Directive node={item} dirpath={safeDirpath} />;
     //   }
