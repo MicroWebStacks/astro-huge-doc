@@ -7,6 +7,8 @@ import {config} from '../config.js';
 import {openDatabase} from 'content-structure/src/sqlite_utils/index.js';
 
 const diagramExts = new Set(['plantuml', 'blockdiag', 'mermaid']);
+const diagramTypeMap = {codeblock: 'code_diagram', linked_file: 'file_diagram'};
+const languageAliases = {puml: 'plantuml'};
 const dbPath = join(config.collect_content.outdir, 'structure.db');
 const db = openDatabase(dbPath);
 
@@ -19,7 +21,8 @@ function normalizeLanguage(value) {
     if (!normalized) {
         return '';
     }
-    return normalized.startsWith('.') ? normalized.slice(1) : normalized;
+    const trimmed = normalized.startsWith('.') ? normalized.slice(1) : normalized;
+    return languageAliases[trimmed] ?? trimmed;
 }
 
 function loadBlob(blobUid) {
@@ -97,11 +100,11 @@ async function main() {
     if (typeof fetch !== 'function') {
         throw new Error('Global fetch is not available. Run with Node 18+ or provide a fetch polyfill.');
     }
-    const codeblocks = db
-        .prepare("SELECT uid, blob_uid, parent_doc_uid, ext FROM asset_info WHERE type = 'codeblock'")
+    const diagramSources = db
+        .prepare("SELECT uid, blob_uid, parent_doc_uid, ext, type FROM asset_info WHERE type IN ('codeblock', 'linked_file')")
         .all();
-    if (!codeblocks.length) {
-        console.log('No codeblocks found; nothing to render.');
+    if (!diagramSources.length) {
+        console.log('No diagram-capable assets found; nothing to render.');
         return;
     }
 
@@ -132,7 +135,7 @@ async function main() {
         }
         insertAssetInfo.run(
             payload.diagramUid,
-            'code_diagram',
+            payload.diagramType,
             payload.blobUid,
             payload.parentDocUid,
             'svg',
@@ -140,11 +143,22 @@ async function main() {
             payload.now
         );
         if (payload.docSid) {
-            insertAssetLink.run(payload.diagramUid, versionId, payload.docSid, payload.blobUid, 'code_diagram');
+            insertAssetLink.run(
+                payload.diagramUid,
+                versionId,
+                payload.docSid,
+                payload.blobUid,
+                payload.diagramType
+            );
         }
     });
 
-    for (const asset of codeblocks) {
+    for (const asset of diagramSources) {
+        const diagramType = diagramTypeMap[asset.type];
+        if (!diagramType) {
+            continue;
+        }
+
         const ext = normalizeLanguage(asset.ext);
         if (!diagramExts.has(ext)) {
             continue;
@@ -193,11 +207,12 @@ async function main() {
             buffer: svgBuffer,
             diagramUid,
             parentDocUid: asset.parent_doc_uid,
-            docSid
+            docSid,
+            diagramType
         });
 
         console.log(
-            `${diagramUid}: ${insertedBlob ? 'generated' : 'reused'} blob ${blobUid} (hash ${hash.slice(0, 8)})`
+            `${diagramUid} [${diagramType}]: ${insertedBlob ? 'generated' : 'reused'} blob ${blobUid} (hash ${hash.slice(0, 8)})`
         );
     }
 }

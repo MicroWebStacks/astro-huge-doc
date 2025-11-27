@@ -46,12 +46,6 @@ function paragraphStyle(node){
 
 ---
 {items.map((item) => {
-    if (item.type === 'paragraph' && item.ast) {
-        const astHtml = item.ast ? renderAstToHtml(item.ast) : null;
-        if (astHtml) {
-            return <Fragment set:html={astHtml}></Fragment>;
-        }
-    }
     if (item.type === 'heading') {
         return <Heading item={item} data={data}/>;
     }
@@ -67,27 +61,36 @@ function paragraphStyle(node){
     if (item.type === 'link') {
         return <Link item={item}  />;
     }
-    //if (item.type === 'textDirective') {
-    //    return <Directive node={item} dirpath={safeDirpath} />;
-    //   }
-    //if (item.type === 'containerDirective') {
-    //    return (
-    //        <ContainerDirective name={item.name} attributes={item.attributes}>
-    //            {item.children?.map((child) => (
-    //                <Fragment set:html={renderAstToHtml(child)}></Fragment>
-    //            ))}
-    //        </ContainerDirective>
-    //    );
-    //}
-    if (item.type === 'paragraph') {
-        const style = paragraphStyle(item);
+    if (item.type === 'containerDirective') {
         return (
+            <ContainerDirective name={item.ast.name} attributes={item.ast.attributes}>
+                {item.ast.children?.map((child) => (
+                    <Fragment set:html={renderAstToHtml(child)}></Fragment>
+                ))}
+            </ContainerDirective>
+        );
+    }
+    if (item.ast) {
+        const astHtml = item.ast ? renderAstToHtml(item.ast) : null;
+        if (astHtml) {
+            return <Fragment set:html={astHtml}></Fragment>;
+        }
+    }
+    if (item.type === 'paragraph' && item.ast) {
+        const style = paragraphStyle(item);
+        const astHtml = item.ast ? renderAstToHtml(item.ast) : null;
+        if (astHtml) {
+            return (
             <div class={style}>
                 {item.children?.map((child) => (
                     <Fragment set:html={renderAstToHtml(child)}></Fragment>
                 )) ?? item.value}
             </div>
-        );
+        )
+        }
     }
-    return <Fragment set:html={renderAstToHtml(item)}></Fragment>;
+    if (item.type === 'paragraph' && !item.ast) {
+        return <Fragment >{item.body_text}</Fragment>;
+    }
+    return <Fragment>md.nan</Fragment>;
 })}
