@@ -1,8 +1,8 @@
 ---
 import './colors.css';
+import AppBar from './AppBar.astro';
 import SideMenu from './SideMenu.astro';
-import { section_from_pathname } from '@/libs/assets.js';
-import { process_toc_list } from "./layout_utils";
+import { process_toc_list, buildNavigationMenus } from "./layout_utils";
 import {config} from '@/config'
 
 
@@ -14,9 +14,9 @@ export interface Props {
 const { headings } = Astro.props;
 const { title } = Astro.props.frontmatter || Astro.props;
 const toc_menu_items = process_toc_list(headings)
-const section = section_from_pathname(Astro.url.pathname)
-
-console.log(`Layout> sectiom = '${section}'`)
+const navigation = buildNavigationMenus(Astro.url.pathname)
+const pages_menu_items = navigation.sectionMenu ?? []
+const appbar_menu = navigation.appBarMenu ?? []
 ---
 <html lang="en">
 	<head>
@@ -30,17 +30,16 @@ console.log(`Layout> sectiom = '${section}'`)
 		<div id="fixed-left" class="fixed-nav active" />
 		<div class="appbar-nav_content-footer">
 			<header>
-				Appbar placeholder
+				<AppBar menu={appbar_menu} />
 			</header>
 			<main>
 				<div id="wide-nav" class="scroll">
-					menu placeholder
+					<SideMenu items={pages_menu_items} category="pages_menu"/>
 				</div>
 				<div id="resize-left" class="nav-resize active"/>
 				<article class="content scroll">
 					<div id="mobile-nav">
-						menu placeholder
-					</div>
+						<SideMenu items={pages_menu_items} category="pages_menu"/>
 					</div>
 					<div class="article-slot">
 						<slot/>

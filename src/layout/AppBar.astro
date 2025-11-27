@@ -1,10 +1,20 @@
 ---
 import './colors.css';
 import Icon from "@/components/icon.astro"
-import { get_base_menu,get_active_appbar_menu } from './layout_utils.js';
+import { buildAppBarMenu } from './layout_utils.js';
 
-let base_menu = get_base_menu()
-const menu = get_active_appbar_menu(base_menu,Astro.url.pathname)
+export interface Props {
+    menu?: Array<{
+        label: string;
+        link: string;
+        active_class?: string;
+        align?: string;
+        icon?: string;
+    }>;
+}
+
+const { menu: providedMenu = [] } = Astro.props as Props;
+const menu = providedMenu.length ? providedMenu : buildAppBarMenu(Astro.url.pathname);
 const left_side  = menu.filter((item)=>(!Object.hasOwn(item,"align") || !(item.align=="right")))
 const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.align=="right")))
 
