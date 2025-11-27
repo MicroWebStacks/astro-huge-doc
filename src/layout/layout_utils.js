@@ -188,17 +188,32 @@ function findParentUrl(url, section) {
 
 function buildAppBarMenuFromDocs(docs, pathname) {
     const currentSection = section_from_pathname(stripBase(pathname));
-    const items = docs
-        .filter((doc) => segmentCount(doc.url) <= 1)
-        .map((doc) => {
-            const link = buildDocLink(doc.url);
-            return {
-                label: doc.title ?? labelFromUrl(doc.url),
-                link,
-                active_class: section_from_pathname(stripBase(link)) === currentSection ? 'active' : '',
-                order: doc.sort_order ?? 0
-            };
+    const topLevel = docs.filter((doc) => segmentCount(doc.url) <= 1);
+    const sectionMap = new Map();
+
+    for (const doc of topLevel) {
+        const section = doc.url ? doc.url.split('/')[0] : 'home';
+        if (!sectionMap.has(section)) {
+            sectionMap.set(section, doc);
+            continue;
+        }
+        const existing = sectionMap.get(section);
+        if (existing.url !== '' && doc.url === '') {
+            sectionMap.set(section, doc);
+        }
+    }
+
+    const items = [];
+    for (const doc of sectionMap.values()) {
+        const isHome = doc.url === '' || doc.url === 'home';
+        const link = isHome ? '/' : buildDocLink(doc.url);
+        items.push({
+            label: doc.title ?? labelFromUrl(doc.url),
+            link,
+            active_class: section_from_pathname(stripBase(link)) === currentSection ? 'active' : '',
+            order: doc.sort_order ?? 0
         });
+    }
     items.sort(sortByOrderThenLabel);
     return items;
 }
@@ -206,7 +221,13 @@ function buildAppBarMenuFromDocs(docs, pathname) {
 function buildSectionMenuFromDocs(docs, pathname) {
     const section = section_from_pathname(stripBase(pathname));
     const activeUrl = toDocUrl(pathname);
-    const filtered = docs.filter((doc) => belongsToSection(doc, section));
+    const isHome = section === 'home';
+    const filtered = docs.filter((doc) => {
+        if (isHome) {
+            return doc.url && (doc.url === '' || doc.url === 'home' || doc.url.startsWith('home/'));
+        }
+        return doc.url.startsWith(`${section}/`);
+    });
     if (!filtered.length) {
         return [];
     }
@@ -214,6 +235,7 @@ function buildSectionMenuFromDocs(docs, pathname) {
     const docMap = new Map(filtered.map((doc) => [doc.url, doc]));
     const nodes = new Map();
     const parentLookup = new Map();
+    const sectionRoots = isHome ? new Set(['', 'home']) : new Set([section]);
 
     function ensureNode(url) {
         let node = nodes.get(url);
@@ -236,27 +258,57 @@ function buildSectionMenuFromDocs(docs, pathname) {
         return node;
     }
 
+    function findSectionParent(url) {
+        if (isHome) {
+            if (!url || url === '' || url === 'home') {
+                return null;
+            }
+            if (url.startsWith('home/')) {
+                const withoutSection = url.slice('home/'.length);
+                const lastSlash = withoutSection.lastIndexOf('/');
+                if (lastSlash === -1) {
+                    return 'home';
+                }
+                return `home/${withoutSection.slice(0, lastSlash)}`;
+            }
+            return null;
+        }
+
+        if (!url.startsWith(`${section}/`)) {
+            return null;
+        }
+        const relative = url.slice(section.length + 1);
+        const lastSlash = relative.lastIndexOf('/');
+        if (lastSlash === -1) {
+            return section;
+        }
+        const parentRelative = relative.slice(0, lastSlash);
+        return `${section}/${parentRelative}`;
+    }
+
     function ensureAncestors(url) {
-        const parentUrl = findParentUrl(url, section);
-        if (parentUrl === null) {
+        const parentUrl = findSectionParent(url);
+        if (!parentUrl) {
             return;
         }
         parentLookup.set(url, parentUrl);
-        ensureNode(parentUrl);
-        ensureAncestors(parentUrl);
+        if (!sectionRoots.has(parentUrl)) {
+            ensureNode(parentUrl);
+            ensureAncestors(parentUrl);
+        }
     }
 
     for (const doc of filtered) {
-        ensureNode(doc.url);
-        ensureAncestors(doc.url);
+        if (!sectionRoots.has(doc.url)) {
+            ensureNode(doc.url);
+            ensureAncestors(doc.url);
+        }
     }
 
     for (const [url, node] of nodes) {
-        const parentUrl = findParentUrl(url, section);
-        if (parentUrl !== null) {
-            parentLookup.set(url, parentUrl);
-            const parent = ensureNode(parentUrl);
-            parent.items.push(node);
+        const parentUrl = parentLookup.get(url);
+        if (parentUrl && nodes.has(parentUrl)) {
+            nodes.get(parentUrl).items.push(node);
         }
     }
 
@@ -267,7 +319,11 @@ function buildSectionMenuFromDocs(docs, pathname) {
             if (node) {
                 node.expanded = true;
             }
-            current = parentLookup.get(current) ?? null;
+            const parentUrl = parentLookup.get(current);
+            if (!parentUrl || sectionRoots.has(parentUrl)) {
+                break;
+            }
+            current = parentUrl;
         }
     };
 
@@ -280,7 +336,7 @@ function buildSectionMenuFromDocs(docs, pathname) {
     const roots = [];
     for (const [url, node] of nodes) {
         const parentUrl = parentLookup.get(url);
-        if (parentUrl === null || parentUrl === undefined) {
+        if (!parentUrl || sectionRoots.has(parentUrl) || !nodes.has(parentUrl)) {
             roots.push(node);
         }
     }
