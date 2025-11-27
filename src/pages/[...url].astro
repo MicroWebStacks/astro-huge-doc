@@ -5,13 +5,15 @@ import { getEntry} from '@/libs/structure-db.js'
 
 let {url} = Astro.params;
 console.log(`in [...path] > path = ${url}`)
-const entry = await getEntry({url:url})
-if(!entry){
-    throw new Error(`entry not found for url '${url}'`)
+const {title, headings, items, data} = getEntry({url:url})
+let empty = false
+if(!title){
+    empty = true
+    throw new Error("entry not found for home page")
 }
-
-const headings = (Object.hasOwn(entry.data,"toc")&&entry.data.toc == false)?[]:entry.headings
 ---
-<Layout title={entry.title} headings={headings} >
-    <AstroMarkdown items={entry.items} data={entry.data} />
+<Layout title={title} headings={headings} >
+    {!empty&&
+        <AstroMarkdown items={items} data={data} headings={headings} />
+    }
 </Layout>

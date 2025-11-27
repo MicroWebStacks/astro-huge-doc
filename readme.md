@@ -62,3 +62,5 @@ True content based ISR (Incremental Static Regenration) with cache warmup.
     - `inline_compression_kb` : threshold above which db blobs get compressed
 - Run `pnpm collect` to parse the `.content` directory Markdown and referenced assets and store them in `.structure/structure.db`
 
+# Notes
+* XLSX files support dropped but could potentially generate two assets, original file for download and asset table for direct asset vieweing

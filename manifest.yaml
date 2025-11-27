@@ -6,7 +6,7 @@ fetch:
       dest: content
 collect:
   folder_single_doc: false
-  file_link_ext: ["svg","webp","png","jpeg","jpg","xlsx","glb"]
+  file_link_ext: ["svg","webp","png","jpeg","jpg","xlsx","glb","puml"]
   file_compress_ext: ['txt','md','json','csv','tsv','yaml','yml']
   external_storage_kb: 512
   inline_compression_kb: 32

@@ -20,8 +20,13 @@ export interface Props {
 const { item } = Astro.props as Props;
 const {asset, buffer} = getAssetWithBlob(item.asset_uid)
 const code = new TextDecoder().decode(buffer)
-
-const language = asset.ext ?? 'plaintext'
+let language = asset.ext ?? 'plaintext'
+const krokiLanguage = asset.ext ? kroki.formats[asset.ext] : undefined
+if(asset.type == "linked_file" && krokiLanguage){
+    console.log("Kroki format detected for extension:", asset.ext)
+    language = krokiLanguage
+}
+console.log("Language:", language)
 const params = asset.params?asset.params.split(' '):[]
 const asset_uid = item.asset_uid
 

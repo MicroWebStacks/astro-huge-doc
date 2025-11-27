@@ -471,10 +471,10 @@ function getEntryDeprecated(match) {
 
 function getEntry(match){
     const document = getDocument(match);
-    console.log("getEntry> document.sid=",document.sid);
     if (!document) {
         return {title: '', headings: [], items: [], data: {}};
     }
+    console.log("getEntry> document.sid=",document.sid);
     const items = getItems(match);
     let headings = document?.toc;
     if (!headings) {

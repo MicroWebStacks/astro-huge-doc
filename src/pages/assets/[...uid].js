@@ -46,11 +46,15 @@ export async function GET({params}) {
     console.log(`Asset request for uid: ${uid}`);
     const {asset, buffer} = getAssetWithBlob(uid);
     if (asset && buffer) {
+        const filename = asset.path ? asset.path.split(/[\\/]/).pop() : null;
         const contentType = file_mime(asset.ext ?? asset.path ?? uid);
         const headers = {
             'Content-Type': contentType,
             'Content-Length': buffer.length?.toString()
         };
+        if (filename) {
+            headers['Content-Disposition'] = `inline; filename="${filename}"`;
+        }
         if (!headers['Content-Length']) {
             delete headers['Content-Length'];
         }

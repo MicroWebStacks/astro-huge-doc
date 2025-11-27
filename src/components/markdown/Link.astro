@@ -2,7 +2,6 @@
 import {toHast} from 'mdast-util-to-hast'
 import {toHtml} from 'hast-util-to-html'
 import ModelViewer from './model/ModelViewer.astro';
-import TableXLSX from './table/TableXLSX.astro';
 import LinkCode from './code/LinkCode.astro';
 import kroki from './code/kroki.yaml'
 import { getAssetInfo } from '@/libs/structure-db';
@@ -34,7 +33,6 @@ let is_link = true
 if (hasAsset){
   const asset_info = getAssetInfo(item);
   is_model3d = (asset_info.ext === "glb")
-  is_table = (asset_info.ext === "xlsx")
   is_diagram = Object.keys(kroki.formats).includes(asset_info.ext)
   is_link = !is_model3d && !is_table && !is_diagram
 }
@@ -43,9 +41,6 @@ if (hasAsset){
 ---
 {is_model3d &&
   <ModelViewer src={url} title={item.body_text} />
-}
-{is_table &&
-  <TableXLSX src={url} title={item.body_text} />
 }
 {is_link &&
   <a href={url} class={`link ${external?"external":""}`} target={external?"_blank":"_self"}>
