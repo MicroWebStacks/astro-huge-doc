@@ -20,6 +20,7 @@
     "@octokit/rest": "^21.0.2",
     "@svgdotjs/svg.js": "^3.2.4",
     "adm-zip": "^0.5.16",
+    "better-sqlite3": "^12.4.1",
     "astro": "^5.16.0",
     "content-structure": "../content-structure",
     "cookie-parser": "^1.4.7",

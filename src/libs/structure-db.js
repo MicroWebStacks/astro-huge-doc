@@ -480,7 +480,6 @@ function getEntry(match){
     if (!headings) {
         headings = items.filter((i) => i.type === 'heading');
     }
-    console.log("getEntry> headings.length=",headings.length);
     const data = {
         ...document,
         ...document.meta_data

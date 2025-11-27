@@ -4,13 +4,19 @@ import {config} from './config.js'
 import yaml from '@rollup/plugin-yaml';
 
 export default defineConfig({
-   adapter: node({
+  adapter: node({
     mode: 'middleware',
   }),
   output: "server",
   outDir: config.outDir,
   trailingSlash: 'ignore',
   vite: {
-    plugins: [yaml()]
+    plugins: [yaml()],
+    ssr: {
+      external: ['better-sqlite3']
+    },
+    optimizeDeps: {
+      exclude: ['better-sqlite3']
+    }
   }
 });
