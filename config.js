@@ -29,12 +29,8 @@ const config = {
     code_path: `${rootdir}/${outdir}/codes`,
     kroki_server: kroki_server,
     client_menu:true,
-    highlighter:{
-        theme:"dark-plus",
-        langs:['javascript','js','python','yaml']
-    },
+    highlighter:manifest.render.highlighter,
     copy_assets:false,
-    copy_assets_dir: "_astro",
     assets_hash_dir:true,    //N.A. if(copy_assets == false)
     fetch: manifest.fetch
 }

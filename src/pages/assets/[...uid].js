@@ -1,7 +1,7 @@
 import {createReadStream} from 'fs';
 import {resolve, join} from 'path';
 import {config} from '@/config';
-import {file_mime} from '@/libs/assets.js';
+import { file_mime } from '@/libs/utils.js';
 import {getAssetWithBlob} from '@/libs/structure-db.js';
 
 function normalizeUid(raw) {

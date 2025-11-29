@@ -1,6 +1,5 @@
 import {join} from 'path';
 import {config} from '@/config.js';
-import {section_from_pathname} from '@/libs/assets.js';
 import {openDatabase} from 'content-structure/src/sqlite_utils/index.js';
 
 function cloneHeading(heading) {
@@ -375,4 +374,24 @@ function buildSectionMenu(pathname) {
     return buildNavigationMenus(pathname).sectionMenu;
 }
 
-export {process_toc_list, buildNavigationMenus, buildAppBarMenu, buildSectionMenu};
+function section_from_pathname(pathname){
+    if(pathname.startsWith('http')){
+        return 'external'
+    }
+    const sections = pathname.split('/')
+    if(sections.length < 2){
+        return "home"
+    }else if(sections[1] == ""){
+        return "home"
+    }else{
+        return sections[1]
+    }
+}
+
+export {
+    process_toc_list,
+    buildNavigationMenus,
+    buildAppBarMenu, 
+    buildSectionMenu, 
+    section_from_pathname
+};

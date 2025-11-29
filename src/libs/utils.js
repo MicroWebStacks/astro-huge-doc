@@ -67,6 +67,36 @@ async function get_dir_files(dirpath,rel_dir){
   return files.map(file=>join(rel_dir,file)).sort()
 }
 
+function file_mime(path){
+    const ext = normalize_ext(path).toLowerCase()
+    if(ext == "svg"){
+        return 'image/svg+xml'
+    }
+    else if(ext == "png"){
+        return 'image/png'
+    }
+    else if(ext == "jpg"){
+        return 'image/jpeg'
+    }
+    else if(ext == "jpeg"){
+        return 'image/jpeg'
+    }
+    else if(ext == "webp"){
+        return 'image/webp'
+    }
+    else if(ext == "gif"){
+        return 'image/gif'
+    }
+    else if(ext == "bmp"){
+        return 'image/bmp'
+    }
+    else if((ext == "txt") || (ext == "md") || (ext == "json") || (ext == "yaml") || (ext == "yml") || (ext == "csv") || (ext == "tsv")){
+        return 'text/plain'
+    }
+    return 'application/octet-stream'
+}
+
+
 export{
   shortMD5,
   exists,
@@ -76,5 +106,6 @@ export{
   load_yaml_abs,
   save_json,
   save_file,
-  get_dir_files
+  get_dir_files,
+  file_mime
 }
