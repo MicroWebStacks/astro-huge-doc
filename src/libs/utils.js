@@ -1,5 +1,5 @@
 import {constants, access, mkdir, readFile, writeFile} from 'fs/promises'
-import { relative, resolve, join, sep, dirname } from 'path';
+import { relative, resolve, join, sep, dirname, extname } from 'path';
 import {config} from '../../config.js'
 import {createHash} from 'crypto'
 import yaml from 'js-yaml'
@@ -65,6 +65,21 @@ async function get_dir_files(dirpath,rel_dir){
   const files = results.map((file)=>(relative(content_dir,resolve(content_dir,file)).split(sep).join('/')))
   process.chdir(originalDirectory)
   return files.map(file=>join(rel_dir,file)).sort()
+}
+
+function normalize_ext(value){
+    if(!value){
+        return ''
+    }
+    const extFromPath = extname(value);
+    if(extFromPath){
+        return extFromPath.startsWith('.') ? extFromPath.slice(1) : extFromPath;
+    }
+    const trimmed = String(value).trim();
+    if(trimmed.startsWith('.')){
+        return trimmed.slice(1);
+    }
+    return trimmed;
 }
 
 function file_mime(path){
