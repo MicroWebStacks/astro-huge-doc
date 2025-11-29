@@ -26,7 +26,7 @@ const max_level = getMaxDepth(items);
 const default_level = Math.min(max_level, 3);
 ---
 <nav class={`${open_class} ${category}`} data-width={data_width} data-max-level={max_level} data-default-level={default_level}>
-    {items.length > 0 &&
+    {(items.length > 0 && max_level > 1) &&
       <div class="depth-controls" data-category={category}>
         <div class="depth-slider">
           <input type="range" min="1" max={max_level} value={default_level} data-role="depth-slider" aria-label="Expand depth" list={`depth-steps-${category}`} />
