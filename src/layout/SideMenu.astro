@@ -11,9 +11,34 @@ let { items,category } = Astro.props;
 
 const open_class = (items.length > 0)?"open":"closed"
 const data_width = (items.length > 0)?"20vw":"0vw"
+
+function getMaxDepth(entries, level = 1) {
+  let max = level;
+  for (const entry of entries ?? []) {
+    if (Array.isArray(entry.items) && entry.items.length > 0) {
+      max = Math.max(max, getMaxDepth(entry.items, level + 1));
+    }
+  }
+  return max;
+}
+
+const max_level = getMaxDepth(items);
+const default_level = Math.min(max_level, 3);
 ---
-<nav class={`${open_class} ${category}`} data-width={data_width}>
-    <SubMenu items={items} />
+<nav class={`${open_class} ${category}`} data-width={data_width} data-max-level={max_level} data-default-level={default_level}>
+    {items.length > 0 &&
+      <div class="depth-controls" data-category={category}>
+        <div class="depth-slider">
+          <input type="range" min="1" max={max_level} value={default_level} data-role="depth-slider" aria-label="Expand depth" list={`depth-steps-${category}`} />
+          <datalist id={`depth-steps-${category}`}>
+            {Array.from({length: max_level}).map((_, idx)=>(
+              <option value={idx+1}></option>
+            ))}
+          </datalist>
+        </div>
+      </div>
+    }
+    <SubMenu items={items} level={1} />
 </nav>
 
 <style define:vars={{ data_width }}>
@@ -44,5 +69,23 @@ nav::-webkit-scrollbar-thumb:hover {
   }
 }
 
-</style>
+.depth-controls{
+  display:flex;
+  align-items:center;
+  flex-direction: row;
+  gap:0.5rem;
+  padding:0.35rem 0.5rem;
+  color:var(--content-color);
+  font-size: 0.9rem;
+}
+.depth-slider{
+  display:flex;
+  align-items:center;
+  gap:0.4rem;
+  flex:1;
+}
+.depth-slider input[type="range"]{
+  flex:1;
+}
 
+</style>

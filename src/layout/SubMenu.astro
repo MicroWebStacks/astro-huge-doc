@@ -4,11 +4,12 @@ import './colors.css';
 export interface Props {
 	items: Array<Object>;
     root:boolean;
+    level?:number;
 }
-const { items,root=true} = Astro.props;
+const { items,root=true, level=1} = Astro.props;
 ---
 {items &&
-    <ul class={root?"root":"nested"}>
+    <ul class={root?"root":"nested"} data-level={level}>
         {items.map((item)=>(
             <li >
                 <div class:list={[{entry_container:true, active:item.active, parent:item.parent, expanded:item.expanded}]}>
@@ -26,7 +27,7 @@ const { items,root=true} = Astro.props;
                         <span class:list={["text",{parent:item.parent}]}>{item.label}</span>
                     }
                 </div>
-                <Astro.self items={item.items} root={false} />
+                <Astro.self items={item.items} root={false} level={level+1} />
             </li>
         ))}
     </ul>
