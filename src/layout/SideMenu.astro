@@ -22,8 +22,26 @@ function getMaxDepth(entries, level = 1) {
   return max;
 }
 
+function collectActiveLinks(entry, accumulator = []) {
+  let isActiveBranch = Boolean(entry.active);
+  for (const child of entry.items ?? []) {
+    if (collectActiveLinks(child, accumulator)) {
+      isActiveBranch = true;
+    }
+  }
+  if (isActiveBranch && entry.link) {
+    accumulator.push(entry.link);
+  }
+  return isActiveBranch;
+}
+
 const max_level = getMaxDepth(items);
 const default_level = Math.min(max_level, 3);
+const activePathEntries = [];
+for (const entry of items) {
+  collectActiveLinks(entry, activePathEntries);
+}
+const activePath = new Set(activePathEntries);
 ---
 <nav class={`${open_class} ${category}`} data-width={data_width} data-max-level={max_level} data-default-level={default_level}>
     {(items.length > 0 && max_level > 1) &&
@@ -38,7 +56,7 @@ const default_level = Math.min(max_level, 3);
         </div>
       </div>
     }
-    <SubMenu items={items} level={1} />
+    <SubMenu items={items} level={1} visibleLevel={default_level} activePath={activePath} forceVisible={false} />
 </nav>
 
 <style define:vars={{ data_width }}>

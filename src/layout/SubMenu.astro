@@ -5,14 +5,18 @@ export interface Props {
 	items: Array<Object>;
     root:boolean;
     level?:number;
+    visibleLevel?: number;
+    activePath?: Set<string>;
+    forceVisible?: boolean;
 }
-const { items,root=true, level=1} = Astro.props;
+const { items,root=true, level=1, visibleLevel = Number.POSITIVE_INFINITY, activePath, forceVisible = false } = Astro.props;
+const nextLevel = level + 1;
 ---
 {items &&
-    <ul class={root?"root":"nested"} data-level={level}>
+    <ul class:list={[root?"root":"nested",{hidden:(!root && level > visibleLevel && !forceVisible)}]} data-level={level}>
         {items.map((item)=>(
             <li >
-                <div class:list={[{entry_container:true, active:item.active, parent:item.parent, expanded:item.expanded}]}>
+                <div class:list={[{entry_container:true, active:item.active, parent:item.parent, expanded:(item.parent && (nextLevel <= visibleLevel || forceVisible || activePath?.has(item.link??'')))}]}>
                     {item.parent &&
                         <span class="icon expand">
                             <svg viewBox="0 0 100 100" width="60" height="60" fill="#00000000" xmlns="http://www.w3.org/2000/svg">
@@ -27,7 +31,14 @@ const { items,root=true, level=1} = Astro.props;
                         <span class:list={["text",{parent:item.parent}]}>{item.label}</span>
                     }
                 </div>
-                <Astro.self items={item.items} root={false} level={level+1} />
+                <Astro.self
+                    items={item.items}
+                    root={false}
+                    level={level+1}
+                    visibleLevel={visibleLevel}
+                    activePath={activePath}
+                    forceVisible={forceVisible || activePath?.has(item.link ?? '')}
+                />
             </li>
         ))}
     </ul>

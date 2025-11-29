@@ -80,11 +80,12 @@ function initDepthControls(nav){
     const slider = nav.querySelector('[data-role="depth-slider"]');
     if(!slider){return;}
     const max = getMaxLevel(nav);
-    const preset = parseInt(nav.getAttribute('data-default-level')||slider.value||'1',10);
-    const defaultDepth = estimateDefaultDepth(nav) || preset || 1;
+    const provided = parseInt(nav.getAttribute('data-default-level')||'',10);
+    const preset = Number.isFinite(provided)?provided:parseInt(slider.value||'1',10);
+    const fallback = Number.isFinite(preset)?preset:(estimateDefaultDepth(nav) || 1);
+    const defaultDepth = Math.min(Math.max(1, fallback), max);
     slider.max = `${max}`;
-    slider.value = `${Math.min(Math.max(1, defaultDepth), max)}`;
-    applyDepth(nav, parseInt(slider.value,10));
+    slider.value = `${defaultDepth}`;
 
     slider.addEventListener('input',(e)=>{
         const val = parseInt(e.target.value,10);
