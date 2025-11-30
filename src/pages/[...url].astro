@@ -1,0 +1,19 @@
+---
+import Layout from "@/layout/Layout.astro"
+import AstroMarkdown from '@/components/markdown/AstroMarkdown.astro'
+import { getEntry} from '@/libs/structure-db.js'
+
+let {url} = Astro.params;
+console.log(`in [...path] > path = ${url}`)
+const {title, headings, items, data} = getEntry({url:url})
+let empty = false
+if(!title){
+    empty = true
+    throw new Error("entry not found for home page")
+}
+---
+<Layout title={title} headings={headings} >
+    {!empty&&
+        <AstroMarkdown items={items} data={data} headings={headings} />
+    }
+</Layout>

@@ -1,0 +1,96 @@
+---
+import Heading from './Heading.astro';
+import DataTable from './table/DataTable.astro'
+import MarkdownImage from './image/MarkdownImage.astro'
+import Code from './code/Code.astro'
+import Tag from './Tag.astro'
+import Link from './Link.astro'
+import Directive from './directive/Directive.astro'
+import ContainerDirective from './directive/ContainerDirective.astro';
+import {toHast} from 'mdast-util-to-hast'
+import {toHtml} from 'hast-util-to-html'
+import {dirname} from 'path'
+import {text_only_children,has_image} from './node_check.js'
+export interface Props {
+    items: {
+        ast?: string;
+        type?: string;
+        [key: string]: unknown;
+    }[];
+    data: object;
+    headings?: object[];
+}
+
+const {items = [], data, headings = []} = Astro.props as Props;
+
+function renderAstToHtml(astNode){
+    try{
+        return toHtml(toHast(astNode));
+    }catch{
+        return '';
+    }
+}
+
+function paragraphStyle(node){
+    if(node.type !== 'paragraph'){
+        return 'paragraph';
+    }
+    if(text_only_children(node)){
+        return 'paragraph text';
+    }
+    if(has_image(node)){
+        return 'paragraph image';
+    }
+    return 'paragraph';
+}
+
+---
+{items.map((item) => {
+    if (item.type === 'heading') {
+        return <Heading item={item} data={data}/>;
+    }
+    if (item.type === 'image') {
+        return <MarkdownImage item={item} />;
+    }
+    if (item.type === 'table') {
+        return <DataTable item={item} />;
+    }
+    if (item.type === 'code') {
+        return <Code item={item} />;
+    }
+    if (item.type === 'link') {
+        return <Link item={item}  />;
+    }
+    if (item.type === 'containerDirective') {
+        return (
+            <ContainerDirective name={item.ast.name} attributes={item.ast.attributes}>
+                {item.ast.children?.map((child) => (
+                    <Fragment set:html={renderAstToHtml(child)}></Fragment>
+                ))}
+            </ContainerDirective>
+        );
+    }
+    if (item.ast) {
+        const astHtml = item.ast ? renderAstToHtml(item.ast) : null;
+        if (astHtml) {
+            return <Fragment set:html={astHtml}></Fragment>;
+        }
+    }
+    if (item.type === 'paragraph' && item.ast) {
+        const style = paragraphStyle(item);
+        const astHtml = item.ast ? renderAstToHtml(item.ast) : null;
+        if (astHtml) {
+            return (
+            <div class={style}>
+                {item.children?.map((child) => (
+                    <Fragment set:html={renderAstToHtml(child)}></Fragment>
+                )) ?? item.value}
+            </div>
+        )
+        }
+    }
+    if (item.type === 'paragraph' && !item.ast) {
+        return <Fragment >{item.body_text}</Fragment>;
+    }
+    return <Fragment>md.nan</Fragment>;
+})}

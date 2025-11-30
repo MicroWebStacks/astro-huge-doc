@@ -1,0 +1,52 @@
+---
+import {getDocument, getEntry} from '@/libs/structure-db.js'
+import CardMeta from './CardsMeta.astro'
+import yaml from 'js-yaml'
+
+export interface Props {
+  code: string;
+}
+
+const { code } = Astro.props as Props;
+
+const cards = yaml.load(code)
+
+const entries = cards.map(entry => getDocument({ uid: entry.uid }));
+const resolvedCards = entries
+  .map((entry, index) => ({entry, config: cards[index]}))
+  .filter(({entry}) => entry);
+
+---
+<div class="cards container">
+    {
+        resolvedCards.map(({entry,config})=>(
+            <div class="card" style={`width:${config.width_rem}rem`}>
+                <CardMeta data={entry.meta_data} />
+            </div>
+        ))
+    }
+</div>
+
+<style>
+.title{
+    width:100%;
+    text-align:center;
+    
+}
+.cards.container{
+    padding-top: 10px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:20px;
+}
+.card{
+    background-color: #222;
+    box-shadow: 2px 2px 3px 3px #333;
+    border-radius:10px;
+    width:15rem;
+    padding:10px;
+}
+.card :global(.paragraph:has(>img)) {
+    text-align: center;
+}
+</style>

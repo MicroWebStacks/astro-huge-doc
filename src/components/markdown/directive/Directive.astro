@@ -1,0 +1,22 @@
+---
+import ButtonDirective from './ButtonDirective.astro'
+
+export interface Props {
+  name: string;
+  attributes: object[];
+}
+
+const { name, attributes } = Astro.props as Props;
+const is_image = (name == "image")
+const is_button = (name == "button")
+const is_other = !(is_image || is_button)
+
+---
+{is_button &&
+  <ButtonDirective label={attributes.label} link={attributes.link} icon={attributes.icon} />
+}
+{is_other &&
+  <div>{name}
+    {Object.keys(attributes).map((key)=>(<span>{key} = {attributes[key]}</span>))}
+  </div>
+}

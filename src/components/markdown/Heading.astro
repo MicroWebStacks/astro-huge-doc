@@ -1,0 +1,70 @@
+---
+import {toHast} from 'mdast-util-to-hast'
+import {toHtml} from 'hast-util-to-html'
+import Svgicons from '../svgicons.astro';
+export interface Props {
+    item: {
+      sid: string;
+      level: number;
+      slug: string;
+      body_text?: string;
+    };
+    data: {
+      url: string;
+    };
+}
+
+const { item, data } = Astro.props as Props;
+const HeadingLevel = `h${item.level}`
+
+---
+<HeadingLevel id={item.slug} class="heading bar">
+  <div class="text">
+    {item.body_text}
+    </div>
+  <div class="icon link">
+      <a href={`#${item.slug}`} class="link">
+        <Svgicons filename="link"/>
+      </a>
+      <div class="icon copy" title="copy short link" data-url={data.url + `#${item.slug}`}>
+        <Svgicons filename="copy"/>
+      </div>
+    </div>
+</HeadingLevel>
+
+<style>
+.heading.bar{
+  width: fit-content;
+  display: flex;
+  gap: 10px;
+}
+.icon{
+  opacity: 0;
+}
+.heading.bar:hover .icon.link{
+  opacity: 1;
+}
+.icon.link:hover .icon.copy{
+  opacity: 1;
+}
+.icon.copy{
+    cursor: pointer;
+    position: relative; /* Needed to position the 'Copied!' message correctly */
+}
+.link{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.icon :global(svg){
+  width:16px;
+  height:16px;
+    fill:rgb(101, 96, 96);
+}
+.heading.bar :global(a){
+  text-decoration: none;
+  color: inherit;
+}
+</style>
+
+<script src="./heading.js" />

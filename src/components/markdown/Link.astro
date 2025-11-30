@@ -1,0 +1,71 @@
+---
+import {toHast} from 'mdast-util-to-hast'
+import {toHtml} from 'hast-util-to-html'
+import ModelViewer from './model/ModelViewer.astro';
+import LinkCode from './code/LinkCode.astro';
+import kroki from './code/kroki.yaml'
+import { getAssetInfo } from '@/libs/structure-db';
+import Code from './code/Code.astro';
+
+export interface Props {
+    item: {
+      asset_uid?: string;
+      body_text: string;
+      ast: {
+          title: string;
+          url: string;
+    };
+    };
+}
+
+const { item } = Astro.props as Props;
+
+const hasAsset = (item.asset_uid != null)
+const external = !hasAsset && item.ast.url.startsWith('http')
+
+const url = hasAsset ? `/assets/${item.asset_uid}` : item.ast.url
+
+let is_model3d = false
+let is_table = false
+let is_diagram = false
+let is_link = true
+
+if (hasAsset){
+  const asset_info = getAssetInfo(item);
+  is_model3d = (asset_info.ext === "glb")
+  is_diagram = Object.keys(kroki.formats).includes(asset_info.ext)
+  is_link = !is_model3d && !is_table && !is_diagram
+}
+
+
+---
+{is_model3d &&
+  <ModelViewer src={url} title={item.body_text} />
+}
+{is_link &&
+  <a href={url} class={`link ${external?"external":""}`} target={external?"_blank":"_self"}>
+        {item.body_text}
+  </a>
+}
+{is_diagram &&
+  <Code item={item}  />
+}
+<style>
+a{
+    color:rgb(38, 102, 166)
+}
+.link {
+  position: relative;
+  display: inline-block;
+}
+.external{
+  margin-right: 0.6em;
+}
+.external::after {
+  content: '\2197';
+  position: absolute;
+  scale:0.6;
+  top: -0.2em;  /* Adjust this value to move the arrow up or down */
+  right: -0.6em;  /* Adjust this value to move the arrow left or right */
+}
+</style>

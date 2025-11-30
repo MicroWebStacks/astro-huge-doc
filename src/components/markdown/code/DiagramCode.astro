@@ -1,0 +1,63 @@
+---
+import Highlighter from './Highlighter.astro'
+import Panzoom from '@/components/panzoom/panzoom.astro'
+import { config } from '@/config.js';
+
+export interface Props {
+    uid:string;
+    code: string;
+    language: string;
+    params: object;
+    meta: object;
+}
+
+const {uid, code, language, params, meta} = Astro.props as Props;
+const diagram_url = `${config.base}/assets/${encodeURIComponent(uid)}.svg`
+let alt = ""
+let title = ""
+if(params && (params.length > 0)){
+    alt = params[0]
+    title = params[0]
+}
+
+---
+<button class="toggler" data-uid={uid}>code/diagram</button>
+<div class="diagram visible" data-uid={uid}>
+    <Panzoom src={diagram_url} alt={alt} title={title} meta={meta} hash={uid}/>
+</div>
+<div class="code hidden" data-uid={uid}>
+    <Highlighter code={code} language={language} params={params} />
+</div>
+
+<style>
+.visible{
+    display:block;
+}
+.hidden{
+    display:none;
+}
+.diagram{
+    background-color: #fff;
+}
+</style>
+
+<script>
+const buttons = document.querySelectorAll('button.toggler');
+
+buttons.forEach(button => {
+    button.addEventListener('click', () => {
+        const uid = button.getAttribute('data-uid');
+        const diagramDiv = document.querySelector(`.diagram[data-uid="${uid}"]`);
+        const codeDiv = document.querySelector(`.code[data-uid="${uid}"]`);
+
+        // Toggle classes to switch visibility
+        if (codeDiv.classList.contains('hidden')) {
+                codeDiv.classList.replace('hidden', 'visible');
+                diagramDiv.classList.replace('visible', 'hidden');
+            } else {
+                codeDiv.classList.replace('visible', 'hidden');
+                diagramDiv.classList.replace('hidden', 'visible');
+        }
+    });
+});
+</script>

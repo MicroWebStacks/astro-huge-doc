@@ -1,0 +1,96 @@
+---
+import SvgIcons from '@/components/svgicons.astro'
+import yaml from 'js-yaml'
+
+export interface Props {
+  uid: string;
+  code: string;
+  model: {
+      [key: string]: any;
+    };
+  };
+
+const { uid, code, model } = Astro.props as Props;
+
+const code_data = yaml.load(code) as object;
+let should_render = true
+let src = ""
+let title = ""
+let poster = ""
+let environment_image = ""
+let error_text = ""
+//mandatory params
+if(Object.hasOwn(model,"src")){
+  src = `/assets/${model.src}`
+  console.log("ModelViewerCode src param:",src)
+}else{
+  should_render = false
+  const err = "ModelViewerCode missing 'src' param ; "
+  console.warn(err)
+  error_text += err
+}
+if(Object.hasOwn(code_data,"title")){
+  title = code_data.title
+}else{
+  should_render = false
+  const err = "ModelViewerCode missing 'title' param"
+  console.warn(err)
+  error_text += err
+}
+//optional params
+if(Object.hasOwn(model,"poster")){
+  poster = `/assets/${model.poster}`
+}
+if(Object.hasOwn(model,"environment-image")){
+  environment_image = `/assets/${model["environment-image"]}`
+}
+
+//potential additional params
+//camera-orbit="-10.92deg 80.06deg 58.4m"
+//field-of-view="30deg"
+
+---
+{should_render &&
+  <div class="header">
+  <div>{title}</div>
+  <a href={src} download>
+      <button class="download" data-file={src}><SvgIcons filename="download"/></button>
+  </a>
+  </div>
+  <model-viewer 
+    alt={title}
+    src={src}
+    shadow-intensity="1" 
+    camera-controls
+    touch-action="pan-y"
+    poster={(poster === "")?false:poster}
+    environment-image={(environment_image === "")?false:environment_image}
+    >
+  </model-viewer>
+}
+{!should_render &&
+  <div>{error_text}</div>
+}
+
+<script>
+  import '@google/model-viewer';
+</script>
+
+<style>
+model-viewer{
+    height:400px;
+    width: 100%;
+    background-color: #eef;
+}
+.header{
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+}
+button{
+  cursor:pointer;
+  margin: auto;
+}
+a{
+}
+</style>

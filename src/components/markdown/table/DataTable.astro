@@ -1,0 +1,25 @@
+---
+
+export interface Props {
+    item: object;
+}
+
+const { item } = Astro.props as Props;
+
+---
+<div class="container">
+    <table class="data-table" data-table-uid={item.asset_uid}>
+        <!-- Data will be populated dynamically using JavaScript -->
+    </table>
+</div>
+
+<style>
+.container{
+    padding:5px;
+    border-radius: 5px;
+    box-shadow: 2px 2px 3px 3px #ccc;
+    display: inline-block;
+}
+</style>
+
+<script src="./data-tables.js" />
