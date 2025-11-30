@@ -448,27 +448,6 @@ function buildItems(items, assets, docUid, documentPath) {
     return {items: renderItems, headings};
 }
 
-function getEntryDeprecated(match) {
-    const document = getDocument(match);
-    if (!document) {
-        return null;
-    }
-    const itemsRaw = getItems(match);
-    const assets = getAssetsForDocument(document.uid);
-    const {items: renderItems, headings} = buildItems(itemsRaw, assets, document.uid, document.path);
-    const data = {
-        ...document.meta_data,
-        ...document,
-        headings
-    };
-    return {
-        title: document.title ?? '',
-        headings,
-        items: renderItems,
-        data
-    };
-}
-
 function getEntry(match){
     const document = getDocument(match);
     if (!document) {

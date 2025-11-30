@@ -27,7 +27,7 @@ function find_parent(index, headings) {
 
 /* not recursive o(n²)
 */
-function headings_list_to_tree(headings, is_toc) {
+function toc_list_to_tree(headings) {
     const copies = headings.map((heading) => ({
         ...cloneHeading(heading),
         order_index: heading.order_index ?? 0
@@ -36,9 +36,7 @@ function headings_list_to_tree(headings, is_toc) {
         element.items = [];
         element.parent = true;
         element.expanded = true;
-        if (is_toc) {
-            element.link = `#${element.slug ?? ''}`;
-        }
+        element.link = `#${element.slug ?? ''}`;
     }
 
     const tree = [];
@@ -72,7 +70,7 @@ function process_toc_list(headings) {
     if (!Array.isArray(headings) || headings.length === 0) {
         return {items: [], visible: false};
     }
-    const tree = headings_list_to_tree(headings, true);
+    const tree = toc_list_to_tree(headings);
     return {items: tree, visible: true};
 }
 
@@ -150,39 +148,6 @@ function loadDocuments() {
     return db
         .prepare('SELECT url, title, level, "order" AS sort_order, url_type FROM documents ORDER BY level, sort_order, url')
         .all();
-}
-
-function belongsToSection(doc, section) {
-    if (section === 'home') {
-        return true;
-    }
-    return doc.url === section || doc.url.startsWith(`${section}/`);
-}
-
-function findParentUrl(url, section) {
-    if (section === 'home') {
-        if (!url) {
-            return null;
-        }
-        const lastSlash = url.lastIndexOf('/');
-        if (lastSlash === -1) {
-            return '';
-        }
-        return url.slice(0, lastSlash);
-    }
-    if (!url || !url.startsWith(section)) {
-        return null;
-    }
-    if (url === section) {
-        return null;
-    }
-    const relative = url.slice(section.length + 1);
-    const lastSlash = relative.lastIndexOf('/');
-    if (lastSlash === -1) {
-        return section;
-    }
-    const parentRelative = relative.slice(0, lastSlash);
-    return `${section}/${parentRelative}`;
 }
 
 function buildAppBarMenuFromDocs(docs, pathname) {
