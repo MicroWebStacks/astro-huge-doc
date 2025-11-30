@@ -3,20 +3,21 @@ import Svgicons from '@/components/svgicons.astro';
 import {codeToHtml} from './highlighter.js'
 
 export interface Props {
+    uid: string;
     code: string;
     language: string;
     params: object;
 }
 
-const { code, language, params } = Astro.props as Props;
+const { uid, code, language, params } = Astro.props as Props;
 
-const {hash,html} = await codeToHtml(code, { lang: language, theme:'dark-plus' })
+const html = await codeToHtml(code, { lang: language, theme:'dark-plus' })
 
 ---
-<div class="highlighter container" data-hash={hash}>
+<div class="highlighter container" data-uid={uid}>
     <Fragment set:html={html}></Fragment>
-    <button class="copy-btn" data-hash={hash}><Svgicons filename="copy" /></button>
-    <span class="copy-message" data-hash={hash}>Copied!</span>
+    <button class="copy-btn" data-uid={uid}><Svgicons filename="copy" /></button>
+    <span class="copy-message" data-uid={uid}>Copied!</span>
 </div>
 
 <style>
@@ -79,11 +80,11 @@ pre{
 const buttons = document.querySelectorAll('button.copy-btn');
 buttons.forEach(button => {
     button.addEventListener('click', async () => {
-        const hash = button.getAttribute('data-hash');
-        const message = document.querySelector(`.copy-message[data-hash="${hash}"]`);
+        const uid = button.getAttribute('data-uid');
+        const message = document.querySelector(`.copy-message[data-uid="${uid}"]`);
         
         try {
-            const response = await fetch(`/codes/${hash}/code.txt`);
+            const response = await fetch(`/assets/${uid}`);
             if (response.ok) {
                 const codeText = await response.text();
                 await navigator.clipboard.writeText(codeText);

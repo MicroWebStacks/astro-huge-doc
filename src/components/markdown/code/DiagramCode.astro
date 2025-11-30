@@ -26,7 +26,7 @@ if(params && (params.length > 0)){
     <Panzoom src={diagram_url} alt={alt} title={title} meta={meta} hash={uid}/>
 </div>
 <div class="code hidden" data-uid={uid}>
-    <Highlighter code={code} language={language} params={params} />
+    <Highlighter uid={uid} code={code} language={language} params={params} />
 </div>
 
 <style>

@@ -52,6 +52,5 @@ const other_language = (!is_diagram && !custom_yaml)
     <Gallery model={item.ast.gallery} />
 }
 {other_language&&
-    <Highlighter code={code} language={language} params={params} />
+    <Highlighter uid={item.asset_uid} code={code} language={language} params={params} />
 }
-
