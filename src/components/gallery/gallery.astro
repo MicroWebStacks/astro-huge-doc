@@ -1,6 +1,7 @@
 ---
 import {calculate_span,select_masonry} from './grid_utils.js'
-import {getImageInfo} from '../../libs/structure-db.js';
+import {getAssetBlob, getImageInfo} from '../../libs/structure-db.js';
+import { config } from '@/config';
 
 interface GalleryItem {
     uid: string;
@@ -15,8 +16,9 @@ const { model, masonry=null } = Astro.props as Props;
 const images_uids = model.map((item)=>(item.uid));
 const imagesInfo = images_uids.map((uid)=>{
     const info = getImageInfo(uid);
+    const blob_uid = getAssetBlob(uid, config.collect_content.version_id);
     return {
-        url: `/assets/${uid}`,
+        url: `/assets/${blob_uid}:${uid}`,
         ...info,
         ...calculate_span(info.ratio)
     }

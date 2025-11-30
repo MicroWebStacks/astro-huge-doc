@@ -98,16 +98,6 @@ function getItems(match, type) {
     });
 }
 
-function getAssetsForDocument(docUid) {
-    const db = ensureDb();
-    const assets = db.prepare('SELECT * FROM asset_info WHERE parent_doc_uid = ?').all(docUid);
-    const map = new Map();
-    for (const asset of assets) {
-        map.set(asset.uid, asset);
-    }
-    return map;
-}
-
 function getAssetInfo(match) {
     if (!match?.asset_uid) {
         return null;
@@ -164,37 +154,37 @@ function loadBlobBuffer(asset) {
     return buffer;
 }
 
-function normalizeAssetRow(row) {
-    if (!row) {
-        return null;
-    }
-    const {info_blob_uid, asset_blob_uid, blob_uid: infoBlobUid, ...rest} = row;
-    return {
-        ...rest,
-        blob_uid: asset_blob_uid ?? info_blob_uid ?? infoBlobUid ?? null
-    };
-}
-
-function getAsset(uid) {
-    if (!uid) {
+function getAssetByUIDVersion(assetUid, versionId) {
+    if (!assetUid || !versionId) {
         return null;
     }
     const db = ensureDb();
-    const row = db
-        .prepare(
-            `
-        SELECT ai.*, ai.blob_uid AS info_blob_uid, a.blob_uid AS asset_blob_uid
-        FROM asset_info ai
-        LEFT JOIN assets a ON ai.uid = a.asset_uid
-        WHERE ai.uid = ?
-    `
-        )
-        .get(uid);
-    return normalizeAssetRow(row);
+    const versionRow = db
+        .prepare('SELECT blob_uid FROM assets WHERE asset_uid = ? AND version_id = ?')
+        .get(assetUid, versionId);
+    const blobUid = versionRow?.blob_uid;
+    if (!blobUid) {
+        return null;
+    }
+    const infoRow = db.prepare('SELECT * FROM asset_info WHERE uid = ? AND blob_uid = ?').get(assetUid, blobUid);
+    return infoRow ?? null;
 }
 
-function getAssetWithBlob(uid) {
-    const asset = getAsset(uid);
+function getAssetInfoBlob_version(assetUid, versionId) {
+    const asset = getAssetByUIDVersion(assetUid, versionId);
+    if (!asset) {
+        return {asset: null, buffer: null};
+    }
+    const buffer = loadBlobBuffer(asset);
+    return {asset, buffer};
+}
+
+function getAssetInfoBlob_blob(assetUid, blobUid) {
+    if (!assetUid || !blobUid) {
+        return {asset: null, buffer: null};
+    }
+    const db = ensureDb();
+    const asset = db.prepare('SELECT * FROM asset_info WHERE uid = ? AND blob_uid = ?').get(assetUid, blobUid);
     if (!asset) {
         return {asset: null, buffer: null};
     }
@@ -467,13 +457,30 @@ function getEntry(match){
     return {found:true, title: document.title, headings, items, data}
 }
 
+function getAssetBlob(assetUid, versionId = null) {
+    if (!assetUid) {
+        return null;
+    }
+    const db = ensureDb();
+    const params = [assetUid];
+    let query = 'SELECT blob_uid FROM assets WHERE asset_uid = ?';
+    if (versionId) {
+        query += ' AND version_id = ?';
+        params.push(versionId);
+    }
+    const row = db.prepare(`${query} ORDER BY version_id DESC`).get(...params);
+    return row?.blob_uid ?? null;
+}
+
 export {
     getEntry, 
-    getAsset, 
-    getAssetWithBlob, 
+    getAssetByUIDVersion,
+    getAssetInfoBlob_version,
+    getAssetInfoBlob_blob,
     getDocument, 
     getItems, 
     getAssetInfo, 
     parseAssetLink,
-    getImageInfo
+    getImageInfo,
+    getAssetBlob
 };

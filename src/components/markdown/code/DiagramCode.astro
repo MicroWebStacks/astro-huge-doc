@@ -2,6 +2,7 @@
 import Highlighter from './Highlighter.astro'
 import Panzoom from '@/components/panzoom/panzoom.astro'
 import { config } from '@/config.js';
+import { getAssetBlob } from '@/libs/structure-db';
 
 export interface Props {
     uid:string;
@@ -12,7 +13,8 @@ export interface Props {
 }
 
 const {uid, code, language, params, meta} = Astro.props as Props;
-const diagram_url = `${config.base}/assets/${encodeURIComponent(uid)}.svg`
+const blob_uid = getAssetBlob(uid, config.collect_content.version_id);
+const diagram_url = `/assets/${blob_uid}:${uid}.svg`
 let alt = ""
 let title = ""
 if(params && (params.length > 0)){

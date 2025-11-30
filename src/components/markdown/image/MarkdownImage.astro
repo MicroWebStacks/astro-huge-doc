@@ -6,13 +6,14 @@ export interface Props {
     item: {
         slug: string;
         asset_uid: string;
+        blob_uid: string;
     };
 }
 
 const {item} = Astro.props as Props;
 
 const alt = item.slug;
-const asseturl = `/assets/${item.asset_uid}`;
+const asseturl = `/assets/${item.blob_uid}:${item.asset_uid}`;
 const meta = {};
 log_debug(`  - MarkdownImage> asseturl: ${asseturl}`);
 ---
