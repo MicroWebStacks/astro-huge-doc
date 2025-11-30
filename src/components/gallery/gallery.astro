@@ -12,7 +12,6 @@ export interface Props {
 }
 
 const { model, masonry=null } = Astro.props as Props;
-console.log(model)
 const images_uids = model.map((item)=>(item.uid));
 const imagesInfo = images_uids.map((uid)=>{
     const info = getImageInfo(uid);

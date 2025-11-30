@@ -1,5 +1,6 @@
 ---
 //https://ellodave.dev/blog/article/using-svgs-as-astro-components-and-inline-css/
+import { log_debug } from '@/libs/utils';
 import PanZoomModal from './panzoommodal.astro'
 import SvgIcons from '@/components/svgicons.astro'
 export interface Props {
@@ -22,7 +23,7 @@ if(title){
   data_name = "diagram.svg"
 }
 
-console.log(` * panzoom : '${data_name}' : '${src}'`)
+log_debug(`  - panzoom : '${data_name}' : '${src}'`)
 const isSvg = asseturl.endsWith(".svg")
 const isImg = !isSvg
 

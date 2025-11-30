@@ -4,16 +4,14 @@ import AstroMarkdown from '@/components/markdown/AstroMarkdown.astro'
 import { getEntry} from '@/libs/structure-db.js'
 
 let {url} = Astro.params;
-console.log(`in [...path] > path = ${url}`)
-const {title, headings, items, data} = getEntry({url:url})
-let empty = false
-if(!title){
-    empty = true
-    throw new Error("entry not found for home page")
+console.log(`* [...url] > url = ${url}`)
+const {found, title, headings, items, data} = getEntry({url:url})
+if(!found){
+    return new Response(null, { status: 404 })
 }
 ---
 <Layout title={title} headings={headings} >
-    {!empty&&
+    {found&&
         <AstroMarkdown items={items} data={data} headings={headings} />
     }
 </Layout>

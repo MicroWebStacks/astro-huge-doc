@@ -1,5 +1,6 @@
 ---
 import Panzoom from '@/components/panzoom/panzoom.astro'
+import { log_debug } from '@/libs/utils';
 
 export interface Props {
     item: {
@@ -13,6 +14,6 @@ const {item} = Astro.props as Props;
 const alt = item.slug;
 const asseturl = `/assets/${item.asset_uid}`;
 const meta = {};
-console.log(`MarkdownImage> asseturl: ${asseturl}`);
+log_debug(`  - MarkdownImage> asseturl: ${asseturl}`);
 ---
 <Panzoom src={asseturl} alt={alt} title={""} meta={meta}/>

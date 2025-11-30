@@ -1,5 +1,6 @@
 ---
 import SvgIcons from '@/components/svgicons.astro'
+import { log_debug } from '@/libs/utils';
 import yaml from 'js-yaml'
 
 export interface Props {
@@ -22,7 +23,7 @@ let error_text = ""
 //mandatory params
 if(Object.hasOwn(model,"src")){
   src = `/assets/${model.src}`
-  console.log("ModelViewerCode src param:",src)
+  log_debug("  - ModelViewerCode src param:",src)
 }else{
   should_render = false
   const err = "ModelViewerCode missing 'src' param ; "

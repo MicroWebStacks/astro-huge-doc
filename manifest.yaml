@@ -13,4 +13,4 @@ collect:
 render:
   highlighter:
     theme: dark-plus
-    langs: ['javascript','js','python','yaml']
+    langs: ['javascript','js','python','yaml', 'markdown', 'text']

@@ -2,7 +2,7 @@ import {existsSync, readFileSync} from 'fs';
 import {join, dirname, extname} from 'path';
 import {gunzipSync} from 'zlib';
 import {config} from '../../config.js';
-import {shortMD5} from './utils.js';
+import {log_debug, shortMD5} from './utils.js';
 import {openDatabase} from 'content-structure/src/sqlite_utils/index.js';
 
 const dbPath = join(config.collect_content.outdir, 'structure.db');
@@ -451,9 +451,9 @@ function buildItems(items, assets, docUid, documentPath) {
 function getEntry(match){
     const document = getDocument(match);
     if (!document) {
-        return {title: '', headings: [], items: [], data: {}};
+        return {found:false, title: '', headings: [], items: [], data: {}};
     }
-    console.log("getEntry> document.sid=",document.sid);
+    log_debug("  - getEntry> document.sid=",document.sid);
     const items = getItems(match);
     let headings = document?.toc;
     if (!headings) {
@@ -464,7 +464,7 @@ function getEntry(match){
         ...document.meta_data
     }
 
-    return {title: document.title, headings, items, data}
+    return {found:true, title: document.title, headings, items, data}
 }
 
 export {

@@ -10,7 +10,6 @@ export async function GET({params}) {
     if (!uid) {
         return new Response('Missing asset uid', {status: 400});
     }
-    console.log(`Asset request for uid: ${uid}`);
     const {asset, buffer} = getAssetWithBlob(uid);
     if (asset && buffer) {
         const filename = asset.path ? asset.path.split(/[\\/]/).pop() : null;

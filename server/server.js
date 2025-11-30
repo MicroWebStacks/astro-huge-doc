@@ -30,8 +30,8 @@ if(process.env.ENABLE_AUTH === "true"){
     console.log("\n -- !!! no auth !!! -- Authentication is disabled -- \n")
 }
 
-app.use(ssrHandler);
 app.use(express.static(outdir))
+app.use(ssrHandler);//catches all other routes
 
 app.use((req, res, next) => {
     res.status(404).send("Sorry can't find that!")
