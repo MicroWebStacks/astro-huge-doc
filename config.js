@@ -3,7 +3,7 @@ import {join} from 'path'
 import path from "node:path";
 import fsp from "node:fs/promises";
 import yaml from "js-yaml";
-import sqlite3 from 'sqlite3';
+import {openDatabase} from 'content-structure/src/sqlite_utils/index.js';
 
 async function loadManifest() {
   const manifestPath = path.join(process.cwd(), "manifest.yaml");
@@ -37,27 +37,17 @@ const config = {
 }
 
 function resolveLatestVersion(structurePath) {
-    return new Promise((resolve) => {
-        const db = new sqlite3.Database(structurePath, sqlite3.OPEN_READONLY, (err) => {
-            if (err) {
-                console.warn('Unable to open structure DB for version lookup:', err.message);
-                resolve(null);
-                return;
-            }
-            db.get('SELECT version_id FROM versions ORDER BY version_id DESC LIMIT 1', (error, row) => {
-                if (error) {
-                    console.warn('Unable to fetch latest version:', error.message);
-                    resolve(null);
-                } else {
-                    resolve(row?.version_id ?? null);
-                }
-                db.close();
-            });
-        });
-    });
+    try {
+        const db = openDatabase(structurePath, {readonly: true});
+        const row = db.prepare('SELECT version_id FROM versions ORDER BY version_id DESC LIMIT 1').get();
+        return row?.version_id ?? null;
+    } catch (error) {
+        console.warn('Unable to resolve latest version:', error.message);
+        return null;
+    }
 }
 
-const latestVersion = await resolveLatestVersion(join(structuredir, 'structure.db'));
+const latestVersion = resolveLatestVersion(join(structuredir, 'structure.db'));
 
 config.collect_content = {
     version_id: latestVersion ?? "",
