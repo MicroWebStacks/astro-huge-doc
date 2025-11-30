@@ -45,18 +45,32 @@ function normalizeDocumentRow(row) {
     };
 }
 
-function getDocument(match) {
+function getDocument(match, versionId = null) {
     const db = ensureDb();
+    const resolvedVersion = versionId ?? config.collect_content.version_id ?? null;
+    const fetchRow = (column, value) => {
+        if (value === undefined) {
+            return null;
+        }
+        if (resolvedVersion) {
+            const row = db.prepare(`SELECT * FROM documents WHERE ${column} = ? AND version_id = ?`).get(value, resolvedVersion);
+            if (row) {
+                return row;
+            }
+        }
+        return db
+            .prepare(`SELECT * FROM documents WHERE ${column} = ? ORDER BY version_id DESC LIMIT 1`)
+            .get(value);
+    };
+    let row = null;
     if (match?.uid) {
-        const row = db.prepare('SELECT * FROM documents WHERE uid = ?').get(match.uid);
-        return normalizeDocumentRow(row);
+        row = fetchRow('uid', match.uid);
+    } else if (match?.sid) {
+        row = fetchRow('sid', match.sid);
+    } else {
+        const urlValue = typeof match?.url === 'string' ? match.url : '';
+        row = fetchRow('url', urlValue);
     }
-    if (match?.sid) {
-        const row = db.prepare('SELECT * FROM documents WHERE sid = ?').get(match.sid);
-        return normalizeDocumentRow(row);
-    }
-    const urlValue = typeof match?.url === 'string' ? match.url : '';
-    const row = db.prepare('SELECT * FROM documents WHERE url = ?').get(urlValue);
     return normalizeDocumentRow(row);
 }
 
@@ -66,27 +80,50 @@ function getImageInfo(uid) {
     return row;
 }
 
-function getItemsForDocument(docSid, type) {
+function getItemsForDocument(docSid, type, versionId = null) {
     const db = ensureDb();
+    const resolvedVersion = versionId ?? config.collect_content.version_id ?? null;
     const params = [docSid];
     let sql = 'SELECT * FROM items WHERE doc_sid = ?';
+    if (resolvedVersion) {
+        sql += ' AND version_id = ?';
+        params.push(resolvedVersion);
+    }
     if (type) {
         sql += ' AND type = ?';
         params.push(type);
     }
     sql += ' ORDER BY order_index';
-    return db.prepare(sql).all(...params);
+    let rows = db.prepare(sql).all(...params);
+    if (rows.length || !resolvedVersion) {
+        return rows;
+    }
+    const fallbackVersion = db
+        .prepare('SELECT version_id FROM items WHERE doc_sid = ? ORDER BY version_id DESC LIMIT 1')
+        .get(docSid);
+    if (!fallbackVersion?.version_id) {
+        return [];
+    }
+    const fallbackParams = [docSid, fallbackVersion.version_id];
+    let fallbackSql = 'SELECT * FROM items WHERE doc_sid = ? AND version_id = ?';
+    if (type) {
+        fallbackSql += ' AND type = ?';
+        fallbackParams.push(type);
+    }
+    fallbackSql += ' ORDER BY order_index';
+    return db.prepare(fallbackSql).all(...fallbackParams);
 }
 
-function getItems(match, type) {
+function getItems(match, type, versionId = null) {
+    const resolvedVersion = versionId ?? config.collect_content.version_id ?? null;
     if (match?.doc_sid) {
-        return getItemsForDocument(match.doc_sid, type);
+        return getItemsForDocument(match.doc_sid, type, resolvedVersion);
     }
-    const document = getDocument(match);
+    const document = getDocument(match, resolvedVersion);
     if (!document?.sid) {
         return [];
     }
-    const items = getItemsForDocument(document.sid, type);
+    const items = getItemsForDocument(document.sid, type, resolvedVersion);
     return items.map((item) => {
         if (!item?.ast) {
             return item;
@@ -439,12 +476,13 @@ function buildItems(items, assets, docUid, documentPath) {
 }
 
 function getEntry(match){
-    const document = getDocument(match);
+    const versionId = match?.version_id ?? config.collect_content.version_id ?? null;
+    const document = getDocument(match, versionId);
     if (!document) {
         return {found:false, title: '', headings: [], items: [], data: {}};
     }
     log_debug("  - getEntry> document.sid=",document.sid);
-    const items = getItems(match);
+    const items = getItems(match, undefined, versionId);
     let headings = document?.toc;
     if (!headings) {
         headings = items.filter((i) => i.type === 'heading');
