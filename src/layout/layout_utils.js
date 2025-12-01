@@ -3,9 +3,10 @@ import {config} from '@/config.js';
 import {openDatabase} from 'content-structure/src/sqlite_utils/index.js';
 
 function cloneHeading(heading) {
+    const label = (heading.label ?? heading.body_text ?? '').trim();
     return {
-        label: heading.label ?? heading.body_text ?? '',
-        slug: heading.slug,
+        label,
+        slug: heading.slug ?? '',
         depth: heading.depth ?? heading.level ?? 1,
         link: heading.link ?? '',
         uid: heading.uid ?? null
@@ -76,44 +77,27 @@ function process_toc_list(headings) {
 
 const dbPath = join(config.collect_content.outdir, 'structure.db');
 
-function stripBase(pathname) {
-    const base = config.base ?? '';
-    if (!base || base === '/') {
-        return pathname;
-    }
-    if (pathname.startsWith(base)) {
-        const stripped = pathname.slice(base.length);
-        return stripped || '/';
-    }
-    return pathname;
-}
-
 function normalizePath(pathname) {
-    const value = pathname || '/';
-    let normalized = value.startsWith('/') ? value : `/${value}`;
-    if (normalized.length > 1 && normalized.endsWith('/')) {
-        normalized = normalized.slice(0, -1);
+    const raw = typeof pathname === 'string' ? pathname : '/';
+    const withLeading = raw.startsWith('/') ? raw : `/${raw}`;
+    const cleaned = withLeading.replace(/\/{2,}/g, '/');
+    if (cleaned.length > 1 && cleaned.endsWith('/')) {
+        return cleaned.slice(0, -1);
     }
-    return normalized;
+    return cleaned || '/';
 }
 
-function toDocUrl(pathname) {
-    const stripped = stripBase(normalizePath(pathname));
-    if (stripped === '/') {
-        return '';
-    }
-    return stripped.startsWith('/') ? stripped.slice(1) : stripped;
+function docUrlFromPathname(pathname) {
+    const normalized = normalizePath(pathname);
+    return normalized === '/' ? '' : normalized.slice(1);
 }
 
 function buildDocLink(url) {
-    const base = config.base ?? '';
-    const suffix = url ? `/${url}` : '/';
-    const combined = `${base}${suffix}`;
-    const cleaned = combined.replace(/\/{2,}/g, '/');
-    if (cleaned === '/') {
+    if (!url) {
         return '/';
     }
-    return cleaned.endsWith('/') ? cleaned.slice(0, -1) : cleaned;
+    const cleaned = String(url).replace(/^\/+|\/+$/g, '');
+    return `/${cleaned}`;
 }
 
 function labelFromUrl(url) {
@@ -151,7 +135,7 @@ function loadDocuments() {
 }
 
 function buildAppBarMenuFromDocs(docs, pathname) {
-    const currentSection = section_from_pathname(stripBase(pathname));
+    const currentSection = section_from_pathname(pathname);
     const topLevel = docs.filter((doc) => segmentCount(doc.url) <= 1);
     const sectionMap = new Map();
 
@@ -174,7 +158,7 @@ function buildAppBarMenuFromDocs(docs, pathname) {
         items.push({
             label: doc.title ?? labelFromUrl(doc.url),
             link,
-            active_class: section_from_pathname(stripBase(link)) === currentSection ? 'active' : '',
+            active_class: section_from_pathname(link) === currentSection ? 'active' : '',
             order: doc.sort_order ?? 0
         });
     }
@@ -183,8 +167,8 @@ function buildAppBarMenuFromDocs(docs, pathname) {
 }
 
 function buildSectionMenuFromDocs(docs, pathname) {
-    const section = section_from_pathname(stripBase(pathname));
-    const activeUrl = toDocUrl(pathname);
+    const section = section_from_pathname(pathname);
+    const activeUrl = docUrlFromPathname(pathname);
     const isHome = section === 'home';
     const filtered = docs.filter((doc) => {
         if (isHome) {
@@ -340,17 +324,13 @@ function buildSectionMenu(pathname) {
 }
 
 function section_from_pathname(pathname){
-    if(pathname.startsWith('http')){
-        return 'external'
+    if(!pathname){return 'home';}
+    const normalized = normalizePath(pathname);
+    if(normalized.startsWith('http')){
+        return 'external';
     }
-    const sections = pathname.split('/')
-    if(sections.length < 2){
-        return "home"
-    }else if(sections[1] == ""){
-        return "home"
-    }else{
-        return sections[1]
-    }
+    const parts = normalized.split('/').filter(Boolean);
+    return parts[0] ?? 'home';
 }
 
 export {
