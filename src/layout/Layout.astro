@@ -3,7 +3,6 @@ import './colors.css';
 import AppBar from './AppBar.astro';
 import SideMenu from './SideMenu.astro';
 import { process_toc_list, buildNavigationMenus } from "./layout_utils";
-import {config} from '@/config'
 
 
 export interface Props {
@@ -24,7 +23,7 @@ const appbar_menu = navigation.appBarMenu ?? []
 		<meta name="viewport" content="width=device-width" />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
-		<link rel="icon" type="image/x-icon" href={`${config.base}/favicon.ico`}>
+		<link rel="icon" type="image/x-icon" href={`/favicon.ico`}>
 	</head>
 	<body >
 		<div id="fixed-left" class="fixed-nav active" />

@@ -1,7 +1,9 @@
 ---
 import SvgIcons from '@/components/svgicons.astro'
+import { getAssetBlob } from '@/libs/structure-db';
 import { log_debug } from '@/libs/utils';
 import yaml from 'js-yaml'
+import { config } from '@/config';
 
 export interface Props {
   uid: string;
@@ -22,7 +24,8 @@ let environment_image = ""
 let error_text = ""
 //mandatory params
 if(Object.hasOwn(model,"src")){
-  src = `/assets/${model.src}`
+  const blob = getAssetBlob(model.src, config.collect_content.version_id);
+  src = `/assets/${blob}:${model.src}`
   log_debug("  - ModelViewerCode src param:",src)
 }else{
   should_render = false
@@ -40,10 +43,12 @@ if(Object.hasOwn(code_data,"title")){
 }
 //optional params
 if(Object.hasOwn(model,"poster")){
-  poster = `/assets/${model.poster}`
+  const blob = getAssetBlob(model.poster, config.collect_content.version_id);
+  poster = `/assets/${blob}:${model.poster}`
 }
 if(Object.hasOwn(model,"environment-image")){
-  environment_image = `/assets/${model["environment-image"]}`
+  const blob = getAssetBlob(model["environment-image"], config.collect_content.version_id);
+  environment_image = `/assets/${blob}:${model["environment-image"]}`
 }
 
 //potential additional params

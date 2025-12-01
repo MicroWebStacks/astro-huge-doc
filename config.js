@@ -15,7 +15,6 @@ dotenv.config()
 const rootdir = process.cwd()
 
 const outdir = (process.env.OUT_DIR==null)?"dist":process.env.OUT_DIR
-const base = (process.env.PUBLIC_BASE==null)?"":process.env.PUBLIC_BASE
 const structuredir = (process.env.STRUCTURE==null)?join(rootdir,".structure"):process.env.STRUCTURE
 const contentdir = (process.env.CONTENT==null)?join(rootdir,"content"):process.env.CONTENT
 const kroki_server = (process.env.KROKI_SERVER==null)?"https://kroki.io":process.env.KROKI_SERVER
@@ -25,14 +24,10 @@ const manifest = await loadManifest();
 const config = {
     rootdir: rootdir,
     outDir: outdir,
-    base: base,
     content_path: contentdir,
     code_path: `${rootdir}/${outdir}/codes`,
     kroki_server: kroki_server,
-    client_menu:true,
     highlighter:manifest.render.highlighter,
-    copy_assets:false,
-    assets_hash_dir:true,    //N.A. if(copy_assets == false)
     fetch: manifest.fetch
 }
 

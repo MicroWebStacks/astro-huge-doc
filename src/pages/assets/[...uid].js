@@ -8,19 +8,14 @@ const VARY_HEADER = 'Authorization, Cookie';
 const VERSION_ID = config.collect_content.version_id ?? null;
 
 export async function GET({params, request}) {
-    if (config.copy_assets) {
-        return new Response('Not supported and not needed with copy_assets = true', {status: 404});
-    }
     const rawUid = params?.uid;
     if (!rawUid) {
         return new Response('Missing asset uid', {status: 400});
     }
 
-    const colonIndex = rawUid.indexOf(':');
-    const has_blob_id = (colonIndex !== -1);
+    const has_blob_id = (rawUid.indexOf(':') !== -1);
     if (has_blob_id) {
-        const blobUid = rawUid.slice(0, colonIndex).trim();
-        const assetUid = rawUid.slice(colonIndex + 1).trim();
+        const [blobUid, assetUid] = rawUid.split(':');
         if (!blobUid || !assetUid) {
             return new Response('Invalid asset identifier', {status: 400});
         }
