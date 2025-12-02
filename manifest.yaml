@@ -4,6 +4,13 @@ fetch:
       branch: main
       folders: [content]
       dest: content
+output:
+  ssr_out: dist
+  content_structure: .structure
+  content: content
+  db_name: content.db
+kroki:
+  server: https://kroki.io
 collect:
   folder_single_doc: false
   file_link_ext: ["svg","webp","png","jpeg","jpg","xlsx","glb","puml"]
@@ -14,3 +21,7 @@ render:
   highlighter:
     theme: dark-plus
     langs: ['javascript','js','python','yaml', 'markdown', 'text']
+html_cache:
+  exclude_paths:
+    - /assets/
+    - .well-known/

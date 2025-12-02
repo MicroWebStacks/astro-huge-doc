@@ -1,4 +1,3 @@
-import * as dotenv from 'dotenv'
 import {join} from 'path'
 import path from "node:path";
 import fsp from "node:fs/promises";
@@ -9,26 +8,6 @@ async function loadManifest() {
   const manifestPath = path.join(process.cwd(), "manifest.yaml");
   const raw = await fsp.readFile(manifestPath, "utf8");
   return yaml.load(raw);
-}
-
-dotenv.config()
-const rootdir = process.cwd()
-
-const outdir = (process.env.OUT_DIR==null)?"dist":process.env.OUT_DIR
-const structuredir = (process.env.STRUCTURE==null)?join(rootdir,".structure"):process.env.STRUCTURE
-const contentdir = (process.env.CONTENT==null)?join(rootdir,"content"):process.env.CONTENT
-const kroki_server = (process.env.KROKI_SERVER==null)?"https://kroki.io":process.env.KROKI_SERVER
-
-const manifest = await loadManifest();
-
-const config = {
-    rootdir: rootdir,
-    outDir: outdir,
-    content_path: contentdir,
-    code_path: `${rootdir}/${outdir}/codes`,
-    kroki_server: kroki_server,
-    highlighter:manifest.render.highlighter,
-    fetch: manifest.fetch
 }
 
 function resolveLatestVersion(structurePath) {
@@ -42,15 +21,29 @@ function resolveLatestVersion(structurePath) {
     }
 }
 
-const latestVersion = resolveLatestVersion(join(structuredir, 'structure.db'));
+const rootdir = process.cwd()
+const manifest = await loadManifest();
+
+const config = {
+    rootdir: rootdir,
+    outDir: join(rootdir, manifest.output.ssr_out),
+    content_path: join(rootdir, manifest.output.content),
+    kroki_server: manifest.kroki.server,
+    highlighter:manifest.render.highlighter,
+    fetch: manifest.fetch,
+    html_cache: manifest.html_cache,
+}
+
+const latestVersion = resolveLatestVersion(join(rootdir, manifest.output.content_structure, manifest.output.db_name));
 
 config.collect_content = {
-    version_id: latestVersion ?? "",
+    version_id: latestVersion,
     rootdir:config.rootdir,
-    contentdir:contentdir,
-    outdir:structuredir,//dist does not persist before build
+    contentdir:join(rootdir, manifest.output.content),
+    outdir:join(rootdir, manifest.output.content_structure),//dist does not persist before build
     out_menu:"public/menu.json",//used by src\layout\client_nav_menu.js
     debug:false,
+    db_name: manifest.output.db_name,
     ...manifest.collect
 }
 
