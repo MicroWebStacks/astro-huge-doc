@@ -24,6 +24,12 @@ True content based ISR (Incremental Static Regenration) with cache warmup.
 - html is cached during warming up for specific versions
 - non html cached versions can still stream on demand
 
+cache libraries considerations :
+
+- lru-cache: simple, in-memory LRU with TTL.
+- cacache: content-addressable disk cache; storing bodies keyed by hash.
+- apicache (with a storage adapter) or express-cache-middleware if you want a plug-and-play layer, but hand-rolling with lru-cache gives more control.
+
 ### pages rendering
 - all pages content is stored as db items with pages ids
 - astro renders pages on the server with React/Astro and streams html
