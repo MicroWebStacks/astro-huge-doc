@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { join, dirname } from 'path';
 import { readFileSync, } from 'fs';
 import { handler as ssrHandler } from '../dist/server/entry.mjs';
+import { createHtmlCacheMiddleware } from './cache/index.js';
 import cors from 'cors';
 
 import * as dotenv from 'dotenv'
@@ -17,6 +18,7 @@ const host = (process.env.HOST==null)?"0.0.0.0":process.env.HOST
 const port = (process.env.PORT==null)?"3001":process.env.PORT
 
 const app = express();
+const htmlCacheMiddleware = createHtmlCacheMiddleware();
 if(process.env.ENABLE_CORS == "true"){
     app.use(cors());      
     console.log("\n -- !!! CORS enabled !!! -- APIs can be used from other sites --\n")
@@ -31,6 +33,7 @@ if(process.env.ENABLE_AUTH === "true"){
 }
 
 app.use(express.static(outdir))
+app.use(htmlCacheMiddleware)
 app.use(ssrHandler);//catches all other routes
 
 app.use((req, res, next) => {
