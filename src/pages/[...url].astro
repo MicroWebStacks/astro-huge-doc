@@ -2,16 +2,17 @@
 import Layout from "@/layout/Layout.astro"
 import AstroMarkdown from '@/components/markdown/AstroMarkdown.astro'
 import { getEntry} from '@/libs/structure-db.js'
+import NotFound from './404.astro'
 
 let {url} = Astro.params;
 console.log(`* [...url] > url = ${url}`)
 const {found, title, headings, items, data} = getEntry({url:url})
-if(!found){
-    return new Response(null, { status: 404 })
-}
 ---
-<Layout title={title} headings={headings} >
-    {found&&
-        <AstroMarkdown items={items} data={data} headings={headings} />
-    }
-</Layout>
+{found&&
+    <Layout title={title} headings={headings} >
+            <AstroMarkdown items={items} data={data} headings={headings} />
+    </Layout>
+}
+{!found&&
+    <NotFound message={`'${url}' Page not found`} />
+}

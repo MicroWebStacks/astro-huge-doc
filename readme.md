@@ -15,14 +15,14 @@ True content based ISR (Incremental Static Regenration) with cache warmup.
 ## details
 
 ### versionning
-- only content is stored on db and versionned
-- astro related code is only git managed
-- astro generated handler and assets are not managed
+- db manages versionning for documents and assets
+- astro and server code are separately git managed
+- astro handler has framework managed assets (css and js) and custom assets endpoint
 
 ### caching
 - Multi levels cache from cloud to server disk to memory
-- html is cached during warming up for specific versions
-- non html cached versions can still stream on demand
+- on demand html can be streamed and cached
+- warming up can ensure cache filling
 
 cache libraries considerations :
 
