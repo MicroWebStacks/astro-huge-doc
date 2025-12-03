@@ -7,6 +7,7 @@ import kroki from './kroki.yaml'
 import { config } from '@/config.js';
 import { getAssetInfoBlob_version } from '@/libs/structure-db';
 import DiagramCode from './DiagramCode.astro';
+import Chart from '../chart/Chart.astro';
 
 export interface Props {
     item: {
@@ -33,9 +34,10 @@ const asset_uid = item.asset_uid
 const yaml_glb      = ((language == "yaml") && (asset.params?.startsWith("glb")))
 const yaml_cards    = ((language == "yaml") && (asset.params?.startsWith("cards")))
 const yaml_gallery  = ((language == "yaml") && (asset.params?.startsWith("gallery")))
+const yaml_chart    = ((language == "yaml") && (asset.params?.startsWith("chart")))
 
 const is_diagram = kroki.languages.includes(language)
-const custom_yaml = yaml_glb || yaml_cards || yaml_gallery
+const custom_yaml = yaml_glb || yaml_cards || yaml_gallery || yaml_chart
 const other_language = (!is_diagram && !custom_yaml)
 
 ---
@@ -50,6 +52,9 @@ const other_language = (!is_diagram && !custom_yaml)
 }
 {yaml_gallery &&
     <Gallery model={item.ast.gallery} />
+}
+{yaml_chart &&
+    <Chart uid={asset_uid} code={code} />
 }
 {other_language&&
     <Highlighter uid={item.asset_uid} code={code} language={language} params={params} />

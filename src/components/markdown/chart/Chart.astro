@@ -1,0 +1,88 @@
+---
+import yaml from 'js-yaml';
+
+export interface Props {
+    uid: string;
+    code: string;
+}
+
+type ChartDefinition = {
+    chart_id: string;
+    sql: string;
+    title?: string;
+};
+
+function normalizeDefinition(raw: unknown): ChartDefinition {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        throw new Error('Chart definition must be a YAML object with keys such as sql and chart_id.');
+    }
+    const record = raw as Record<string, any>;
+    const sql = typeof record.sql === 'string' ? record.sql.trim() : '';
+    if (!sql) {
+        throw new Error("Chart definition is missing the required 'sql' property.");
+    }
+    const chartId = typeof record.chart_id === 'string' ? record.chart_id.trim() : '';
+    if (!chartId) {
+        throw new Error("Chart definition is missing the required 'chart_id' property.");
+    }
+    return {
+        chart_id: chartId,
+        sql,
+        title: typeof record.title === 'string' ? record.title : undefined
+    };
+}
+
+const {code, uid} = Astro.props as Props;
+
+let chartDefinition: ChartDefinition | null = null;
+let chartError: string | null = null;
+
+try {
+    chartDefinition = normalizeDefinition(yaml.load(code));
+} catch (error) {
+    chartError = error instanceof Error ? error.message : String(error);
+}
+
+const chartContainerId = `chart-${uid}`;
+const encodedSql = chartDefinition?.sql ? encodeURIComponent(chartDefinition.sql) : '';
+---
+{chartError && (
+    <div class="chart-error">
+        <strong>Unable to render chart.</strong>
+        <div>{chartError}</div>
+    </div>
+)}
+{!chartError && chartDefinition && (
+    <div class="chart-wrapper">
+        {chartDefinition.title && <div class="chart-title">{chartDefinition.title}</div>}
+        <div
+            id={chartContainerId}
+            class="chart-root"
+            data-chart-id={chartDefinition.chart_id}
+            data-chart-sql={encodedSql}
+        ></div>
+    </div>
+)}
+
+<style>
+.chart-wrapper {
+    margin: 1.5rem 0;
+}
+.chart-root {
+    width: 100%;
+    min-height: 320px;
+}
+.chart-title {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+.chart-error {
+    border-left: 4px solid #f66;
+    padding: 1rem;
+    background: #2b1f1f;
+    color: #ffdede;
+    margin: 1rem 0;
+}
+</style>
+
+<script src="./chart.js" />
