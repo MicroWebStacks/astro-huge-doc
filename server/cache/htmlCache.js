@@ -1,12 +1,8 @@
 import Database from 'better-sqlite3';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const DEFAULT_DB_PATH = join(__dirname, 'cache.db');
 
-function initDb(dbPath = DEFAULT_DB_PATH) {
+function initDb(dbPath) {
   const db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.prepare(`
@@ -46,8 +42,8 @@ function bufferFromChunk(chunk, encoding) {
   return Buffer.from(chunk, typeof encoding === 'string' ? encoding : undefined);
 }
 
-export function createHtmlCacheMiddleware(options = {}) {
-  const { dbPath = DEFAULT_DB_PATH } = options;
+export function createHtmlCacheMiddleware(manifest) {
+  const dbPath = join(process.cwd(), manifest.output.db_path);
   const { select, upsert } = initDb(dbPath);
 
   return function htmlCacheMiddleware(req, res, next) {
