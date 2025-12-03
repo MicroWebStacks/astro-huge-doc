@@ -18,7 +18,7 @@ let isSvg = false
 let isImg = false
 let asseturl = ""
 if(data.image){
-    const blob_uid = getAssetBlob(data.image, config.collect_content.version_id);
+    const blob_uid = getAssetBlob(data.image, config.collect.version_id);
     asseturl = `/assets/${blob_uid}:${data.image}`
     isSvg = data.image.endsWith(".svg")
     isImg = !isSvg

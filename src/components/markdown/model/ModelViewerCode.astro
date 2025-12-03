@@ -24,7 +24,7 @@ let environment_image = ""
 let error_text = ""
 //mandatory params
 if(Object.hasOwn(model,"src")){
-  const blob = getAssetBlob(model.src, config.collect_content.version_id);
+  const blob = getAssetBlob(model.src, config.collect.version_id);
   src = `/assets/${blob}:${model.src}`
   log_debug("  - ModelViewerCode src param:",src)
 }else{
@@ -43,11 +43,11 @@ if(Object.hasOwn(code_data,"title")){
 }
 //optional params
 if(Object.hasOwn(model,"poster")){
-  const blob = getAssetBlob(model.poster, config.collect_content.version_id);
+  const blob = getAssetBlob(model.poster, config.collect.version_id);
   poster = `/assets/${blob}:${model.poster}`
 }
 if(Object.hasOwn(model,"environment-image")){
-  const blob = getAssetBlob(model["environment-image"], config.collect_content.version_id);
+  const blob = getAssetBlob(model["environment-image"], config.collect.version_id);
   environment_image = `/assets/${blob}:${model["environment-image"]}`
 }
 

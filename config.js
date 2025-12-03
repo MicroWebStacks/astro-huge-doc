@@ -23,28 +23,26 @@ function resolveLatestVersion(structurePath) {
 
 const rootdir = process.cwd()
 const manifest = await loadManifest();
+const abs_db_path = join(rootdir, manifest.output.db_path);
+const latestVersion = resolveLatestVersion(abs_db_path);
 
 const config = {
     rootdir: rootdir,
-    outDir: join(rootdir, manifest.output.ssr_out),
+    outDir: join(rootdir, manifest.output.ssr),
     content_path: join(rootdir, manifest.output.content),
     kroki_server: manifest.kroki.server,
     highlighter:manifest.render.highlighter,
     fetch: manifest.fetch,
     html_cache: manifest.html_cache,
-}
-
-const latestVersion = resolveLatestVersion(join(rootdir, manifest.output.db_path, manifest.output.db_name));
-
-config.collect_content = {
-    version_id: latestVersion,
-    rootdir:config.rootdir,
-    contentdir:join(rootdir, manifest.output.content),
-    outdir:join(rootdir, manifest.output.db_path),//dist does not persist before build
-    out_menu:"public/menu.json",//used by src\layout\client_nav_menu.js
-    debug:false,
-    db_name: manifest.output.db_name,
-    ...manifest.collect
+    collect:{
+        version_id: latestVersion,
+        rootdir:rootdir,
+        contentdir:join(rootdir, manifest.output.content),
+        outdir:join(rootdir, manifest.output.store),//dist does not persist before build
+        debug:false,
+        db_path: abs_db_path,
+        ...manifest.collect
+    }
 }
 
 console.log(config)

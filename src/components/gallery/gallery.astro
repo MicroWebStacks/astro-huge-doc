@@ -16,7 +16,7 @@ const { model, masonry=null } = Astro.props as Props;
 const images_uids = model.map((item)=>(item.uid));
 const imagesInfo = images_uids.map((uid)=>{
     const info = getImageInfo(uid);
-    const blob_uid = getAssetBlob(uid, config.collect_content.version_id);
+    const blob_uid = getAssetBlob(uid, config.collect.version_id);
     return {
         url: `/assets/${blob_uid}:${uid}`,
         ...info,

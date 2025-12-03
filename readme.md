@@ -66,7 +66,7 @@ cache libraries considerations :
     - `file_compress_ext` : files subject to compressions in blobs storage
     - `external_storage_kb` : threshold to manage blobs in folders and not in db
     - `inline_compression_kb` : threshold above which db blobs get compressed
-- Run `pnpm collect` to parse the `.content` directory Markdown and referenced assets and store them in `.structure/structure.db`
+- Run `pnpm collect` to parse the `content` directory Markdown and referenced assets and store them in `dataset/content.db`
 
 # Notes
 * XLSX files support dropped but could potentially generate two assets, original file for download and asset table for direct asset vieweing

@@ -5,16 +5,15 @@ import {config} from '../../config.js';
 import {log_debug, shortMD5} from './utils.js';
 import {openDatabase} from 'content-structure/src/sqlite_utils/index.js';
 
-const dbPath = join(config.collect_content.outdir, 'structure.db');
 let cachedDb;
 const blobCache = new Map();
 
 function ensureDb() {
     if (!cachedDb) {
-        if (!existsSync(dbPath)) {
-            throw new Error(`structure-db: missing database at ${dbPath}`);
+        if (!existsSync(config.collect.db_path)) {
+            throw new Error(`structure-db: missing database at ${config.collect.db_path}`);
         }
-        cachedDb = openDatabase(dbPath, {readonly: true});
+        cachedDb = openDatabase(config.collect.db_path, {readonly: true});
     }
     return cachedDb;
 }
@@ -47,7 +46,7 @@ function normalizeDocumentRow(row) {
 
 function getDocument(match, versionId = null) {
     const db = ensureDb();
-    const resolvedVersion = versionId ?? config.collect_content.version_id ?? null;
+    const resolvedVersion = versionId ?? config.collect.version_id ?? null;
     const fetchRow = (column, value) => {
         if (value === undefined) {
             return null;
@@ -82,7 +81,7 @@ function getImageInfo(uid) {
 
 function getItemsForDocument(docSid, type, versionId = null) {
     const db = ensureDb();
-    const resolvedVersion = versionId ?? config.collect_content.version_id ?? null;
+    const resolvedVersion = versionId ?? config.collect.version_id ?? null;
     const params = [docSid];
     let sql = 'SELECT * FROM items WHERE doc_sid = ?';
     if (resolvedVersion) {
@@ -115,7 +114,7 @@ function getItemsForDocument(docSid, type, versionId = null) {
 }
 
 function getItems(match, type, versionId = null) {
-    const resolvedVersion = versionId ?? config.collect_content.version_id ?? null;
+    const resolvedVersion = versionId ?? config.collect.version_id ?? null;
     if (match?.doc_sid) {
         return getItemsForDocument(match.doc_sid, type, resolvedVersion);
     }
@@ -171,7 +170,7 @@ function loadBlobBuffer(asset) {
     if (blob.payload) {
         buffer = Buffer.from(blob.payload);
     } else if (blob.path && blob.hash) {
-        const absPath = join(config.collect_content.outdir, 'blobs', blob.path, blob.hash);
+        const absPath = join(config.collect.outdir, 'blobs', blob.path, blob.hash);
         try {
             buffer = readFileSync(absPath);
         } catch {
@@ -476,7 +475,7 @@ function buildItems(items, assets, docUid, documentPath) {
 }
 
 function getEntry(match){
-    const versionId = match?.version_id ?? config.collect_content.version_id ?? null;
+    const versionId = match?.version_id ?? config.collect.version_id ?? null;
     const document = getDocument(match, versionId);
     if (!document) {
         return {found:false, title: '', headings: [], items: [], data: {}};

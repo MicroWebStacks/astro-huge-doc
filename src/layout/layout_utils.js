@@ -75,8 +75,6 @@ function process_toc_list(headings) {
     return {items: tree, visible: true};
 }
 
-const dbPath = join(config.collect_content.outdir, 'structure.db');
-
 function normalizePath(pathname) {
     const raw = typeof pathname === 'string' ? pathname : '/';
     const withLeading = raw.startsWith('/') ? raw : `/${raw}`;
@@ -128,7 +126,7 @@ function segmentCount(url) {
 }
 
 function loadDocuments() {
-    const db = openDatabase(dbPath, {readonly: true});
+    const db = openDatabase(config.collect.db_path, {readonly: true});
     return db
         .prepare('SELECT url, title, level, "order" AS sort_order, url_type FROM documents ORDER BY level, sort_order, url')
         .all();

@@ -5,7 +5,7 @@ import {getAssetInfoBlob_version, getAssetInfoBlob_blob} from '@/libs/structure-
 const PRIVATE_CACHE = 'private, max-age=0, no-cache';
 const IMMUTABLE_CACHE = 'private, max-age=31536000, immutable';
 const VARY_HEADER = 'Authorization, Cookie';
-const VERSION_ID = config.collect_content.version_id ?? null;
+const VERSION_ID = config.collect.version_id ?? null;
 
 export async function GET({params, request}) {
     const rawUid = params?.uid;

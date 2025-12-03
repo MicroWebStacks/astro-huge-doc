@@ -9,8 +9,8 @@ import Database from 'better-sqlite3';
 const diagramExts = new Set(['plantuml', 'blockdiag', 'mermaid']);
 const diagramTypeMap = {codeblock: 'code_diagram', linked_file: 'file_diagram'};
 const languageAliases = {puml: 'plantuml'};
-const dbPath = join(config.collect_content.outdir, 'structure.db');
-const db = new Database(dbPath, {readonly: false});
+const db = new Database(config.collect.db_path, {readonly: false});
+
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
 db.pragma('foreign_keys = ON');
@@ -42,7 +42,7 @@ function loadBlob(blobUid) {
     if (row.payload) {
         buffer = Buffer.from(row.payload);
     } else if (row.path && row.hash) {
-        const absPath = join(config.collect_content.outdir, 'blobs', row.path, row.hash);
+        const absPath = join(config.collect.outdir, 'blobs', row.path, row.hash);
         try {
             buffer = readFileSync(absPath);
         } catch {

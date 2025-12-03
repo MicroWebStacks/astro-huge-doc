@@ -9,7 +9,7 @@ export interface Props {
 }
 
 const { item } = Astro.props as Props;
-const blob_uid = getAssetBlob(item.asset_uid, config.collect_content.version_id);
+const blob_uid = getAssetBlob(item.asset_uid, config.collect.version_id);
 const asset_url = `/assets/${blob_uid}:${item.asset_uid}`;
 ---
 <div class="container">

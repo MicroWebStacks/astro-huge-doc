@@ -13,8 +13,8 @@ export interface Props {
 }
 
 const {uid, code, language, params, meta} = Astro.props as Props;
-console.log("Rendering DiagramCode for uid:", uid, "with verison:", config.collect_content.version_id);
-const diag_blob_uid = getAssetBlob(`${uid}.svg`, config.collect_content.version_id);
+console.log("Rendering DiagramCode for uid:", uid, "with verison:", config.collect.version_id);
+const diag_blob_uid = getAssetBlob(`${uid}.svg`, config.collect.version_id);
 const diagram_url = `/assets/${diag_blob_uid}:${uid}.svg`
 let alt = ""
 let title = ""

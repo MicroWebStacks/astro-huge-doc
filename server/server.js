@@ -12,7 +12,7 @@ import * as dotenv from 'dotenv'
 dotenv.config()
 
 const manifest = yaml.load(readFileSync(join(process.cwd(), 'manifest.yaml'), 'utf8'));
-const outdir = join(process.cwd(), manifest.output.ssr_out);
+const outdir = join(process.cwd(), manifest.output.ssr);
 
 const app = express();
 const htmlCacheMiddleware = createHtmlCacheMiddleware(manifest);

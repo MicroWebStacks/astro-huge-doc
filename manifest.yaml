@@ -5,10 +5,10 @@ fetch:
       folders: [content]
       dest: content
 output:
-  ssr_out: dist
+  ssr: dist
   content: content
-  db_path: datasets
-  db_name: content.db
+  store: dataset
+  db_path: dataset/content.db
 server:
   protocol: http
   host: 0.0.0.0

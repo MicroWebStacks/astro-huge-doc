@@ -20,7 +20,7 @@ const { item } = Astro.props as Props;
 
 const hasAsset = (item.asset_uid != null)
 const external = !hasAsset && item.ast.url.startsWith('http')
-const blob_uid = hasAsset ? getAssetBlob(item.asset_uid!, config.collect_content.version_id) : null
+const blob_uid = hasAsset ? getAssetBlob(item.asset_uid!, config.collect.version_id) : null
 const url = hasAsset ? `/assets/${blob_uid}:${item.asset_uid}` : item.ast.url
 
 let is_model3d = false

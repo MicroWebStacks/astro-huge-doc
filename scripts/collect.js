@@ -2,7 +2,7 @@ import { config } from '../config.js';
 import { collect } from 'content-structure';
 
 async function main() {
-  const collectConfig = config.collect_content;
+  const collectConfig = config.collect;
 
   console.log("content-structure: starting collect()");
   collectConfig.version_id = await collect(collectConfig);
