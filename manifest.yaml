@@ -6,9 +6,13 @@ fetch:
       dest: content
 output:
   ssr_out: dist
-  content_structure: .structure
   content: content
+  db_path: datasets
   db_name: content.db
+server:
+  protocol: http
+  host: 0.0.0.0
+  port: 4321
 kroki:
   server: https://kroki.io
 collect:

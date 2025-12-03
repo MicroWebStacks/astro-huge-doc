@@ -34,13 +34,13 @@ const config = {
     html_cache: manifest.html_cache,
 }
 
-const latestVersion = resolveLatestVersion(join(rootdir, manifest.output.content_structure, manifest.output.db_name));
+const latestVersion = resolveLatestVersion(join(rootdir, manifest.output.db_path, manifest.output.db_name));
 
 config.collect_content = {
     version_id: latestVersion,
     rootdir:config.rootdir,
     contentdir:join(rootdir, manifest.output.content),
-    outdir:join(rootdir, manifest.output.content_structure),//dist does not persist before build
+    outdir:join(rootdir, manifest.output.db_path),//dist does not persist before build
     out_menu:"public/menu.json",//used by src\layout\client_nav_menu.js
     debug:false,
     db_name: manifest.output.db_name,
