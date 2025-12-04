@@ -15,6 +15,7 @@ import {
 
 const API_ENDPOINT = '/api/tables';
 const DEFAULT_TABLE = 'dataset.asset_info';
+const TABLE_MAX_HEIGHT = 'calc(100vh - 320px)';
 
 function buildColumns(keys) {
     if (!keys.length) {
@@ -112,6 +113,19 @@ export default function ServerTable() {
         enableColumnResizing: true,
         enableDensityToggle: false,
         enableFullScreenToggle: false,
+        muiTablePaperProps: {
+            sx: {
+                maxHeight: TABLE_MAX_HEIGHT,
+                display: 'flex',
+                flexDirection: 'column'
+            }
+        },
+        muiTableContainerProps: {
+            sx: {
+                maxHeight: TABLE_MAX_HEIGHT,
+                overflow: 'auto'
+            }
+        },
         muiToolbarAlertBannerProps: error ? {color: 'error', children: error} : undefined
     });
 

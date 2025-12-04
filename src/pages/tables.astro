@@ -5,5 +5,7 @@ import ServerTable from '@/components/tables/ServerTable.jsx'
 console.log(`tables page`)
 ---
 <Layout title="Server tables" headings={[]} >
-    <ServerTable client:only="react"/>
+    <div style="background:#fff; padding:16px;">
+        <ServerTable client:only="react"/>
+    </div>
 </Layout>
