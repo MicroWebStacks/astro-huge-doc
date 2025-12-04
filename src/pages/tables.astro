@@ -1,0 +1,9 @@
+---
+import Layout from "@/layout/Layout.astro"
+import ServerTable from '@/components/tables/ServerTable.jsx'
+
+console.log(`tables page`)
+---
+<Layout title="Server tables" headings={[]} >
+    <ServerTable client:load/>
+</Layout>
