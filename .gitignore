@@ -6,3 +6,4 @@ node_modules/
 content/
 dataset/
 .tmp/
+dev-journal.md
