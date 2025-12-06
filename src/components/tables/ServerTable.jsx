@@ -1,21 +1,19 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {MaterialReactTable, useMaterialReactTable} from 'material-react-table';
-
+import {MantineReactTable, useMantineReactTable} from 'mantine-react-table';
 import {
     Alert,
-    Box,
     Button,
-    CssBaseline,
-    Divider,
-    FormControlLabel,
-    FormGroup,
     Checkbox,
+    Divider,
+    Group,
+    MantineProvider,
+    Paper,
+    ScrollArea,
     Stack,
-    TextField,
-    ThemeProvider,
-    Typography,
-    createTheme
-} from '@mui/material';
+    Text,
+    TextInput
+} from '@mantine/core';
+import './ServerTable.css';
 
 const API_ENDPOINT = '/api/tables';
 const DEFAULT_TABLE = 'dataset.asset_info';
@@ -67,41 +65,30 @@ function Facet({column, stat, options, selected, onToggle, onClear}) {
         return null;
     }
     return (
-        <Box
-            key={column.id}
-            sx={{
-                minWidth: 220,
-                border: '1px solid #e5e7eb',
-                borderRadius: 1,
-                p: 1.5,
-                backgroundColor: '#fff'
-            }}
-        >
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="subtitle2">
+        <Paper key={column.id} withBorder shadow="xs" className="facet-card">
+            <Group position="apart" align="center" className="facet-card__header">
+                <Text fw={600} size="sm">
                     {column.columnDef.header}{' '}
                     {typeof stat?.unique_count === 'number' ? `(unique ${stat.unique_count})` : ''}
-                </Typography>
-                <Button size="small" onClick={() => onClear(column)}>
+                </Text>
+                <Button variant="subtle" size="xs" onClick={() => onClear(column)}>
                     Clear
                 </Button>
-            </Stack>
-            <FormGroup sx={{maxHeight: 200, overflowY: 'auto', mt: 1}}>
-                {options.map(({raw, label, count}) => (
-                    <FormControlLabel
-                        key={label}
-                        control={
-                            <Checkbox
-                                size="small"
-                                checked={selected.has(raw)}
-                                onChange={() => onToggle(column, raw)}
-                            />
-                        }
-                        label={`${label} (${count})`}
-                    />
-                ))}
-            </FormGroup>
-        </Box>
+            </Group>
+            <ScrollArea className="facet-options">
+                <Stack gap="xs">
+                    {options.map(({raw, label, count}) => (
+                        <Checkbox
+                            key={label}
+                            size="sm"
+                            checked={selected.has(raw)}
+                            onChange={() => onToggle(column, raw)}
+                            label={`${label} (${count})`}
+                        />
+                    ))}
+                </Stack>
+            </ScrollArea>
+        </Paper>
     );
 }
 
@@ -122,19 +109,15 @@ function SearchPanes({table, columnStats, getStatOptions, clearFacet, toggleFace
     }
 
     return (
-        <Box
-            sx={{
-                border: '1px solid #e5e7eb',
-                borderRadius: 1,
-                p: 2,
-                backgroundColor: '#fafafa'
-            }}
-        >
-            <Typography variant="subtitle1" sx={{mb: 1}}>
-                Facet filters (low-cardinality columns)
-            </Typography>
-            <Divider sx={{mb: 1}} />
-            <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+        <Paper withBorder shadow="xs" className="search-panes">
+            <Group position="apart" align="center" className="search-panes__header">
+                <Text fw={600}>Facet filters</Text>
+                <Text size="sm" c="dimmed">
+                    Low-cardinality columns
+                </Text>
+            </Group>
+            <Divider />
+            <div className="facet-grid">
                 {facets.map(({column, stat, options, selected}) => (
                     <Facet
                         key={column.id}
@@ -146,8 +129,8 @@ function SearchPanes({table, columnStats, getStatOptions, clearFacet, toggleFace
                         onClear={clearFacet}
                     />
                 ))}
-            </Stack>
-        </Box>
+            </div>
+        </Paper>
     );
 }
 
@@ -166,8 +149,6 @@ export default function ServerTable() {
         const keys = columnNames.length ? columnNames : rows[0] ? Object.keys(rows[0]) : [];
         return buildColumns(keys, rows, columnStats);
     }, [columnNames, rows, columnStats]);
-    const theme = useMemo(() => createTheme({palette: {mode: 'light'}}), []);
-
     const getStatOptions = useCallback(
         (column) => {
             if (!column) {
@@ -291,7 +272,7 @@ export default function ServerTable() {
         fetchTable(activeTableRef.current, columnFilters);
     }, [columnFilters, fetchTable]);
 
-    const table = useMaterialReactTable({
+    const table = useMantineReactTable({
         columns,
         data: rows,
         getRowId: (row, index) => {
@@ -314,78 +295,64 @@ export default function ServerTable() {
         enableFullScreenToggle: false,
         enableColumnFilters: true,
         enableFilterMatchHighlighting: true,
-        muiTablePaperProps: {
-            sx: {
-                maxHeight: TABLE_MAX_HEIGHT,
-                display: 'flex',
-                flexDirection: 'column'
-            }
-        },
-        muiTableContainerProps: {
-            sx: {
-                maxHeight: TABLE_MAX_HEIGHT,
-                overflow: 'auto'
-            }
-        },
-        muiToolbarAlertBannerProps: error ? {color: 'error', children: error} : undefined
+        mantineTablePaperProps: {className: 'table-paper'},
+        mantineTableContainerProps: {className: 'table-container'},
+        mantineToolbarAlertBannerProps: error ? {color: 'red', children: error} : undefined
     });
 
     return (
-        <ThemeProvider theme={theme}>
-            <CssBaseline />
-            <Stack spacing={2} sx={{p: 2}}>
-                <Typography variant="h5" component="h1">
-                    Server tables with DuckDB + Material React Table
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                    Fetch any attached table (for example {DEFAULT_TABLE}) through /api/tables and render it with
-                    Material React Table.
-                </Typography>
-                <Box
-                    component="form"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        fetchTable(tableName);
-                    }}
-                    sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                        flexWrap: 'wrap'
-                    }}
-                >
-                    <TextField
-                        label="Table name"
-                        size="small"
-                        value={tableName}
-                        onChange={(event) => setTableName(event.target.value)}
-                        disabled={loading}
+        <MantineProvider withGlobalStyles withNormalizeCSS theme={{colorScheme: 'dark'}}>
+            <div className="server-table-wrapper">
+                <Stack spacing="sm">
+                    <Text component="h1" fw={700} size="lg">
+                        Server tables with DuckDB + Mantine React Table
+                    </Text>
+                    <Text size="sm" c="dimmed">
+                        Fetch any attached table (for example {DEFAULT_TABLE}) through /api/tables and render it with
+                        Mantine React Table.
+                    </Text>
+                    <form
+                        className="table-form"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            fetchTable(tableName);
+                        }}
+                    >
+                        <div className="form-row">
+                            <TextInput
+                                label="Table name"
+                                value={tableName}
+                                onChange={(event) => setTableName(event.currentTarget.value)}
+                                disabled={loading}
+                                placeholder="dataset.asset_info"
+                            />
+                            <Button type="submit" disabled={loading}>
+                                {loading ? 'Loading...' : 'Load table'}
+                            </Button>
+                            <Text size="sm" className="status-text">
+                                {loading
+                                    ? `Loading ${tableName || 'table'}...`
+                                    : activeTable
+                                      ? `Showing ${activeTable} (${rows.length} rows)`
+                                      : 'No table loaded yet'}
+                            </Text>
+                        </div>
+                    </form>
+                    {error ? (
+                        <Alert color="red" title="Error">
+                            {error}
+                        </Alert>
+                    ) : null}
+                    <SearchPanes
+                        table={table}
+                        columnStats={columnStats}
+                        getStatOptions={getStatOptions}
+                        clearFacet={clearFacet}
+                        toggleFacetValue={toggleFacetValue}
                     />
-                    <Button type="submit" variant="contained" disabled={loading}>
-                        {loading ? 'Loading...' : 'Load table'}
-                    </Button>
-                    <Typography variant="body2" color="text.secondary" sx={{minHeight: '1.5em'}}>
-                        {loading
-                            ? `Loading ${tableName || 'table'}...`
-                            : activeTable
-                              ? `Showing ${activeTable} (${rows.length} rows)`
-                              : 'No table loaded yet'}
-                    </Typography>
-                </Box>
-                {error ? (
-                    <Alert severity="error" variant="filled">
-                        {error}
-                    </Alert>
-                ) : null}
-                <SearchPanes
-                    table={table}
-                    columnStats={columnStats}
-                    getStatOptions={getStatOptions}
-                    clearFacet={clearFacet}
-                    toggleFacetValue={toggleFacetValue}
-                />
-                <MaterialReactTable table={table} />
-            </Stack>
-        </ThemeProvider>
+                    <MantineReactTable table={table} />
+                </Stack>
+            </div>
+        </MantineProvider>
     );
 }
