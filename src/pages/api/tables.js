@@ -10,6 +10,24 @@ function jsonResponse(body, init = {}) {
 }
 
 const IDENTIFIER_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const LOW_CARDINALITY_THRESHOLD = 20;
+
+function quoteIdentifier(identifier) {
+    return `"${identifier.replace(/"/g, '""')}"`;
+}
+
+function escapeLiteral(value) {
+    if (value === null || value === undefined) {
+        return 'NULL';
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return String(value);
+    }
+    if (typeof value === 'boolean') {
+        return value ? 'TRUE' : 'FALSE';
+    }
+    return `'${String(value).replace(/'/g, "''")}'`;
+}
 
 function normalizeTableIdentifier(rawValue) {
     if (typeof rawValue !== 'string') {
@@ -31,6 +49,87 @@ function normalizeTableIdentifier(rawValue) {
     return null;
 }
 
+async function fetchColumns(tableIdentifier) {
+    const [schema, table] = tableIdentifier.split('.');
+    const columnsSql = `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = '${schema}'
+          AND table_name = '${table}'
+        ORDER BY ordinal_position
+    `;
+    const infoRows = await queryDataset(columnsSql);
+    return (infoRows ?? [])
+        .map((row) => row?.column_name)
+        .filter((name) => typeof name === 'string' && name.length > 0);
+}
+
+function buildWhereClause(filters, allowedColumns) {
+    if (!Array.isArray(filters) || !filters.length) {
+        return '';
+    }
+    const clauses = [];
+    for (const filter of filters) {
+        const column = typeof filter?.column === 'string' ? filter.column.trim() : '';
+        if (!column || !allowedColumns.includes(column)) {
+            throw new Error(`Unknown filter column: ${column}`);
+        }
+        const values = Array.isArray(filter?.values)
+            ? filter.values
+            : filter?.values !== undefined
+              ? [filter.values]
+              : [];
+        const normalized = values.map((value) => (value === undefined ? null : value));
+        if (!normalized.length) {
+            continue;
+        }
+        const nonNullValues = normalized.filter((value) => value !== null);
+        const includesNull = normalized.length > nonNullValues.length;
+        const parts = [];
+        if (nonNullValues.length) {
+            const literals = nonNullValues.map(escapeLiteral).join(', ');
+            parts.push(`${quoteIdentifier(column)} IN (${literals})`);
+        }
+        if (includesNull) {
+            parts.push(`${quoteIdentifier(column)} IS NULL`);
+        }
+        if (parts.length) {
+            clauses.push(parts.length > 1 ? `(${parts.join(' OR ')})` : parts[0]);
+        }
+    }
+    if (!clauses.length) {
+        return '';
+    }
+    return `WHERE ${clauses.join(' AND ')}`;
+}
+
+async function fetchColumnStats(tableIdentifier, columnNames, whereClause) {
+    const stats = {};
+    for (const columnName of columnNames) {
+        const quotedColumn = quoteIdentifier(columnName);
+        const uniqueCountSql = `SELECT COUNT(DISTINCT ${quotedColumn}) AS unique_count FROM ${tableIdentifier} ${whereClause}`;
+        const uniqueRows = await queryDataset(uniqueCountSql);
+        const uniqueCountRaw = uniqueRows?.[0]?.unique_count ?? uniqueRows?.[0]?.count ?? 0;
+        const uniqueCount = Number(uniqueCountRaw);
+        const lowCardinality = Number.isFinite(uniqueCount) && uniqueCount <= LOW_CARDINALITY_THRESHOLD;
+        let values = null;
+        if (lowCardinality) {
+            const valueCountsSql = `SELECT ${quotedColumn} AS value, COUNT(*) AS count FROM ${tableIdentifier} ${whereClause} GROUP BY ${quotedColumn} ORDER BY count DESC, value ASC`;
+            const valueRows = await queryDataset(valueCountsSql);
+            values = (valueRows ?? []).map((row) => ({
+                value: row?.value ?? null,
+                count: row?.count ?? 0
+            }));
+        }
+        stats[columnName] = {
+            unique_count: Number.isFinite(uniqueCount) ? uniqueCount : 0,
+            low_cardinality: lowCardinality,
+            values
+        };
+    }
+    return stats;
+}
+
 export async function POST({request}) {
     let payload = null;
     try {
@@ -46,17 +145,25 @@ export async function POST({request}) {
         );
     }
 
+    const filters = Array.isArray(payload?.filters) ? payload.filters : [];
+
     try {
-        const sql = `SELECT * FROM ${tableIdentifier}`;
+        const columns = await fetchColumns(tableIdentifier);
+        const whereClause = buildWhereClause(filters, columns);
+        const sql = `SELECT * FROM ${tableIdentifier} ${whereClause}`;
         const rows = await queryDataset(sql);
-        const columns = rows.length ? Object.keys(rows[0]) : [];
+        const resolvedColumns = columns.length ? columns : rows.length ? Object.keys(rows[0]) : [];
+        const stats = await fetchColumnStats(tableIdentifier, resolvedColumns, whereClause);
         return jsonResponse({
             table: tableIdentifier,
-            columns,
+            columns: resolvedColumns,
             row_count: rows.length,
-            rows
+            rows,
+            stats
         });
     } catch (error) {
-        return jsonResponse({error: error instanceof Error ? error.message : String(error)}, {status: 500});
+        const message = error instanceof Error ? error.message : String(error);
+        const status = message.startsWith('Unknown filter column:') ? 400 : 500;
+        return jsonResponse({error: message}, {status});
     }
 }
