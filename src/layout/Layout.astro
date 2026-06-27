@@ -24,6 +24,30 @@ const appbar_menu = navigation.appBarMenu ?? []
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
 		<link rel="icon" type="image/x-icon" href={`/favicon.ico`}>
+		<script is:inline>
+			// Resolve and apply the theme before first paint to avoid a
+			// flash of the wrong palette (bright flash on dark, dark flash on light).
+			(function () {
+				try {
+					var pref = localStorage.getItem('theme-pref') || 'auto';
+					if (pref !== 'light' && pref !== 'dark' && pref !== 'auto') {
+						pref = 'auto';
+					}
+					var resolved = pref;
+					if (pref === 'auto') {
+						resolved = window.matchMedia('(prefers-color-scheme: light)').matches
+							? 'light'
+							: 'dark';
+					}
+					var root = document.documentElement;
+					root.setAttribute('data-theme', resolved);
+					root.setAttribute('data-theme-pref', pref);
+				} catch (e) {
+					document.documentElement.setAttribute('data-theme', 'dark');
+					document.documentElement.setAttribute('data-theme-pref', 'auto');
+				}
+			})();
+		</script>
 	</head>
 	<body >
 		<div id="fixed-left" class="fixed-nav active" />
@@ -51,7 +75,7 @@ const appbar_menu = navigation.appBarMenu ?? []
 					}
 				</div>
 			</main>
-			<footer>
+			<footer hidden>
 				<p>footer</p>
 			</footer>
 		</div>
@@ -66,6 +90,8 @@ body{
 	font-family: Arial, Helvetica, sans-serif;
 	display:flex;
 	flex-direction: row;
+	background-color: var(--content-bg-color);
+	color: var(--content-color);
 }
 /* Body => #fixed-left, .appbar-nav_content-footer, #fixed-right */
 .appbar-nav_content-footer{

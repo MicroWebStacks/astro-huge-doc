@@ -1,6 +1,7 @@
 ---
 import './colors.css';
 import Icon from "@/components/icon.astro"
+import ThemeToggle from './ThemeToggle.astro';
 import { buildAppBarMenu } from './layout_utils.js';
 
 export interface Props {
@@ -38,6 +39,9 @@ const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.ali
                 </a>
             </li>
         ))}
+        <li class="theme-toggle-item">
+            <ThemeToggle />
+        </li>
     </ul>
 </div>
 
@@ -80,12 +84,16 @@ a:hover{
 }
 a.active{
     border:0px;
-    border-bottom:  3px solid rgb(88, 88, 88);
+    border-bottom:  3px solid var(--content-color-faint);
     background-color: var(--header-active-color);
 }
 
 .navbar-right > li > a{
     float:right;
     padding: 6px;
+}
+.theme-toggle-item{
+    display:flex;
+    align-items:center;
 }
 </style>

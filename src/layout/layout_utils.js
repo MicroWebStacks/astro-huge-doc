@@ -132,13 +132,47 @@ function loadDocuments() {
         .all();
 }
 
+/* The set of top-level names that are real folders (sections of their own).
+ * Anything not in this set — the root index and loose root files — belongs to "home".
+ */
+function topLevelSections(docs) {
+    const sections = new Set();
+    for (const doc of docs) {
+        if (doc.url_type === 'dir' && doc.url) {
+            sections.add(doc.url.split('/')[0]);
+        }
+    }
+    return sections;
+}
+
+function sectionKeyForDoc(doc, sections) {
+    if (!doc.url || doc.url === 'home') {
+        return 'home';
+    }
+    const first = doc.url.split('/')[0];
+    return sections.has(first) ? first : 'home';
+}
+
+function resolveSection(pathname, sections) {
+    const segment = section_from_pathname(pathname);
+    if (segment === 'home' || segment === 'external') {
+        return segment;
+    }
+    return sections.has(segment) ? segment : 'home';
+}
+
+function homeLabel(doc) {
+    return doc?.title && doc.title !== '.' ? doc.title : 'Home';
+}
+
 function buildAppBarMenuFromDocs(docs, pathname) {
-    const currentSection = section_from_pathname(pathname);
+    const sections = topLevelSections(docs);
+    const currentSection = resolveSection(pathname, sections);
     const topLevel = docs.filter((doc) => segmentCount(doc.url) <= 1);
     const sectionMap = new Map();
 
     for (const doc of topLevel) {
-        const section = doc.url ? doc.url.split('/')[0] : 'home';
+        const section = sectionKeyForDoc(doc, sections);
         if (!sectionMap.has(section)) {
             sectionMap.set(section, doc);
             continue;
@@ -150,27 +184,34 @@ function buildAppBarMenuFromDocs(docs, pathname) {
     }
 
     const items = [];
-    for (const doc of sectionMap.values()) {
-        const isHome = doc.url === '' || doc.url === 'home';
+    for (const [section, doc] of sectionMap) {
+        const isHome = section === 'home';
         const link = isHome ? '/' : buildDocLink(doc.url);
         items.push({
-            label: doc.title ?? labelFromUrl(doc.url),
+            label: isHome ? homeLabel(doc) : (doc.title ?? labelFromUrl(doc.url)),
             link,
-            active_class: section_from_pathname(link) === currentSection ? 'active' : '',
-            order: doc.sort_order ?? 0
+            active_class: resolveSection(link, sections) === currentSection ? 'active' : '',
+            order: doc.sort_order ?? 0,
+            isHome
         });
     }
-    items.sort(sortByOrderThenLabel);
-    return items;
+    items.sort((a, b) => {
+        if (a.isHome !== b.isHome) {
+            return a.isHome ? -1 : 1;
+        }
+        return sortByOrderThenLabel(a, b);
+    });
+    return items.map(({isHome, ...item}) => item);
 }
 
 function buildSectionMenuFromDocs(docs, pathname) {
-    const section = section_from_pathname(pathname);
+    const sections = topLevelSections(docs);
+    const section = resolveSection(pathname, sections);
     const activeUrl = docUrlFromPathname(pathname);
     const isHome = section === 'home';
     const filtered = docs.filter((doc) => {
         if (isHome) {
-            return doc.url && (doc.url === '' || doc.url === 'home' || doc.url.startsWith('home/'));
+            return sectionKeyForDoc(doc, sections) === 'home';
         }
         return doc.url.startsWith(`${section}/`);
     });

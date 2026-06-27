@@ -134,7 +134,27 @@ function SearchPanes({table, columnStats, getStatOptions, clearFacet, toggleFace
     );
 }
 
+// Follow the site's light/dark toggle: mirror the <html data-theme> attribute
+// into Mantine's colorScheme and update live when the user switches themes.
+function useSiteColorScheme() {
+    const read = () =>
+        (typeof document !== 'undefined' &&
+            document.documentElement.getAttribute('data-theme') === 'light')
+            ? 'light'
+            : 'dark';
+    const [colorScheme, setColorScheme] = useState(read);
+    useEffect(() => {
+        const target = document.documentElement;
+        const observer = new MutationObserver(() => setColorScheme(read()));
+        observer.observe(target, {attributes: true, attributeFilter: ['data-theme']});
+        setColorScheme(read());
+        return () => observer.disconnect();
+    }, []);
+    return colorScheme;
+}
+
 export default function ServerTable() {
+    const colorScheme = useSiteColorScheme();
     const [tableName, setTableName] = useState(DEFAULT_TABLE);
     const [activeTable, setActiveTable] = useState('');
     const activeTableRef = useRef('');
@@ -301,7 +321,7 @@ export default function ServerTable() {
     });
 
     return (
-        <MantineProvider withGlobalStyles withNormalizeCSS theme={{colorScheme: 'dark'}}>
+        <MantineProvider withGlobalStyles withNormalizeCSS theme={{colorScheme}}>
             <div className="server-table-wrapper">
                 <Stack spacing="sm">
                     <Text component="h1" fw={700} size="lg">

@@ -30,6 +30,7 @@ const DEFAULT_MANIFEST = {
     render: {
         highlighter: {
             theme: 'dark-plus',
+            themes: {light: 'light-plus', dark: 'dark-plus'},
             langs: ['javascript', 'js', 'python', 'yaml', 'markdown', 'text']
         }
     },

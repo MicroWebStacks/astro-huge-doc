@@ -77,10 +77,10 @@ const encodedSql = chartDefinition?.sql ? encodeURIComponent(chartDefinition.sql
     margin-bottom: 0.5rem;
 }
 .chart-error {
-    border-left: 4px solid #f66;
+    border-left: 4px solid var(--chart-error-accent-color);
     padding: 1rem;
-    background: #2b1f1f;
-    color: #ffdede;
+    background: var(--chart-error-bg-color);
+    color: var(--chart-error-text-color);
     margin: 1rem 0;
 }
 </style>

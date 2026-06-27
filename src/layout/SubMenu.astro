@@ -3,13 +3,14 @@ import './colors.css';
 
 export interface Props {
 	items: Array<Object>;
-    root:boolean;
+    root?:boolean;
     level?:number;
     visibleLevel?: number;
     activePath?: Set<string>;
     forceVisible?: boolean;
+    linkClass?: string;
 }
-const { items,root=true, level=1, visibleLevel = Number.POSITIVE_INFINITY, activePath, forceVisible = false } = Astro.props;
+const { items,root=true, level=1, visibleLevel = Number.POSITIVE_INFINITY, activePath, forceVisible = false, linkClass = '' } = Astro.props;
 const nextLevel = level + 1;
 ---
 {items &&
@@ -19,13 +20,13 @@ const nextLevel = level + 1;
                 <div class:list={[{entry_container:true, active:item.active, parent:item.parent, expanded:(item.parent && (nextLevel <= visibleLevel || forceVisible || activePath?.has(item.link??'')))}]}>
                     {item.parent &&
                         <span class="icon expand">
-                            <svg viewBox="0 0 100 100" width="60" height="60" fill="#00000000" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M 20,10 L 70,50 L 20,90" stroke-width="20px" stroke="#d0d0d0" stroke-linecap="round" stroke-linejoin="round"></path>
+                            <svg viewBox="0 0 100 100" width="60" height="60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M 20,10 L 70,50 L 20,90" stroke-width="20px" stroke="var(--menu-arrow-color)" stroke-linecap="round" stroke-linejoin="round"></path>
                             </svg>
                         </span>
                     }
                     {Object.hasOwn(item,"link")?
-                        <a  href={item.link}>
+                        <a  href={item.link} class:list={[linkClass]}>
                             <span class:list={["text href_hover",{parent:item.parent}]}>{item.label}</span>
                         </a>:
                         <span class:list={["text",{parent:item.parent}]}>{item.label}</span>
@@ -38,6 +39,7 @@ const nextLevel = level + 1;
                     visibleLevel={visibleLevel}
                     activePath={activePath}
                     forceVisible={forceVisible || activePath?.has(item.link ?? '')}
+                    linkClass={linkClass}
                 />
             </li>
         ))}
@@ -96,7 +98,7 @@ const nextLevel = level + 1;
         padding:2px;
         padding-top:3px;
         padding-bottom:3px;
-        color:#bbb;
+        color:var(--menu-text-color);
         display: block;
         flex-grow: 1;
     }
@@ -120,6 +122,16 @@ const nextLevel = level + 1;
         cursor: pointer;
     }
     span.text.href_hover:hover{
+        background-color: var(--menu-span-hover-color);
+    }
+
+    /* scroll-spy cross-highlight: toc link matching the heading in view */
+    a.toc_href.active > span.text{
+        background-color: var(--menu-active-color);
+        box-shadow: inset 3px 0 0 var(--front-blue);
+        color: var(--content-color);
+    }
+    a.toc_href.hover > span.text{
         background-color: var(--menu-span-hover-color);
     }
 

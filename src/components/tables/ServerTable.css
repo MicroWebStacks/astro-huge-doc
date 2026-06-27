@@ -1,7 +1,7 @@
 .server-table-wrapper {
     padding: 16px;
-    background: #0b1021;
-    color: #e5e7eb;
+    background: var(--data-table-bg);
+    color: var(--data-table-text-color);
     min-height: 100vh;
 }
 
@@ -25,9 +25,9 @@
 .search-panes {
     border-radius: 8px;
     padding: 16px;
-    background: #0f172a;
-    border-color: #1f2937;
-    color: #e5e7eb;
+    background: var(--data-table-panel-bg);
+    border-color: var(--data-table-border-color);
+    color: var(--data-table-text-color);
 }
 
 .search-panes__header {
@@ -44,8 +44,8 @@
     min-width: 220px;
     border-radius: 8px;
     padding: 12px;
-    background: #111827;
-    border-color: #1f2937;
+    background: var(--data-table-card-bg);
+    border-color: var(--data-table-border-color);
 }
 
 .facet-card__header {
