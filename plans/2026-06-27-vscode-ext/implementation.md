@@ -145,3 +145,19 @@ Fix:
 * `DiagramCode.astro` now checks whether the generated SVG blob exists. If it
   does not, it renders the source code view directly instead of showing an
   empty diagram panel.
+
+## Preview Cache Invalidation And Version Logging
+
+Follow-up testing showed diagram SVGs were generated and served correctly from
+`/assets/...`, but pages could still render stale diagram HTML from the
+persisted `html_cache` table in the same extension `content.db`.
+
+Fix:
+
+* `scripts/collect.js` now clears `html_cache` after a successful collection.
+* `scripts/diagrams.js` now clears `html_cache` after diagram processing, even
+  when no diagram-capable assets are found.
+* The VS Code extension logs its package version and installed extension path
+  on activation so the Output panel shows which extension copy is running.
+* The local VSIX package version was bumped to `0.0.2` for this diagnostic
+  build.

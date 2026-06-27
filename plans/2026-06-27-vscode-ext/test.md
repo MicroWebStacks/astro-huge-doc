@@ -227,3 +227,42 @@ node --check config.js
 $dbPath='C:\dev\MicroWebStacks\astro-huge-doc\.tmp\diagrams-smoke\content.db'; $storePath='C:\dev\MicroWebStacks\astro-huge-doc\.tmp\diagrams-smoke\store'; New-Item -ItemType Directory -Force -Path (Split-Path $dbPath) | Out-Null; New-Item -ItemType Directory -Force -Path $storePath | Out-Null; node -e "const Database=require('better-sqlite3'); const db=new Database(process.argv[1]); db.exec('DROP TABLE IF EXISTS versions; DROP TABLE IF EXISTS asset_info; DROP TABLE IF EXISTS blob_store; DROP TABLE IF EXISTS assets; DROP TABLE IF EXISTS documents; CREATE TABLE versions (version_id TEXT, created_at TEXT, type TEXT, tags TEXT); CREATE TABLE asset_info (uid TEXT, type TEXT, blob_uid TEXT, parent_doc_uid TEXT, path TEXT, ext TEXT, first_seen TEXT, last_seen TEXT); CREATE TABLE blob_store (blob_uid TEXT, hash TEXT, path TEXT, first_seen TEXT, last_seen TEXT, size INTEGER, compression INTEGER, payload BLOB); CREATE TABLE assets (asset_uid TEXT, version_id TEXT, doc_sid TEXT, blob_uid TEXT, type TEXT); CREATE TABLE documents (uid TEXT, sid TEXT);'); db.prepare('INSERT INTO versions VALUES (?, ?, ?, ?)').run('V1', '2026-06-27T00:00:00.000Z', 'daily', '[]'); db.close();" $dbPath; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; $env:MICROWEBSTACKS_ENGINE_ROOT='C:\dev\MicroWebStacks\astro-huge-doc'; $env:MICROWEBSTACKS_WORKSPACE_ROOT='C:\dev\MicroWebStacks\astro-huge-doc'; $env:MICROWEBSTACKS_DOCS_ROOT='C:\dev\MicroWebStacks\astro-huge-doc\content'; $env:MICROWEBSTACKS_DB_PATH=$dbPath; $env:MICROWEBSTACKS_STORE_PATH=$storePath; $env:MICROWEBSTACKS_OUTDIR='C:\dev\MicroWebStacks\astro-huge-doc\dist'; node scripts\diagrams.js
 $env:ASTRO_TELEMETRY_DISABLED='1'; node node_modules\astro\astro.js build
 ```
+
+## 2026-06-27 - Preview Cache Invalidation
+
+Expected:
+
+* Recollection and diagram generation should invalidate stale rendered HTML so
+  pages cannot keep old `/assets/null:<uid>.svg` markup from `html_cache`.
+* The extension Output panel should show which installed extension version and
+  extension path are active.
+* The repackaged VSIX and installed extension should contain the version/path
+  logging and diagram generation step.
+
+Actual:
+
+* `node --check scripts\diagrams.js` passed.
+* `node --check scripts\collect.js` passed.
+* `node --check packages\vscode-extension\extension.js` passed.
+* `scripts\diagrams.js` smoke test cleared a synthetic stale `html_cache` row;
+  final count was `0`.
+* The VSIX was repackaged and installed successfully with VS Code CLI.
+* The extension package was bumped to `0.0.2`, repackaged as
+  `microwebstacks-docs-preview-0.0.2.vsix`, and installed successfully with VS
+  Code CLI.
+* The installed `0.0.2` extension contains `Extension version`,
+  `Extension path`, and the `scripts\diagrams.js` run step.
+* The current external workspace preview DB had one stale `html_cache` row; it
+  was manually cleared and ended at count `0`.
+
+Commands run:
+
+```txt
+node --check scripts\diagrams.js
+node --check scripts\collect.js
+node --check packages\vscode-extension\extension.js
+$dbPath='C:\dev\MicroWebStacks\astro-huge-doc\.tmp\cache-clear-smoke\content.db'; $storePath='C:\dev\MicroWebStacks\astro-huge-doc\.tmp\cache-clear-smoke\store'; ...; node scripts\diagrams.js; ... SELECT COUNT(*) AS count FROM html_cache
+code.cmd --install-extension C:\dev\MicroWebStacks\astro-huge-doc\packages\vscode-extension\microwebstacks-docs-preview-0.0.2.vsix --force
+Select-String -LiteralPath $env:USERPROFILE\.vscode\extensions\microwebstacks.microwebstacks-docs-preview-0.0.2\extension.js -Pattern "Extension version|Extension path|diagrams\.js"
+DELETE FROM html_cache in C:\Users\wassi\AppData\Roaming\Code\User\workspaceStorage\5016c24955d6a92c7d44a346bbf322d8\microwebstacks.microwebstacks-docs-preview\microwebstacks\5100c9dfd466ec99\content.db
+```

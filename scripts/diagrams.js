@@ -87,6 +87,17 @@ function resolveBlobUidForHash(hash) {
     return row?.blob_uid ?? null;
 }
 
+function clearHtmlCache() {
+    try {
+        db.prepare("DELETE FROM html_cache WHERE EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'html_cache')").run();
+        console.log('html-cache: cleared');
+    } catch (error) {
+        if (!String(error?.message ?? '').includes('no such table')) {
+            console.warn(`html-cache: clear skipped ${error.message}`);
+        }
+    }
+}
+
 async function renderDiagram(language, code) {
     const response = await fetch(`${config.kroki_server}/${language}/svg/`, {
         method: 'POST',
@@ -112,6 +123,7 @@ async function main() {
         .all();
     if (!diagramSources.length) {
         console.log('No diagram-capable assets found; nothing to render.');
+        clearHtmlCache();
         return;
     }
 
@@ -223,6 +235,7 @@ async function main() {
             `${diagramUid} [${diagramType}]: ${insertedBlob ? 'generated' : 'reused'} blob ${blobUid} (hash ${hash.slice(0, 8)})`
         );
     }
+    clearHtmlCache();
 }
 
 main().catch((error) => {

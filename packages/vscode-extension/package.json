@@ -2,7 +2,7 @@
   "name": "microwebstacks-docs-preview",
   "displayName": "MicroWebStacks Docs Preview",
   "description": "Preview astro-huge-doc rendered Markdown documentation inside VS Code.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "microwebstacks",
   "private": true,
   "engines": {

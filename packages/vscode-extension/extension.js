@@ -6,6 +6,7 @@ const fsp = require('fs/promises');
 const http = require('http');
 const net = require('net');
 const path = require('path');
+const extensionPackage = require('./package.json');
 
 const COMMANDS = {
   preview: 'microwebstacks.previewDocs',
@@ -40,6 +41,8 @@ let operation = Promise.resolve();
 
 function activate(context) {
   output = vscode.window.createOutputChannel('MicroWebStacks Docs');
+  log(`Extension version: ${extensionPackage.version}`);
+  log(`Extension path: ${context.extensionPath}`);
   context.subscriptions.push(output);
   context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.preview, () => enqueue(() => previewDocs(context))));
   context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.browser, () => enqueue(() => openDocsInBrowser(context))));
