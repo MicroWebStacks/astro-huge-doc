@@ -1,18 +1,23 @@
 ---
 import Panzoom from '@/components/panzoom/panzoom.astro'
+import { getAssetBlob } from '@/libs/structure-db';
+import { log_debug } from '@/libs/utils';
+import { config } from '@/config';
 
 export interface Props {
     item: {
         slug: string;
         asset_uid: string;
+        blob_uid: string;
     };
 }
 
 const {item} = Astro.props as Props;
 
 const alt = item.slug;
-const asseturl = `/assets/${item.asset_uid}`;
+const blob_uid = getAssetBlob(item.asset_uid, config.collect.version_id);
+const asseturl = `/assets/${blob_uid}:${item.asset_uid}`;
 const meta = {};
-console.log(`MarkdownImage> asseturl: ${asseturl}`);
+log_debug(`  - MarkdownImage> asseturl: ${asseturl}`);
 ---
 <Panzoom src={asseturl} alt={alt} title={""} meta={meta}/>

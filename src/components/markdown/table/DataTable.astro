@@ -1,14 +1,19 @@
 ---
+import { getAssetBlob } from '@/libs/structure-db';
+import { config } from '@/config';
 
 export interface Props {
-    item: object;
+    item: {
+        asset_uid: string;
+    };
 }
 
 const { item } = Astro.props as Props;
-
+const blob_uid = getAssetBlob(item.asset_uid, config.collect.version_id);
+const asset_url = `/assets/${blob_uid}:${item.asset_uid}`;
 ---
 <div class="container">
-    <table class="data-table" data-table-uid={item.asset_uid}>
+    <table class="data-table" data-table-url={asset_url}>
         <!-- Data will be populated dynamically using JavaScript -->
     </table>
 </div>
@@ -17,7 +22,7 @@ const { item } = Astro.props as Props;
 .container{
     padding:5px;
     border-radius: 5px;
-    box-shadow: 2px 2px 3px 3px #ccc;
+    box-shadow: 2px 2px 3px 3px var(--card-shadow-color);
     display: inline-block;
 }
 </style>

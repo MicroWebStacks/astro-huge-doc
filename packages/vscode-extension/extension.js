@@ -1,0 +1,483 @@
+const vscode = require('vscode');
+const cp = require('child_process');
+const crypto = require('crypto');
+const fs = require('fs');
+const fsp = require('fs/promises');
+const http = require('http');
+const net = require('net');
+const path = require('path');
+const extensionPackage = require('./package.json');
+
+const COMMANDS = {
+  preview: 'microwebstacks.previewDocs',
+  browser: 'microwebstacks.openDocsInBrowser',
+  restart: 'microwebstacks.restartDocsPreviewServer',
+  stop: 'microwebstacks.stopDocsPreviewServer'
+};
+
+const WATCHED_EXTENSIONS = new Set([
+  '.md',
+  '.mdx',
+  '.yaml',
+  '.yml',
+  '.json',
+  '.svg',
+  '.webp',
+  '.png',
+  '.jpeg',
+  '.jpg',
+  '.xlsx',
+  '.glb',
+  '.puml'
+]);
+
+let output;
+let serverProcess = null;
+let serverState = null;
+let previewPanel = null;
+let fileWatcher = null;
+let refreshTimer = null;
+let operation = Promise.resolve();
+
+function activate(context) {
+  output = vscode.window.createOutputChannel('MicroWebStacks Docs');
+  log(`Extension version: ${extensionPackage.version}`);
+  log(`Extension path: ${context.extensionPath}`);
+  context.subscriptions.push(output);
+  context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.preview, () => enqueue(() => previewDocs(context))));
+  context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.browser, () => enqueue(() => openDocsInBrowser(context))));
+  context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.restart, () => enqueue(() => restartDocsPreviewServer(context))));
+  context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.stop, () => enqueue(() => stopDocsPreviewServer(true))));
+}
+
+function deactivate() {
+  return stopDocsPreviewServer(false);
+}
+
+function enqueue(task) {
+  operation = operation.then(task, task);
+  return operation;
+}
+
+function log(message) {
+  output.appendLine(`[${new Date().toLocaleTimeString()}] ${message}`);
+}
+
+function showOutput() {
+  output.show(true);
+}
+
+function getWorkspaceFolder() {
+  const activeUri = vscode.window.activeTextEditor?.document?.uri;
+  if (activeUri) {
+    const folder = vscode.workspace.getWorkspaceFolder(activeUri);
+    if (folder) {
+      return folder;
+    }
+  }
+  return vscode.workspace.workspaceFolders?.[0] ?? null;
+}
+
+function exists(filePath) {
+  return fs.existsSync(filePath);
+}
+
+function findNodeExecutable(runtime) {
+  const candidates = [
+    process.env.MICROWEBSTACKS_NODE_PATH,
+    path.join(runtime.engineRoot, 'node_modules', '.bin', process.platform === 'win32' ? 'node.exe' : 'node'),
+    process.platform === 'win32' ? 'node.exe' : 'node'
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    if (candidate.endsWith('node.exe') || candidate.endsWith('/node') || candidate.endsWith('\\node')) {
+      if (path.isAbsolute(candidate) && !exists(candidate)) {
+        continue;
+      }
+      return candidate;
+    }
+  }
+  return process.platform === 'win32' ? 'node.exe' : 'node';
+}
+
+function resolveEngineRoot() {
+  const configured = vscode.workspace.getConfiguration('microwebstacks.preview').get('enginePath');
+  const candidates = [];
+  if (configured) {
+    candidates.push(path.resolve(configured));
+  }
+  candidates.push(path.resolve(__dirname, '..', '..'));
+  candidates.push(path.resolve(__dirname));
+
+  for (const candidate of candidates) {
+    if (exists(path.join(candidate, 'server', 'server.js')) && exists(path.join(candidate, 'scripts', 'collect.js'))) {
+      return candidate;
+    }
+  }
+  throw new Error('Unable to find astro-huge-doc engine. Set microwebstacks.preview.enginePath to this repository checkout.');
+}
+
+function resolveDocsRoot(workspaceRoot, manifestPath) {
+  const configured = vscode.workspace.getConfiguration('microwebstacks.preview').get('docsRoot');
+  if (configured) {
+    return {
+      path: path.isAbsolute(configured) ? configured : path.join(workspaceRoot, configured),
+      passToEngine: true
+    };
+  }
+  if (exists(manifestPath)) {
+    return {
+      path: workspaceRoot,
+      passToEngine: false
+    };
+  }
+  return {
+    path: workspaceRoot,
+    passToEngine: true
+  };
+}
+
+function workspaceKey(workspaceFolder) {
+  return crypto.createHash('sha256').update(workspaceFolder.uri.toString()).digest('hex').slice(0, 16);
+}
+
+async function buildRuntime(context) {
+  const workspaceFolder = getWorkspaceFolder();
+  if (!workspaceFolder) {
+    throw new Error('Open a workspace folder before starting the docs preview.');
+  }
+
+  const engineRoot = resolveEngineRoot();
+  const workspaceRoot = workspaceFolder.uri.fsPath;
+  const manifestPath = path.join(workspaceRoot, 'manifest.yaml');
+  const docsRoot = resolveDocsRoot(workspaceRoot, manifestPath);
+  if (!context.storageUri) {
+    throw new Error('VS Code did not provide workspace-scoped extension storage for this window.');
+  }
+  const storageRoot = path.join(context.storageUri.fsPath, 'microwebstacks', workspaceKey(workspaceFolder));
+  const storePath = path.join(storageRoot, 'store');
+  const dbPath = path.join(storageRoot, 'content.db');
+  const outDir = path.join(engineRoot, 'dist');
+  const entryPath = path.join(outDir, 'server', 'entry.mjs');
+
+  if (!exists(entryPath)) {
+    throw new Error(`Missing Astro SSR build at ${entryPath}. Run pnpm build in the astro-huge-doc repository first.`);
+  }
+  if (!exists(docsRoot.path)) {
+    throw new Error(`Documentation root does not exist: ${docsRoot.path}`);
+  }
+
+  await fsp.mkdir(storageRoot, {recursive: true});
+  await fsp.mkdir(storePath, {recursive: true});
+
+  const runtime = {
+    workspaceFolder,
+    engineRoot,
+    workspaceRoot,
+    docsRoot: docsRoot.path,
+    passDocsRootToEngine: docsRoot.passToEngine,
+    storageRoot,
+    storePath,
+    dbPath,
+    outDir,
+    manifestPath: exists(manifestPath) ? manifestPath : null
+  };
+  log(`Workspace root: ${runtime.workspaceRoot}`);
+  log(`Docs root: ${runtime.docsRoot}`);
+  log(`Engine root: ${runtime.engineRoot}`);
+  log(`Storage root: ${runtime.storageRoot}`);
+  log(`DB path: ${runtime.dbPath}`);
+  log(`SSR outDir: ${runtime.outDir}`);
+  log(`Manifest path: ${runtime.manifestPath ?? '(none; using defaults)'}`);
+  return runtime;
+}
+
+async function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = address.port;
+      server.close(() => resolve(port));
+    });
+  });
+}
+
+function createRuntimeEnv(runtime, port) {
+  return {
+    ...process.env,
+    MICROWEBSTACKS_ENGINE_ROOT: runtime.engineRoot,
+    MICROWEBSTACKS_WORKSPACE_ROOT: runtime.workspaceRoot,
+    MICROWEBSTACKS_DB_PATH: runtime.dbPath,
+    MICROWEBSTACKS_STORE_PATH: runtime.storePath,
+    MICROWEBSTACKS_OUTDIR: runtime.outDir,
+    MICROWEBSTACKS_HOST: '127.0.0.1',
+    MICROWEBSTACKS_PORT: String(port),
+    MICROWEBSTACKS_PROTOCOL: 'http',
+    ...(runtime.passDocsRootToEngine ? {MICROWEBSTACKS_DOCS_ROOT: runtime.docsRoot} : {}),
+    ...(runtime.manifestPath ? {MICROWEBSTACKS_MANIFEST_PATH: runtime.manifestPath} : {})
+  };
+}
+
+function runNodeScript(runtime, scriptPath, env) {
+  return new Promise((resolve, reject) => {
+    const nodeExecutable = findNodeExecutable(runtime);
+    log(`Running ${scriptPath}`);
+    log(`Node executable: ${nodeExecutable}`);
+    const child = cp.spawn(nodeExecutable, [scriptPath], {
+      cwd: runtime.engineRoot,
+      env,
+      shell: process.platform === 'win32',
+      windowsHide: true
+    });
+    child.stdout.on('data', (chunk) => output.append(chunk.toString()));
+    child.stderr.on('data', (chunk) => output.append(chunk.toString()));
+    child.on('error', reject);
+    child.on('exit', (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`${scriptPath} exited with code ${code}`));
+    });
+  });
+}
+
+async function collect(runtime, env) {
+  await runNodeScript(runtime, path.join('scripts', 'collect.js'), env);
+  await runNodeScript(runtime, path.join('scripts', 'diagrams.js'), env);
+}
+
+function startServer(runtime, port, env) {
+  const nodeExecutable = findNodeExecutable(runtime);
+  log(`Starting preview server on http://127.0.0.1:${port}/`);
+  log(`Node executable: ${nodeExecutable}`);
+  const child = cp.spawn(nodeExecutable, [path.join('server', 'server.js')], {
+    cwd: runtime.engineRoot,
+    env,
+    shell: process.platform === 'win32',
+    windowsHide: true
+  });
+  child.stdout.on('data', (chunk) => output.append(chunk.toString()));
+  child.stderr.on('data', (chunk) => output.append(chunk.toString()));
+  child.on('exit', (code, signal) => {
+    if (serverProcess === child) {
+      log(`Preview server exited (code: ${code}, signal: ${signal}).`);
+      serverProcess = null;
+      serverState = null;
+    }
+  });
+  serverProcess = child;
+}
+
+async function waitForServer(url, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError = null;
+  while (Date.now() < deadline) {
+    if (!serverProcess) {
+      throw new Error('Preview server exited before it became reachable. Check the MicroWebStacks Docs output channel.');
+    }
+    try {
+      await requestUrl(url);
+      return;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+  throw new Error(`Preview server did not become reachable at ${url}: ${lastError?.message ?? 'timeout'}`);
+}
+
+function requestUrl(url) {
+  return new Promise((resolve, reject) => {
+    const request = http.get(url, (response) => {
+      response.resume();
+      response.on('end', resolve);
+    });
+    request.setTimeout(2000, () => {
+      request.destroy(new Error('request timed out'));
+    });
+    request.on('error', reject);
+  });
+}
+
+async function ensureServer(context) {
+  if (serverProcess && serverState) {
+    return serverState;
+  }
+  const runtime = await buildRuntime(context);
+  const port = await getFreePort();
+  const env = createRuntimeEnv(runtime, port);
+  await collect(runtime, env);
+  startServer(runtime, port, env);
+  const browserUrl = `http://127.0.0.1:${port}/`;
+  await waitForServer(browserUrl);
+  serverState = {
+    ...runtime,
+    port,
+    browserUrl,
+    webviewUrl: `http://localhost:${port}/`,
+    env
+  };
+  ensureWatcher(context, serverState);
+  return serverState;
+}
+
+function ensureWatcher(context, state) {
+  if (fileWatcher) {
+    fileWatcher.dispose();
+    fileWatcher = null;
+  }
+  const pattern = new vscode.RelativePattern(state.docsRoot, '**/*');
+  fileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
+  const onChange = (uri) => {
+    const ext = path.extname(uri.fsPath).toLowerCase();
+    if (!WATCHED_EXTENSIONS.has(ext)) {
+      return;
+    }
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => {
+      enqueue(() => refreshPreviewAfterChange(context)).catch((error) => {
+        vscode.window.showErrorMessage(error.message);
+      });
+    }, 600);
+  };
+  fileWatcher.onDidCreate(onChange);
+  fileWatcher.onDidChange(onChange);
+  fileWatcher.onDidDelete(onChange);
+  context.subscriptions.push(fileWatcher);
+}
+
+async function refreshPreviewAfterChange(context) {
+  if (!serverState) {
+    return;
+  }
+  log('File change detected; rebuilding preview index and restarting server.');
+  await stopDocsPreviewServer(false);
+  const state = await ensureServer(context);
+  updatePreviewPanel(state);
+}
+
+async function previewDocs(context) {
+  try {
+    const state = await ensureServer(context);
+    openPreviewPanel(context, state);
+  } catch (error) {
+    log(error.stack || error.message);
+    showOutput();
+    vscode.window.showErrorMessage(error.message);
+  }
+}
+
+async function openDocsInBrowser(context) {
+  try {
+    const state = await ensureServer(context);
+    await vscode.env.openExternal(vscode.Uri.parse(state.browserUrl));
+  } catch (error) {
+    log(error.stack || error.message);
+    showOutput();
+    vscode.window.showErrorMessage(error.message);
+  }
+}
+
+async function restartDocsPreviewServer(context) {
+  try {
+    await stopDocsPreviewServer(false);
+    const state = await ensureServer(context);
+    updatePreviewPanel(state);
+    vscode.window.showInformationMessage('MicroWebStacks docs preview server restarted.');
+  } catch (error) {
+    log(error.stack || error.message);
+    showOutput();
+    vscode.window.showErrorMessage(error.message);
+  }
+}
+
+async function stopDocsPreviewServer(showMessage) {
+  clearTimeout(refreshTimer);
+  refreshTimer = null;
+  if (fileWatcher) {
+    fileWatcher.dispose();
+    fileWatcher = null;
+  }
+  if (serverProcess) {
+    const child = serverProcess;
+    serverProcess = null;
+    serverState = null;
+    child.kill();
+    log('Stopped preview server.');
+  }
+  if (showMessage) {
+    vscode.window.showInformationMessage('MicroWebStacks docs preview server stopped.');
+  }
+}
+
+function openPreviewPanel(context, state) {
+  if (previewPanel) {
+    previewPanel.reveal(vscode.ViewColumn.Beside);
+    updatePreviewPanel(state);
+    return;
+  }
+  previewPanel = vscode.window.createWebviewPanel(
+    'microwebstacksDocsPreview',
+    'MicroWebStacks Docs',
+    vscode.ViewColumn.Beside,
+    {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+      portMapping: [{webviewPort: state.port, extensionHostPort: state.port}]
+    }
+  );
+  previewPanel.onDidDispose(() => {
+    previewPanel = null;
+  }, null, context.subscriptions);
+  updatePreviewPanel(state);
+}
+
+function updatePreviewPanel(state) {
+  if (!previewPanel) {
+    return;
+  }
+  previewPanel.webview.html = renderWebviewHtml(state.webviewUrl, state.port, previewPanel.webview.cspSource);
+}
+
+function renderWebviewHtml(url, port, cspSource) {
+  const escapedUrl = escapeHtml(url);
+  const escapedCspSource = escapeHtml(cspSource);
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src http://localhost:${port} http://127.0.0.1:${port}; style-src 'unsafe-inline' ${escapedCspSource};">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MicroWebStacks Docs</title>
+  <style>
+    html, body, iframe {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      overflow: hidden;
+      background: var(--vscode-editor-background);
+    }
+  </style>
+</head>
+<body>
+  <iframe src="${escapedUrl}" title="MicroWebStacks Docs Preview"></iframe>
+</body>
+</html>`;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+module.exports = {
+  activate,
+  deactivate
+};

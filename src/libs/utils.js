@@ -111,6 +111,11 @@ function file_mime(path){
     return 'application/octet-stream'
 }
 
+function log_debug(...args){
+  if(import.meta.env.DEV){
+    console.log(...args)
+  }
+}
 
 export{
   shortMD5,
@@ -122,5 +127,6 @@ export{
   save_json,
   save_file,
   get_dir_files,
-  file_mime
+  file_mime,
+  log_debug
 }

@@ -1,6 +1,11 @@
 const root = document.querySelector(':root');
-const header_bg_color = getComputedStyle(root).getPropertyValue('--header-bg-color');
-const content_bg_color = getComputedStyle(root).getPropertyValue('--content-bg-color');
+// Read tokens live so resize-handle colors follow the active light/dark theme
+// instead of being frozen to whatever was active at page load.
+function cssVar(name){
+    return getComputedStyle(root).getPropertyValue(name).trim();
+}
+function header_bg_color(){ return cssVar('--header-bg-color'); }
+function content_bg_color(){ return cssVar('--content-bg-color'); }
 
 function configure_nav(fixed_el,resize_el,nav_el,left_to_right){
     fixed_el.addEventListener("click",(e)=>{
@@ -35,14 +40,14 @@ function configure_nav(fixed_el,resize_el,nav_el,left_to_right){
         nav_el.classList.add("open")
         nav_el.classList.remove("closed")
     }
-    resize_el.style.backgroundColor = content_bg_color
+    resize_el.style.backgroundColor = content_bg_color()
     }
-    
+
     resize_el.addEventListener("mouseenter",(e)=>{
-        resize_el.style.backgroundColor = header_bg_color
+        resize_el.style.backgroundColor = header_bg_color()
     })
     resize_el.addEventListener("mouseleave",(e)=>{
-        resize_el.style.backgroundColor = content_bg_color
+        resize_el.style.backgroundColor = content_bg_color()
     })
     resize_el.addEventListener("mousedown",(e)=>{
         global_resize_state = true

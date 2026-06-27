@@ -1,0 +1,56 @@
+{
+  "name": "microwebstacks-docs-preview",
+  "displayName": "MicroWebStacks Docs Preview",
+  "description": "Preview astro-huge-doc rendered Markdown documentation inside VS Code.",
+  "version": "0.0.2",
+  "publisher": "microwebstacks",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:microwebstacks.previewDocs",
+    "onCommand:microwebstacks.openDocsInBrowser",
+    "onCommand:microwebstacks.restartDocsPreviewServer",
+    "onCommand:microwebstacks.stopDocsPreviewServer"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "microwebstacks.previewDocs",
+        "title": "MicroWebStacks: Preview Docs in VS Code"
+      },
+      {
+        "command": "microwebstacks.openDocsInBrowser",
+        "title": "MicroWebStacks: Open Docs in Browser"
+      },
+      {
+        "command": "microwebstacks.restartDocsPreviewServer",
+        "title": "MicroWebStacks: Restart Docs Preview Server"
+      },
+      {
+        "command": "microwebstacks.stopDocsPreviewServer",
+        "title": "MicroWebStacks: Stop Docs Preview Server"
+      }
+    ],
+    "configuration": {
+      "title": "MicroWebStacks Docs Preview",
+      "properties": {
+        "microwebstacks.preview.enginePath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to an astro-huge-doc repository checkout. Only needed when the extension cannot infer the engine path."
+        },
+        "microwebstacks.preview.docsRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Optional path to the documentation root inside the workspace. Defaults to manifest output.content when manifest.yaml exists, otherwise the workspace folder."
+        }
+      }
+    }
+  }
+}

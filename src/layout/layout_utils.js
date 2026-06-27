@@ -3,9 +3,10 @@ import {config} from '@/config.js';
 import {openDatabase} from 'content-structure/src/sqlite_utils/index.js';
 
 function cloneHeading(heading) {
+    const label = (heading.label ?? heading.body_text ?? '').trim();
     return {
-        label: heading.label ?? heading.body_text ?? '',
-        slug: heading.slug,
+        label,
+        slug: heading.slug ?? '',
         depth: heading.depth ?? heading.level ?? 1,
         link: heading.link ?? '',
         uid: heading.uid ?? null
@@ -74,46 +75,27 @@ function process_toc_list(headings) {
     return {items: tree, visible: true};
 }
 
-const dbPath = join(config.collect_content.outdir, 'structure.db');
-
-function stripBase(pathname) {
-    const base = config.base ?? '';
-    if (!base || base === '/') {
-        return pathname;
-    }
-    if (pathname.startsWith(base)) {
-        const stripped = pathname.slice(base.length);
-        return stripped || '/';
-    }
-    return pathname;
-}
-
 function normalizePath(pathname) {
-    const value = pathname || '/';
-    let normalized = value.startsWith('/') ? value : `/${value}`;
-    if (normalized.length > 1 && normalized.endsWith('/')) {
-        normalized = normalized.slice(0, -1);
+    const raw = typeof pathname === 'string' ? pathname : '/';
+    const withLeading = raw.startsWith('/') ? raw : `/${raw}`;
+    const cleaned = withLeading.replace(/\/{2,}/g, '/');
+    if (cleaned.length > 1 && cleaned.endsWith('/')) {
+        return cleaned.slice(0, -1);
     }
-    return normalized;
+    return cleaned || '/';
 }
 
-function toDocUrl(pathname) {
-    const stripped = stripBase(normalizePath(pathname));
-    if (stripped === '/') {
-        return '';
-    }
-    return stripped.startsWith('/') ? stripped.slice(1) : stripped;
+function docUrlFromPathname(pathname) {
+    const normalized = normalizePath(pathname);
+    return normalized === '/' ? '' : normalized.slice(1);
 }
 
 function buildDocLink(url) {
-    const base = config.base ?? '';
-    const suffix = url ? `/${url}` : '/';
-    const combined = `${base}${suffix}`;
-    const cleaned = combined.replace(/\/{2,}/g, '/');
-    if (cleaned === '/') {
+    if (!url) {
         return '/';
     }
-    return cleaned.endsWith('/') ? cleaned.slice(0, -1) : cleaned;
+    const cleaned = String(url).replace(/^\/+|\/+$/g, '');
+    return `/${cleaned}`;
 }
 
 function labelFromUrl(url) {
@@ -144,19 +126,53 @@ function segmentCount(url) {
 }
 
 function loadDocuments() {
-    const db = openDatabase(dbPath, {readonly: true});
+    const db = openDatabase(config.collect.db_path, {readonly: true});
     return db
         .prepare('SELECT url, title, level, "order" AS sort_order, url_type FROM documents ORDER BY level, sort_order, url')
         .all();
 }
 
+/* The set of top-level names that are real folders (sections of their own).
+ * Anything not in this set — the root index and loose root files — belongs to "home".
+ */
+function topLevelSections(docs) {
+    const sections = new Set();
+    for (const doc of docs) {
+        if (doc.url_type === 'dir' && doc.url) {
+            sections.add(doc.url.split('/')[0]);
+        }
+    }
+    return sections;
+}
+
+function sectionKeyForDoc(doc, sections) {
+    if (!doc.url || doc.url === 'home') {
+        return 'home';
+    }
+    const first = doc.url.split('/')[0];
+    return sections.has(first) ? first : 'home';
+}
+
+function resolveSection(pathname, sections) {
+    const segment = section_from_pathname(pathname);
+    if (segment === 'home' || segment === 'external') {
+        return segment;
+    }
+    return sections.has(segment) ? segment : 'home';
+}
+
+function homeLabel(doc) {
+    return doc?.title && doc.title !== '.' ? doc.title : 'Home';
+}
+
 function buildAppBarMenuFromDocs(docs, pathname) {
-    const currentSection = section_from_pathname(stripBase(pathname));
+    const sections = topLevelSections(docs);
+    const currentSection = resolveSection(pathname, sections);
     const topLevel = docs.filter((doc) => segmentCount(doc.url) <= 1);
     const sectionMap = new Map();
 
     for (const doc of topLevel) {
-        const section = doc.url ? doc.url.split('/')[0] : 'home';
+        const section = sectionKeyForDoc(doc, sections);
         if (!sectionMap.has(section)) {
             sectionMap.set(section, doc);
             continue;
@@ -168,27 +184,34 @@ function buildAppBarMenuFromDocs(docs, pathname) {
     }
 
     const items = [];
-    for (const doc of sectionMap.values()) {
-        const isHome = doc.url === '' || doc.url === 'home';
+    for (const [section, doc] of sectionMap) {
+        const isHome = section === 'home';
         const link = isHome ? '/' : buildDocLink(doc.url);
         items.push({
-            label: doc.title ?? labelFromUrl(doc.url),
+            label: isHome ? homeLabel(doc) : (doc.title ?? labelFromUrl(doc.url)),
             link,
-            active_class: section_from_pathname(stripBase(link)) === currentSection ? 'active' : '',
-            order: doc.sort_order ?? 0
+            active_class: resolveSection(link, sections) === currentSection ? 'active' : '',
+            order: doc.sort_order ?? 0,
+            isHome
         });
     }
-    items.sort(sortByOrderThenLabel);
-    return items;
+    items.sort((a, b) => {
+        if (a.isHome !== b.isHome) {
+            return a.isHome ? -1 : 1;
+        }
+        return sortByOrderThenLabel(a, b);
+    });
+    return items.map(({isHome, ...item}) => item);
 }
 
 function buildSectionMenuFromDocs(docs, pathname) {
-    const section = section_from_pathname(stripBase(pathname));
-    const activeUrl = toDocUrl(pathname);
+    const sections = topLevelSections(docs);
+    const section = resolveSection(pathname, sections);
+    const activeUrl = docUrlFromPathname(pathname);
     const isHome = section === 'home';
     const filtered = docs.filter((doc) => {
         if (isHome) {
-            return doc.url && (doc.url === '' || doc.url === 'home' || doc.url.startsWith('home/'));
+            return sectionKeyForDoc(doc, sections) === 'home';
         }
         return doc.url.startsWith(`${section}/`);
     });
@@ -340,17 +363,13 @@ function buildSectionMenu(pathname) {
 }
 
 function section_from_pathname(pathname){
-    if(pathname.startsWith('http')){
-        return 'external'
+    if(!pathname){return 'home';}
+    const normalized = normalizePath(pathname);
+    if(normalized.startsWith('http')){
+        return 'external';
     }
-    const sections = pathname.split('/')
-    if(sections.length < 2){
-        return "home"
-    }else if(sections[1] == ""){
-        return "home"
-    }else{
-        return sections[1]
-    }
+    const parts = normalized.split('/').filter(Boolean);
+    return parts[0] ?? 'home';
 }
 
 export {

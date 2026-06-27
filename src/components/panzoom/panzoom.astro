@@ -1,5 +1,6 @@
 ---
 //https://ellodave.dev/blog/article/using-svgs-as-astro-components-and-inline-css/
+import { log_debug } from '@/libs/utils';
 import PanZoomModal from './panzoommodal.astro'
 import SvgIcons from '@/components/svgicons.astro'
 export interface Props {
@@ -22,7 +23,7 @@ if(title){
   data_name = "diagram.svg"
 }
 
-console.log(` * panzoom : '${data_name}' : '${src}'`)
+log_debug(`  - panzoom : '${data_name}' : '${src}'`)
 const isSvg = asseturl.endsWith(".svg")
 const isImg = !isSvg
 
@@ -69,14 +70,14 @@ const isImg = !isSvg
   display:none;
   flex-direction: row;
   justify-content: center;
-  background:#777;
+  background:var(--surface-2-bg);
   align-items: stretch;
   width:5em;/* not clear why right side padding is ignored */
   padding: 2px;
   border-radius: 5px;
 }
 .header:hover{
-  background:#888;
+  background:var(--menu-span-hover-color);
   cursor: pointer;
 }
 

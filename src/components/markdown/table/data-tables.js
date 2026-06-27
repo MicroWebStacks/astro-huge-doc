@@ -21,14 +21,14 @@ async function init(){
     const DataTable = (await import('datatables.net-dt')).default;
 
     containers_els.forEach(async table_element => {
-        const data_table_uid = table_element.getAttribute("data-table-uid")
-        const response = await fetch(`/assets/${data_table_uid}`);
+        const data_table_url = table_element.getAttribute("data-table-url")
+        const response = await fetch(`${data_table_url}`);
         if (!response.ok) {
-            throw new Error(`Failed to load /assets/${data_table_uid}`);
+            throw new Error(`Failed to load ${data_table_url}`);
         }
         const data_table = await response.json();
         if (!Array.isArray(data_table) || data_table.length === 0) {
-            console.warn(`No data available for table ${data_table_uid}`);
+            console.warn(`No data available for table ${data_table_url}`);
             return;
         }
 

@@ -2,19 +2,18 @@ import {existsSync, readFileSync} from 'fs';
 import {join, dirname, extname} from 'path';
 import {gunzipSync} from 'zlib';
 import {config} from '../../config.js';
-import {shortMD5} from './utils.js';
+import {log_debug, shortMD5} from './utils.js';
 import {openDatabase} from 'content-structure/src/sqlite_utils/index.js';
 
-const dbPath = join(config.collect_content.outdir, 'structure.db');
 let cachedDb;
 const blobCache = new Map();
 
 function ensureDb() {
     if (!cachedDb) {
-        if (!existsSync(dbPath)) {
-            throw new Error(`structure-db: missing database at ${dbPath}`);
+        if (!existsSync(config.collect.db_path)) {
+            throw new Error(`structure-db: missing database at ${config.collect.db_path}`);
         }
-        cachedDb = openDatabase(dbPath, {readonly: true});
+        cachedDb = openDatabase(config.collect.db_path, {readonly: true});
     }
     return cachedDb;
 }
@@ -45,18 +44,32 @@ function normalizeDocumentRow(row) {
     };
 }
 
-function getDocument(match) {
+function getDocument(match, versionId = null) {
     const db = ensureDb();
+    const resolvedVersion = versionId ?? config.collect.version_id ?? null;
+    const fetchRow = (column, value) => {
+        if (value === undefined) {
+            return null;
+        }
+        if (resolvedVersion) {
+            const row = db.prepare(`SELECT * FROM documents WHERE ${column} = ? AND version_id = ?`).get(value, resolvedVersion);
+            if (row) {
+                return row;
+            }
+        }
+        return db
+            .prepare(`SELECT * FROM documents WHERE ${column} = ? ORDER BY version_id DESC LIMIT 1`)
+            .get(value);
+    };
+    let row = null;
     if (match?.uid) {
-        const row = db.prepare('SELECT * FROM documents WHERE uid = ?').get(match.uid);
-        return normalizeDocumentRow(row);
+        row = fetchRow('uid', match.uid);
+    } else if (match?.sid) {
+        row = fetchRow('sid', match.sid);
+    } else {
+        const urlValue = typeof match?.url === 'string' ? match.url : '';
+        row = fetchRow('url', urlValue);
     }
-    if (match?.sid) {
-        const row = db.prepare('SELECT * FROM documents WHERE sid = ?').get(match.sid);
-        return normalizeDocumentRow(row);
-    }
-    const urlValue = typeof match?.url === 'string' ? match.url : '';
-    const row = db.prepare('SELECT * FROM documents WHERE url = ?').get(urlValue);
     return normalizeDocumentRow(row);
 }
 
@@ -66,27 +79,50 @@ function getImageInfo(uid) {
     return row;
 }
 
-function getItemsForDocument(docSid, type) {
+function getItemsForDocument(docSid, type, versionId = null) {
     const db = ensureDb();
+    const resolvedVersion = versionId ?? config.collect.version_id ?? null;
     const params = [docSid];
     let sql = 'SELECT * FROM items WHERE doc_sid = ?';
+    if (resolvedVersion) {
+        sql += ' AND version_id = ?';
+        params.push(resolvedVersion);
+    }
     if (type) {
         sql += ' AND type = ?';
         params.push(type);
     }
     sql += ' ORDER BY order_index';
-    return db.prepare(sql).all(...params);
+    let rows = db.prepare(sql).all(...params);
+    if (rows.length || !resolvedVersion) {
+        return rows;
+    }
+    const fallbackVersion = db
+        .prepare('SELECT version_id FROM items WHERE doc_sid = ? ORDER BY version_id DESC LIMIT 1')
+        .get(docSid);
+    if (!fallbackVersion?.version_id) {
+        return [];
+    }
+    const fallbackParams = [docSid, fallbackVersion.version_id];
+    let fallbackSql = 'SELECT * FROM items WHERE doc_sid = ? AND version_id = ?';
+    if (type) {
+        fallbackSql += ' AND type = ?';
+        fallbackParams.push(type);
+    }
+    fallbackSql += ' ORDER BY order_index';
+    return db.prepare(fallbackSql).all(...fallbackParams);
 }
 
-function getItems(match, type) {
+function getItems(match, type, versionId = null) {
+    const resolvedVersion = versionId ?? config.collect.version_id ?? null;
     if (match?.doc_sid) {
-        return getItemsForDocument(match.doc_sid, type);
+        return getItemsForDocument(match.doc_sid, type, resolvedVersion);
     }
-    const document = getDocument(match);
+    const document = getDocument(match, resolvedVersion);
     if (!document?.sid) {
         return [];
     }
-    const items = getItemsForDocument(document.sid, type);
+    const items = getItemsForDocument(document.sid, type, resolvedVersion);
     return items.map((item) => {
         if (!item?.ast) {
             return item;
@@ -96,16 +132,6 @@ function getItems(match, type) {
             ast: safeParseAst(item.ast)
         };
     });
-}
-
-function getAssetsForDocument(docUid) {
-    const db = ensureDb();
-    const assets = db.prepare('SELECT * FROM asset_info WHERE parent_doc_uid = ?').all(docUid);
-    const map = new Map();
-    for (const asset of assets) {
-        map.set(asset.uid, asset);
-    }
-    return map;
 }
 
 function getAssetInfo(match) {
@@ -144,7 +170,7 @@ function loadBlobBuffer(asset) {
     if (blob.payload) {
         buffer = Buffer.from(blob.payload);
     } else if (blob.path && blob.hash) {
-        const absPath = join(config.collect_content.outdir, 'blobs', blob.path, blob.hash);
+        const absPath = join(config.collect.outdir, 'blobs', blob.path, blob.hash);
         try {
             buffer = readFileSync(absPath);
         } catch {
@@ -164,37 +190,37 @@ function loadBlobBuffer(asset) {
     return buffer;
 }
 
-function normalizeAssetRow(row) {
-    if (!row) {
-        return null;
-    }
-    const {info_blob_uid, asset_blob_uid, blob_uid: infoBlobUid, ...rest} = row;
-    return {
-        ...rest,
-        blob_uid: asset_blob_uid ?? info_blob_uid ?? infoBlobUid ?? null
-    };
-}
-
-function getAsset(uid) {
-    if (!uid) {
+function getAssetByUIDVersion(assetUid, versionId) {
+    if (!assetUid || !versionId) {
         return null;
     }
     const db = ensureDb();
-    const row = db
-        .prepare(
-            `
-        SELECT ai.*, ai.blob_uid AS info_blob_uid, a.blob_uid AS asset_blob_uid
-        FROM asset_info ai
-        LEFT JOIN assets a ON ai.uid = a.asset_uid
-        WHERE ai.uid = ?
-    `
-        )
-        .get(uid);
-    return normalizeAssetRow(row);
+    const versionRow = db
+        .prepare('SELECT blob_uid FROM assets WHERE asset_uid = ? AND version_id = ?')
+        .get(assetUid, versionId);
+    const blobUid = versionRow?.blob_uid;
+    if (!blobUid) {
+        return null;
+    }
+    const infoRow = db.prepare('SELECT * FROM asset_info WHERE uid = ? AND blob_uid = ?').get(assetUid, blobUid);
+    return infoRow ?? null;
 }
 
-function getAssetWithBlob(uid) {
-    const asset = getAsset(uid);
+function getAssetInfoBlob_version(assetUid, versionId) {
+    const asset = getAssetByUIDVersion(assetUid, versionId);
+    if (!asset) {
+        return {asset: null, buffer: null};
+    }
+    const buffer = loadBlobBuffer(asset);
+    return {asset, buffer};
+}
+
+function getAssetInfoBlob_blob(assetUid, blobUid) {
+    if (!assetUid || !blobUid) {
+        return {asset: null, buffer: null};
+    }
+    const db = ensureDb();
+    const asset = db.prepare('SELECT * FROM asset_info WHERE uid = ? AND blob_uid = ?').get(assetUid, blobUid);
     if (!asset) {
         return {asset: null, buffer: null};
     }
@@ -449,12 +475,19 @@ function buildItems(items, assets, docUid, documentPath) {
 }
 
 function getEntry(match){
-    const document = getDocument(match);
+    const versionId = match?.version_id ?? config.collect.version_id ?? null;
+    const document = getDocument(match, versionId);
     if (!document) {
-        return {title: '', headings: [], items: [], data: {}};
+        if (match?.url === '' || match?.url === undefined) {
+            const firstDocument = getFirstDocument(versionId);
+            if (firstDocument?.url && firstDocument.url !== match?.url) {
+                return getEntry({...match, url: firstDocument.url, version_id: versionId});
+            }
+        }
+        return {found:false, title: '', headings: [], items: [], data: {}};
     }
-    console.log("getEntry> document.sid=",document.sid);
-    const items = getItems(match);
+    log_debug("  - getEntry> document.sid=",document.sid);
+    const items = getItems(match, undefined, versionId);
     let headings = document?.toc;
     if (!headings) {
         headings = items.filter((i) => i.type === 'heading');
@@ -464,16 +497,54 @@ function getEntry(match){
         ...document.meta_data
     }
 
-    return {title: document.title, headings, items, data}
+    return {found:true, title: document.title, headings, items, data}
+}
+
+function getFirstDocument(versionId = null) {
+    const db = ensureDb();
+    const resolvedVersion = versionId ?? config.collect.version_id ?? null;
+    const params = [];
+    let sql = 'SELECT * FROM documents';
+    if (resolvedVersion) {
+        sql += ' WHERE version_id = ?';
+        params.push(resolvedVersion);
+    }
+    sql += `
+        ORDER BY
+            CASE WHEN url = '' THEN 0 WHEN url = 'home' THEN 1 ELSE 2 END,
+            level,
+            "order",
+            url
+        LIMIT 1
+    `;
+    return normalizeDocumentRow(db.prepare(sql).get(...params));
+}
+
+function getAssetBlob(assetUid, versionId = null) {
+    if (!assetUid) {
+        return null;
+    }
+    const db = ensureDb();
+    const params = [assetUid];
+    let query = 'SELECT blob_uid FROM assets WHERE asset_uid = ?';
+    if (versionId) {
+        query += ' AND version_id = ?';
+        params.push(versionId);
+    }
+    const row = db.prepare(`${query} ORDER BY version_id DESC`).get(...params);
+    return row?.blob_uid ?? null;
 }
 
 export {
     getEntry, 
-    getAsset, 
-    getAssetWithBlob, 
+    getFirstDocument,
+    getAssetByUIDVersion,
+    getAssetInfoBlob_version,
+    getAssetInfoBlob_blob,
     getDocument, 
     getItems, 
     getAssetInfo, 
     parseAssetLink,
-    getImageInfo
+    getImageInfo,
+    getAssetBlob
 };

@@ -1,0 +1,11 @@
+---
+import Layout from "@/layout/Layout.astro"
+import ServerTable from '@/components/tables/ServerTable.jsx'
+
+console.log(`tables page`)
+---
+<Layout title="Server tables" headings={[]} >
+    <div style="background:var(--content-bg-color); padding:16px;">
+        <ServerTable client:only="react"/>
+    </div>
+</Layout>

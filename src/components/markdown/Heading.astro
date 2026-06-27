@@ -37,6 +37,15 @@ const HeadingLevel = `h${item.level}`
   width: fit-content;
   display: flex;
   gap: 10px;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+/* cross-highlight driven by the toc menu (scroll-spy active / hover) */
+.heading.bar.active,
+.heading.bar.hover{
+  background-color: var(--header-active-color);
+}
+.heading.bar.active{
+  box-shadow: -8px 0 0 0 var(--front-blue);
 }
 .icon{
   opacity: 0;
@@ -59,7 +68,7 @@ const HeadingLevel = `h${item.level}`
 .icon :global(svg){
   width:16px;
   height:16px;
-    fill:rgb(101, 96, 96);
+    fill:var(--heading-icon-color);
 }
 .heading.bar :global(a){
   text-decoration: none;

@@ -4,6 +4,17 @@ fetch:
       branch: main
       folders: [content]
       dest: content
+output:
+  ssr: dist
+  content: content
+  store: dataset
+  db_path: dataset/content.db
+server:
+  protocol: http
+  host: 0.0.0.0
+  port: 4321
+kroki:
+  server: https://kroki.io
 collect:
   folder_single_doc: false
   file_link_ext: ["svg","webp","png","jpeg","jpg","xlsx","glb","puml"]
@@ -13,4 +24,8 @@ collect:
 render:
   highlighter:
     theme: dark-plus
-    langs: ['javascript','js','python','yaml']
+    langs: ['javascript','js','python','yaml', 'markdown', 'text']
+html_cache:
+  exclude_paths:
+    - /assets/
+    - .well-known/

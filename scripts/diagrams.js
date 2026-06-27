@@ -4,13 +4,16 @@ import {readFileSync} from 'fs';
 import {gunzipSync} from 'zlib';
 import {createHash} from 'crypto';
 import {config} from '../config.js';
-import {openDatabase} from 'content-structure/src/sqlite_utils/index.js';
+import Database from 'better-sqlite3';
 
 const diagramExts = new Set(['plantuml', 'blockdiag', 'mermaid']);
 const diagramTypeMap = {codeblock: 'code_diagram', linked_file: 'file_diagram'};
 const languageAliases = {puml: 'plantuml'};
-const dbPath = join(config.collect_content.outdir, 'structure.db');
-const db = openDatabase(dbPath);
+const db = new Database(config.collect.db_path, {readonly: false});
+
+db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL');
+db.pragma('foreign_keys = ON');
 
 function sha512(buffer) {
     return createHash('sha512').update(buffer).digest('hex');
@@ -39,7 +42,7 @@ function loadBlob(blobUid) {
     if (row.payload) {
         buffer = Buffer.from(row.payload);
     } else if (row.path && row.hash) {
-        const absPath = join(config.collect_content.outdir, 'blobs', row.path, row.hash);
+        const absPath = join(config.collect.outdir, 'blobs', row.path, row.hash);
         try {
             buffer = readFileSync(absPath);
         } catch {
@@ -84,6 +87,17 @@ function resolveBlobUidForHash(hash) {
     return row?.blob_uid ?? null;
 }
 
+function clearHtmlCache() {
+    try {
+        db.prepare("DELETE FROM html_cache WHERE EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'html_cache')").run();
+        console.log('html-cache: cleared');
+    } catch (error) {
+        if (!String(error?.message ?? '').includes('no such table')) {
+            console.warn(`html-cache: clear skipped ${error.message}`);
+        }
+    }
+}
+
 async function renderDiagram(language, code) {
     const response = await fetch(`${config.kroki_server}/${language}/svg/`, {
         method: 'POST',
@@ -100,16 +114,19 @@ async function main() {
     if (typeof fetch !== 'function') {
         throw new Error('Global fetch is not available. Run with Node 18+ or provide a fetch polyfill.');
     }
+    const versionRow = db.prepare('SELECT version_id FROM versions ORDER BY version_id DESC LIMIT 1').get();
+    const versionId = versionRow?.version_id ?? 'manual';
     const diagramSources = db
-        .prepare("SELECT uid, blob_uid, parent_doc_uid, ext, type FROM asset_info WHERE type IN ('codeblock', 'linked_file')")
+        .prepare(
+            "SELECT uid, blob_uid, parent_doc_uid, ext, type FROM asset_info WHERE type IN ('codeblock', 'linked_file')"
+        )
         .all();
     if (!diagramSources.length) {
         console.log('No diagram-capable assets found; nothing to render.');
+        clearHtmlCache();
         return;
     }
 
-    const versionRow = db.prepare('SELECT version_id FROM assets LIMIT 1').get();
-    const versionId = versionRow?.version_id ?? 'manual';
     let nextBlobId = getCurrentMaxBlobId();
 
     const insertBlob = db.prepare(
@@ -166,8 +183,11 @@ async function main() {
 
         const diagramUid = `${asset.uid}.svg`;
         const existing = db.prepare('SELECT uid FROM asset_info WHERE uid = ?').get(diagramUid);
-        if (existing) {
-            console.log(`Skipping existing diagram ${diagramUid}`);
+        const existingLink = db
+            .prepare('SELECT asset_uid FROM assets WHERE asset_uid = ? AND version_id = ?')
+            .get(diagramUid, versionId);
+        if (existing && existingLink) {
+            console.log(`Skipping existing diagram ${diagramUid} for version ${versionId}`);
             continue;
         }
 
@@ -199,7 +219,7 @@ async function main() {
 
         const docSid = getDocSid(asset.parent_doc_uid);
         writeDiagram({
-            insertBlob: insertedBlob,
+            insertBlob: insertedBlob && !existing,
             blobUid,
             hash,
             now,
@@ -215,6 +235,7 @@ async function main() {
             `${diagramUid} [${diagramType}]: ${insertedBlob ? 'generated' : 'reused'} blob ${blobUid} (hash ${hash.slice(0, 8)})`
         );
     }
+    clearHtmlCache();
 }
 
 main().catch((error) => {
