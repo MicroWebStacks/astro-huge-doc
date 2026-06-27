@@ -242,6 +242,7 @@ function runNodeScript(runtime, scriptPath, env) {
 
 async function collect(runtime, env) {
   await runNodeScript(runtime, path.join('scripts', 'collect.js'), env);
+  await runNodeScript(runtime, path.join('scripts', 'diagrams.js'), env);
 }
 
 function startServer(runtime, port, env) {

@@ -3,7 +3,7 @@ import path from "node:path";
 import fsp from "node:fs/promises";
 import yaml from "js-yaml";
 import {existsSync} from 'node:fs';
-import {openDatabase} from 'content-structure/src/sqlite_utils/index.js';
+import Database from 'better-sqlite3';
 
 const DEFAULT_MANIFEST = {
     output: {
@@ -79,13 +79,19 @@ function parsePort(value, fallback) {
 }
 
 function resolveLatestVersion(structurePath) {
+    if (!existsSync(structurePath)) {
+        return null;
+    }
+    let db;
     try {
-        const db = openDatabase(structurePath, {readonly: true});
+        db = new Database(structurePath, {readonly: true, fileMustExist: true});
         const row = db.prepare('SELECT version_id FROM versions ORDER BY version_id DESC LIMIT 1').get();
         return row?.version_id ?? null;
     } catch (error) {
         console.warn('Unable to resolve latest version:', error.message);
         return null;
+    } finally {
+        db?.close();
     }
 }
 

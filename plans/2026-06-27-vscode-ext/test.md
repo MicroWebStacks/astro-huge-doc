@@ -155,3 +155,75 @@ Commands run:
 $env:ASTRO_TELEMETRY_DISABLED='1'; node node_modules\astro\astro.js build
 $env:MICROWEBSTACKS_ENGINE_ROOT='C:\dev\MicroWebStacks\astro-huge-doc'; $env:MICROWEBSTACKS_WORKSPACE_ROOT='C:\dev\VectorMind'; $env:MICROWEBSTACKS_DOCS_ROOT='C:\dev\VectorMind'; $env:MICROWEBSTACKS_DB_PATH='C:\dev\MicroWebStacks\astro-huge-doc\.tmp\vector-test\content.db'; $env:MICROWEBSTACKS_STORE_PATH='C:\dev\MicroWebStacks\astro-huge-doc\.tmp\vector-test\store'; $env:MICROWEBSTACKS_OUTDIR='C:\dev\MicroWebStacks\astro-huge-doc\dist'; node scripts\collect.js
 ```
+
+## 2026-06-27 - Readonly DB Regression
+
+Expected:
+
+* Importing `config.js` with an existing extension-style DB path should not
+  leave a read-only SQLite handle in `content-structure`'s shared cache.
+* The same DB path should remain writable through
+  `content-structure/src/sqlite_utils/index.js` after config import.
+* The Astro SSR build should still pass.
+
+Actual:
+
+* `node --check config.js` passed.
+* `node --check scripts\collect.js` passed.
+* `node --check packages\vscode-extension\extension.js` passed.
+* Direct regression check passed: config resolved version `V1`, then a writable
+  cached `content-structure` connection inserted `V2` into the same DB path;
+  final row count was `2`.
+* Full `node scripts\collect.js` validation against a temp DB did not reach the
+  SQLite writer because the local linked `content-structure` install still
+  fails first on the known Node 22 `glob/index.js` package-main issue.
+* `pnpm --version` failed because `pnpm` is not available on this shell's PATH.
+* `$env:ASTRO_TELEMETRY_DISABLED='1'; node node_modules\astro\astro.js build`
+  passed.
+
+Commands run:
+
+```txt
+node --check config.js
+node --check scripts\collect.js
+node --check packages\vscode-extension\extension.js
+$env:ASTRO_TELEMETRY_DISABLED='1'; $env:MICROWEBSTACKS_ENGINE_ROOT='C:\dev\MicroWebStacks\astro-huge-doc'; $env:MICROWEBSTACKS_WORKSPACE_ROOT='C:\dev\MicroWebStacks\astro-huge-doc'; $env:MICROWEBSTACKS_DOCS_ROOT='C:\dev\MicroWebStacks\astro-huge-doc\content'; $env:MICROWEBSTACKS_DB_PATH='C:\dev\MicroWebStacks\astro-huge-doc\.tmp\readonly-repro\content.db'; $env:MICROWEBSTACKS_STORE_PATH='C:\dev\MicroWebStacks\astro-huge-doc\.tmp\readonly-repro\store'; $env:MICROWEBSTACKS_OUTDIR='C:\dev\MicroWebStacks\astro-huge-doc\dist'; New-Item -ItemType Directory -Force -Path .tmp\readonly-repro | Out-Null; New-Item -ItemType Directory -Force -Path .tmp\readonly-repro\store | Out-Null; node scripts\collect.js; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; node scripts\collect.js
+pnpm --version
+$dbPath='C:\dev\MicroWebStacks\astro-huge-doc\.tmp\readonly-cache-check\content.db'; $storePath='C:\dev\MicroWebStacks\astro-huge-doc\.tmp\readonly-cache-check\store'; New-Item -ItemType Directory -Force -Path (Split-Path $dbPath) | Out-Null; New-Item -ItemType Directory -Force -Path $storePath | Out-Null; node -e "const Database=require('better-sqlite3'); const db=new Database(process.argv[1]); db.exec('CREATE TABLE IF NOT EXISTS versions (version_id TEXT, created_at TEXT, type TEXT, tags TEXT); DELETE FROM versions;'); db.prepare('INSERT INTO versions VALUES (?, ?, ?, ?)').run('V1', '2026-06-27T00:00:00.000Z', 'daily', '[]'); db.close();" $dbPath; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; $env:MICROWEBSTACKS_ENGINE_ROOT='C:\dev\MicroWebStacks\astro-huge-doc'; $env:MICROWEBSTACKS_WORKSPACE_ROOT='C:\dev\MicroWebStacks\astro-huge-doc'; $env:MICROWEBSTACKS_DOCS_ROOT='C:\dev\MicroWebStacks\astro-huge-doc\content'; $env:MICROWEBSTACKS_DB_PATH=$dbPath; $env:MICROWEBSTACKS_STORE_PATH=$storePath; $env:MICROWEBSTACKS_OUTDIR='C:\dev\MicroWebStacks\astro-huge-doc\dist'; node -e "const path=process.env.MICROWEBSTACKS_DB_PATH; const {config}=await import('./config.js'); const {openDatabase}=await import('content-structure/src/sqlite_utils/index.js'); const db=openDatabase(path, {readonly:false}); db.prepare('INSERT INTO versions VALUES (?, ?, ?, ?)').run('V2', '2026-06-27T00:01:00.000Z', 'daily', '[]'); console.log(JSON.stringify({version: config.collect.version_id, count: db.prepare('SELECT COUNT(*) AS count FROM versions').get().count}));"
+$env:ASTRO_TELEMETRY_DISABLED='1'; node node_modules\astro\astro.js build
+```
+
+## 2026-06-27 - Diagram Generation In Extension Preview
+
+Expected:
+
+* The extension should run diagram generation after content collection so
+  Kroki-backed diagram SVG assets exist before the preview server starts.
+* If a diagram cannot be generated, the rendered page should fall back to the
+  code view instead of requesting `/assets/null:<uid>.svg` and showing a blank
+  diagram panel.
+* The changed extension and renderer files should parse/build successfully.
+
+Actual:
+
+* `packages\vscode-extension\extension.js` now runs `scripts\diagrams.js`
+  immediately after `scripts\collect.js`.
+* `DiagramCode.astro` now renders the diagram panel only when a generated SVG
+  blob id exists; otherwise it shows the code block.
+* `node --check packages\vscode-extension\extension.js` passed.
+* `node --check scripts\diagrams.js` passed.
+* `node --check config.js` passed.
+* `scripts\diagrams.js` smoke test passed against a minimal temp DB with no
+  diagram-capable assets and did not require a Kroki network call.
+* `$env:ASTRO_TELEMETRY_DISABLED='1'; node node_modules\astro\astro.js build`
+  passed.
+
+Commands run:
+
+```txt
+node --check packages\vscode-extension\extension.js
+node --check scripts\diagrams.js
+node --check config.js
+$dbPath='C:\dev\MicroWebStacks\astro-huge-doc\.tmp\diagrams-smoke\content.db'; $storePath='C:\dev\MicroWebStacks\astro-huge-doc\.tmp\diagrams-smoke\store'; New-Item -ItemType Directory -Force -Path (Split-Path $dbPath) | Out-Null; New-Item -ItemType Directory -Force -Path $storePath | Out-Null; node -e "const Database=require('better-sqlite3'); const db=new Database(process.argv[1]); db.exec('DROP TABLE IF EXISTS versions; DROP TABLE IF EXISTS asset_info; DROP TABLE IF EXISTS blob_store; DROP TABLE IF EXISTS assets; DROP TABLE IF EXISTS documents; CREATE TABLE versions (version_id TEXT, created_at TEXT, type TEXT, tags TEXT); CREATE TABLE asset_info (uid TEXT, type TEXT, blob_uid TEXT, parent_doc_uid TEXT, path TEXT, ext TEXT, first_seen TEXT, last_seen TEXT); CREATE TABLE blob_store (blob_uid TEXT, hash TEXT, path TEXT, first_seen TEXT, last_seen TEXT, size INTEGER, compression INTEGER, payload BLOB); CREATE TABLE assets (asset_uid TEXT, version_id TEXT, doc_sid TEXT, blob_uid TEXT, type TEXT); CREATE TABLE documents (uid TEXT, sid TEXT);'); db.prepare('INSERT INTO versions VALUES (?, ?, ?, ?)').run('V1', '2026-06-27T00:00:00.000Z', 'daily', '[]'); db.close();" $dbPath; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; $env:MICROWEBSTACKS_ENGINE_ROOT='C:\dev\MicroWebStacks\astro-huge-doc'; $env:MICROWEBSTACKS_WORKSPACE_ROOT='C:\dev\MicroWebStacks\astro-huge-doc'; $env:MICROWEBSTACKS_DOCS_ROOT='C:\dev\MicroWebStacks\astro-huge-doc\content'; $env:MICROWEBSTACKS_DB_PATH=$dbPath; $env:MICROWEBSTACKS_STORE_PATH=$storePath; $env:MICROWEBSTACKS_OUTDIR='C:\dev\MicroWebStacks\astro-huge-doc\dist'; node scripts\diagrams.js
+$env:ASTRO_TELEMETRY_DISABLED='1'; node node_modules\astro\astro.js build
+```
