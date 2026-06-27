@@ -1,13 +1,81 @@
-import {join} from 'path'
+import {isAbsolute, join, resolve} from 'path'
 import path from "node:path";
 import fsp from "node:fs/promises";
 import yaml from "js-yaml";
+import {existsSync} from 'node:fs';
 import {openDatabase} from 'content-structure/src/sqlite_utils/index.js';
 
-async function loadManifest() {
-  const manifestPath = path.join(process.cwd(), "manifest.yaml");
-  const raw = await fsp.readFile(manifestPath, "utf8");
-  return yaml.load(raw);
+const DEFAULT_MANIFEST = {
+    output: {
+        ssr: 'dist',
+        content: 'content',
+        store: 'dataset',
+        db_path: 'dataset/content.db'
+    },
+    server: {
+        protocol: 'http',
+        host: '0.0.0.0',
+        port: 4321
+    },
+    kroki: {
+        server: 'https://kroki.io'
+    },
+    collect: {
+        folder_single_doc: false,
+        file_link_ext: ['svg', 'webp', 'png', 'jpeg', 'jpg', 'xlsx', 'glb', 'puml'],
+        file_compress_ext: ['txt', 'md', 'json', 'csv', 'tsv', 'yaml', 'yml'],
+        external_storage_kb: 512,
+        inline_compression_kb: 32
+    },
+    render: {
+        highlighter: {
+            theme: 'dark-plus',
+            langs: ['javascript', 'js', 'python', 'yaml', 'markdown', 'text']
+        }
+    },
+    html_cache: {
+        exclude_paths: ['/assets/', '.well-known/']
+    }
+};
+
+function mergeManifest(manifest = {}) {
+    return {
+        ...DEFAULT_MANIFEST,
+        ...manifest,
+        output: {...DEFAULT_MANIFEST.output, ...(manifest.output ?? {})},
+        server: {...DEFAULT_MANIFEST.server, ...(manifest.server ?? {})},
+        kroki: {...DEFAULT_MANIFEST.kroki, ...(manifest.kroki ?? {})},
+        collect: {...DEFAULT_MANIFEST.collect, ...(manifest.collect ?? {})},
+        render: {
+            ...DEFAULT_MANIFEST.render,
+            ...(manifest.render ?? {}),
+            highlighter: {
+                ...DEFAULT_MANIFEST.render.highlighter,
+                ...(manifest.render?.highlighter ?? {})
+            }
+        },
+        html_cache: {...DEFAULT_MANIFEST.html_cache, ...(manifest.html_cache ?? {})}
+    };
+}
+
+async function loadManifest(manifestPath) {
+    if (!manifestPath || !existsSync(manifestPath)) {
+        return mergeManifest();
+    }
+    const raw = await fsp.readFile(manifestPath, "utf8");
+    return mergeManifest(yaml.load(raw));
+}
+
+function resolvePath(basePath, targetPath) {
+    if (!targetPath) {
+        return basePath;
+    }
+    return isAbsolute(targetPath) ? targetPath : join(basePath, targetPath);
+}
+
+function parsePort(value, fallback) {
+    const port = Number.parseInt(value, 10);
+    return Number.isFinite(port) ? port : fallback;
 }
 
 function resolveLatestVersion(structurePath) {
@@ -21,31 +89,59 @@ function resolveLatestVersion(structurePath) {
     }
 }
 
-const rootdir = process.cwd()
-const manifest = await loadManifest();
-const abs_db_path = join(rootdir, manifest.output.db_path);
+const workspaceRoot = resolve(process.env.MICROWEBSTACKS_WORKSPACE_ROOT ?? process.cwd());
+const engineRoot = resolve(process.env.MICROWEBSTACKS_ENGINE_ROOT ?? process.cwd());
+const manifestPath = process.env.MICROWEBSTACKS_MANIFEST_PATH
+    ? resolve(process.env.MICROWEBSTACKS_MANIFEST_PATH)
+    : join(workspaceRoot, "manifest.yaml");
+const manifest = await loadManifest(manifestPath);
+const docsRoot = process.env.MICROWEBSTACKS_DOCS_ROOT
+    ? resolve(process.env.MICROWEBSTACKS_DOCS_ROOT)
+    : resolvePath(workspaceRoot, manifest.output.content);
+const outDir = process.env.MICROWEBSTACKS_OUTDIR
+    ? resolve(process.env.MICROWEBSTACKS_OUTDIR)
+    : resolvePath(engineRoot, manifest.output.ssr);
+const storePath = process.env.MICROWEBSTACKS_STORE_PATH
+    ? resolve(process.env.MICROWEBSTACKS_STORE_PATH)
+    : resolvePath(workspaceRoot, manifest.output.store);
+const abs_db_path = process.env.MICROWEBSTACKS_DB_PATH
+    ? resolve(process.env.MICROWEBSTACKS_DB_PATH)
+    : resolvePath(workspaceRoot, manifest.output.db_path);
 const latestVersion = resolveLatestVersion(abs_db_path);
+const serverHost = process.env.MICROWEBSTACKS_HOST ?? manifest.server.host;
+const serverPort = parsePort(process.env.MICROWEBSTACKS_PORT, manifest.server.port);
+const serverProtocol = process.env.MICROWEBSTACKS_PROTOCOL ?? manifest.server.protocol;
 
 const config = {
-    rootdir: rootdir,
-    outDir: join(rootdir, manifest.output.ssr),
-    content_path: join(rootdir, manifest.output.content),
+    rootdir: engineRoot,
+    workspaceRoot,
+    manifestPath,
+    outDir,
+    content_path: docsRoot,
     kroki_server: manifest.kroki.server,
     highlighter:manifest.render.highlighter,
     fetch: manifest.fetch,
     html_cache: manifest.html_cache,
+    server: {
+        ...manifest.server,
+        protocol: serverProtocol,
+        host: serverHost,
+        port: serverPort
+    },
     collect:{
+        ...manifest.collect,
         version_id: latestVersion,
-        rootdir:rootdir,
-        contentdir:join(rootdir, manifest.output.content),
-        outdir:join(rootdir, manifest.output.store),//dist does not persist before build
-        debug:false,
-        db_path: abs_db_path,
-        ...manifest.collect
+        rootdir: workspaceRoot,
+        contentdir: docsRoot,
+        outdir: storePath,//dist does not persist before build
+        debug: manifest.collect.debug ?? false,
+        db_path: abs_db_path
     }
 }
 
-console.log(config)
+if (process.env.MICROWEBSTACKS_DEBUG_CONFIG === 'true') {
+    console.log(config)
+}
 
 export {
     config

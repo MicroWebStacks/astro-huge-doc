@@ -6,16 +6,18 @@ import { readFileSync, } from 'fs';
 import { handler as ssrHandler } from '../dist/server/entry.mjs';
 import { createHtmlCacheMiddleware } from './cache/index.js';
 import cors from 'cors';
-import yaml from 'js-yaml';
+import {config} from '../config.js';
 
 import * as dotenv from 'dotenv'
 dotenv.config()
 
-const manifest = yaml.load(readFileSync(join(process.cwd(), 'manifest.yaml'), 'utf8'));
-const outdir = join(process.cwd(), manifest.output.ssr);
+const outdir = config.outDir;
 
 const app = express();
-const htmlCacheMiddleware = createHtmlCacheMiddleware(manifest);
+const htmlCacheMiddleware = createHtmlCacheMiddleware({
+    dbPath: config.collect.db_path,
+    excludePaths: config.html_cache?.exclude_paths
+});
 
 if(process.env.ENABLE_CORS == "true"){
     app.use(cors());      
@@ -39,17 +41,17 @@ app.use((req, res, next) => {
   })
 
   
-if(manifest.server.protocol == "https"){
+if(config.server.protocol == "https"){
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
     const key = readFileSync(join(__dirname, process.env.KEY_FILE),'utf8')
     const cert = readFileSync(join(__dirname, process.env.CERT_FILE),'utf8')
     const httpsServer = https.createServer({key,cert},app)
-    httpsServer.listen(manifest.server.port,manifest.server.host,()=>{
-        console.log(`listening on https://${manifest.server.host}:${manifest.server.port}`)
+    httpsServer.listen(config.server.port,config.server.host,()=>{
+        console.log(`listening on https://${config.server.host}:${config.server.port}`)
     });
 }else{
-    app.listen(manifest.server.port,manifest.server.host,()=>{
-        console.log(`listening on http://${manifest.server.host}:${manifest.server.port}`)
+    app.listen(config.server.port,config.server.host,()=>{
+        console.log(`listening on http://${config.server.host}:${config.server.port}`)
     });
 }

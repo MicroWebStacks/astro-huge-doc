@@ -478,6 +478,12 @@ function getEntry(match){
     const versionId = match?.version_id ?? config.collect.version_id ?? null;
     const document = getDocument(match, versionId);
     if (!document) {
+        if (match?.url === '' || match?.url === undefined) {
+            const firstDocument = getFirstDocument(versionId);
+            if (firstDocument?.url && firstDocument.url !== match?.url) {
+                return getEntry({...match, url: firstDocument.url, version_id: versionId});
+            }
+        }
         return {found:false, title: '', headings: [], items: [], data: {}};
     }
     log_debug("  - getEntry> document.sid=",document.sid);
@@ -492,6 +498,26 @@ function getEntry(match){
     }
 
     return {found:true, title: document.title, headings, items, data}
+}
+
+function getFirstDocument(versionId = null) {
+    const db = ensureDb();
+    const resolvedVersion = versionId ?? config.collect.version_id ?? null;
+    const params = [];
+    let sql = 'SELECT * FROM documents';
+    if (resolvedVersion) {
+        sql += ' WHERE version_id = ?';
+        params.push(resolvedVersion);
+    }
+    sql += `
+        ORDER BY
+            CASE WHEN url = '' THEN 0 WHEN url = 'home' THEN 1 ELSE 2 END,
+            level,
+            "order",
+            url
+        LIMIT 1
+    `;
+    return normalizeDocumentRow(db.prepare(sql).get(...params));
 }
 
 function getAssetBlob(assetUid, versionId = null) {
@@ -511,6 +537,7 @@ function getAssetBlob(assetUid, versionId = null) {
 
 export {
     getEntry, 
+    getFirstDocument,
     getAssetByUIDVersion,
     getAssetInfoBlob_version,
     getAssetInfoBlob_blob,

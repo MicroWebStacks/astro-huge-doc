@@ -48,6 +48,55 @@ The VS Code extension should:
 5. Provide a fallback command to open the same localhost URL in the external browser.
 6. Watch Markdown/content changes and refresh or invalidate the rendered output.
 
+## Workspace And Storage Contract
+
+Use VS Code desktop extension storage conventions for generated preview data.
+
+The extension should keep generated runtime artifacts that belong only to the
+preview session out of both the extension install directory and the user's
+project tree by default. The generated content database, HTML cache, and similar
+private extension state should be stored under VS Code's workspace-scoped
+extension storage, `ExtensionContext.storageUri`.
+
+Recommended V1 layout:
+
+```txt
+<context.storageUri>/microwebstacks/content.db
+<context.storageUri>/microwebstacks/html-cache.db
+```
+
+If the implementation keeps HTML cache rows in the same SQLite database as the
+content index, that combined database should still live under
+`context.storageUri`.
+
+Workspace files remain the source material:
+
+* Markdown, MDX, assets, and optional `manifest.yaml` are read from the selected
+  workspace or documentation root.
+* Generated preview DB/cache files are not written to the workspace by default.
+* Writing generated output to the workspace should be an explicit future option
+  only when the user wants a portable or inspectable project artifact.
+
+Do not write runtime DBs or caches into the packaged extension installation
+directory.
+
+For later multi-root support, store per-folder data under a child directory of
+`context.storageUri` keyed by a stable hash of the selected
+`workspaceFolder.uri.toString()`.
+
+The local server and collector should receive explicit runtime paths:
+
+* `workspaceRoot` or `docsRoot` for source files.
+* `manifestPath` when a manifest exists.
+* `dbPath` under `context.storageUri` for generated preview data.
+* `storePath` under `context.storageUri` for generated blobs/cache data.
+* `host` and `port`, with the port chosen dynamically for the VS Code preview
+  session.
+
+This keeps the existing repository usable in its current standalone mode while
+allowing the VS Code extension to run the same rendering stack against another
+workspace without polluting that workspace.
+
 ## Initial Commands
 
 Implement these commands first:
@@ -145,14 +194,18 @@ The main things to validate early are:
 
 1. Create `packages/vscode-extension`.
 2. Add a minimal VS Code extension with one command.
-3. Start a local preview server from the extension.
-4. Open the rendered site in an external browser.
-5. Add the VS Code webview preview.
-6. Add file watching and refresh.
-7. Add restart/stop commands.
-8. Clean up packaging and native dependency handling.
-9. Only then consider extracting a stable `core` package.
+3. Add explicit runtime path support for workspace root, DB path, store path,
+   and dynamic port without breaking the current manifest/cwd standalone flow.
+4. Start a local preview server from the extension.
+5. Open the rendered site in an external browser.
+6. Add the VS Code webview preview.
+7. Add file watching and refresh.
+8. Add restart/stop commands.
+9. Clean up packaging and native dependency handling.
+10. Only then consider extracting a stable `core` package.
 
 ## Decision
 
-Proceed with `astro-huge-doc`, same repository, desktop VS Code only, SSR/localhost preview first.
+Proceed with `astro-huge-doc`, same repository, desktop VS Code only,
+SSR/localhost preview first, and VS Code-compliant workspace-scoped extension
+storage for generated preview data.

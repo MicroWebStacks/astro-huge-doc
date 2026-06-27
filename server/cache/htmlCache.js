@@ -29,11 +29,15 @@ function initDb(dbPath) {
   };
 }
 
-function shouldBypassCache(req) {
+function shouldBypassCache(req, excludePaths = []) {
   if (req.method && req.method.toUpperCase() !== 'GET') {
     return true;
   }
-  return req.originalUrl && req.originalUrl.startsWith('/assets/');
+  const url = req.originalUrl || req.url || '';
+  if (url.startsWith('/assets/')) {
+    return true;
+  }
+  return excludePaths.some((pathPrefix) => url.startsWith(pathPrefix));
 }
 
 function bufferFromChunk(chunk, encoding) {
@@ -42,12 +46,13 @@ function bufferFromChunk(chunk, encoding) {
   return Buffer.from(chunk, typeof encoding === 'string' ? encoding : undefined);
 }
 
-export function createHtmlCacheMiddleware(manifest) {
-  const dbPath = join(process.cwd(), manifest.output.db_path);
+export function createHtmlCacheMiddleware(options = {}) {
+  const dbPath = options.dbPath ?? join(process.cwd(), options.output?.db_path ?? options.output?.dbPath ?? 'dataset/content.db');
+  const excludePaths = options.excludePaths ?? options.html_cache?.exclude_paths ?? [];
   const { select, upsert } = initDb(dbPath);
 
   return function htmlCacheMiddleware(req, res, next) {
-    if (shouldBypassCache(req)) {
+    if (shouldBypassCache(req, excludePaths)) {
       return next();
     }
 
