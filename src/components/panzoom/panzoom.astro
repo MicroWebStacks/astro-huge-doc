@@ -12,9 +12,19 @@ export interface Props {
   height?: string;
   width?: string;
   center?: boolean;
+  showOpenButton?: boolean;
 }
 
-const { src, alt, title, meta, height, width, center } = Astro.props as Props;
+const {
+  src,
+  alt,
+  title,
+  meta,
+  height,
+  width,
+  center,
+  showOpenButton = true,
+} = Astro.props as Props;
 // Inline image-directive options. A bare numeric value gets a px unit.
 const withUnit = (v?: string) => (v == null || v === '' ? undefined : /^\d+$/.test(v) ? `${v}px` : v);
 const figureStyle = [
@@ -37,14 +47,16 @@ const isSvg = asseturl.endsWith(".svg")
 const isImg = !isSvg
 
 ---
-<div class={`container panzoom ${center?"center":""}`}
+<div class={`container panzoom ${center?"center":""} ${showOpenButton ? 'with-open-button' : 'without-open-button'}`}
       data-type={isSvg?"svg":"img"}
       data-name={data_name}
       data-meta={JSON.stringify(meta)}
       >
-  <div class="header open">
-    <SvgIcons filename="full-screen"/>
-  </div>
+  {showOpenButton &&
+    <div class="header open" title="Open full view" aria-label="Open full view">
+      <SvgIcons filename="full-screen"/>
+    </div>
+  }
   <div class="figure">
     {isSvg&&
       <object data={asseturl} name={title} data-alt={alt} style={figureStyle} />
@@ -65,15 +77,18 @@ const isImg = !isSvg
   flex-direction: column;
   align-items: center;
   padding:10px;
-  padding-top:20px;
   width:fit-content;
   border-top: 4px solid transparent;
+  position: relative;
+}
+.container.with-open-button{
+  padding-top:20px;
 }
 /* `center` option on an inline image directive */
 .container.center{
   margin-inline: auto;
 }
-.container:hover{
+.container.with-open-button:hover{
   border: 0px solid transparent;
   border-color: transparent;
   padding-left:10px;
@@ -94,7 +109,7 @@ const isImg = !isSvg
   cursor: pointer;
 }
 
-.container:hover .header {
+.container.with-open-button:hover .header {
   display: flex; /* Show the header on hover */
 }
 

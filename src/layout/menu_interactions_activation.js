@@ -7,40 +7,60 @@ function cssVar(name){
 function header_bg_color(){ return cssVar('--header-bg-color'); }
 function content_bg_color(){ return cssVar('--content-bg-color'); }
 
-function configure_nav(fixed_el,resize_el,nav_el,left_to_right){
-    fixed_el.addEventListener("click",(e)=>{
-        const current_state = nav_el.classList.contains("open")?"open":"closed"
-        //console.log(current_state)
-        if(current_state == "open"){
-            nav_el.classList.remove("open")
-            nav_el.classList.add("closed")
-            nav_el.style.width = "0vw"
-            localStorage.setItem("left_open","false")
-        }else if(current_state == "closed"){
-            nav_el.classList.add("open")
-            nav_el.classList.remove("closed")
-            nav_el.style.width = nav_el.getAttribute("data-width")
-            localStorage.setItem("left_open","true")
-        }
-        e.preventDefault()
-    })
+// Open/close is now driven by the app-bar toggle buttons (the side rails are
+// gone). The button is the single authority; it reflects state via
+// aria-expanded so the icon styling and the persisted preference stay in sync.
+function configure_toggle(btn, nav_el, storageKey){
+    if(!btn || !nav_el){ return; }
 
+    function apply(open){
+        if(open){
+            nav_el.classList.add("open");
+            nav_el.classList.remove("closed");
+            nav_el.style.width = nav_el.getAttribute("data-width");
+        }else{
+            nav_el.classList.add("closed");
+            nav_el.classList.remove("open");
+            nav_el.style.width = "0px";
+        }
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+
+    // Restore the last choice; default to whatever the server rendered.
+    const saved = localStorage.getItem(storageKey);
+    if(saved === "true" || saved === "false"){
+        apply(saved === "true");
+    }else{
+        apply(nav_el.classList.contains("open"));
+    }
+
+    btn.addEventListener("click",(e)=>{
+        const open = !nav_el.classList.contains("open");
+        apply(open);
+        localStorage.setItem(storageKey, open ? "true" : "false");
+        e.preventDefault();
+    });
+}
+
+// The thin handles between nav and content keep only the drag-to-resize role.
+function configure_resize(resize_el,nav_el,left_to_right){
+    if(!resize_el || !nav_el){ return; }
     var global_resize_state = false
     var x_down
     var start_width
-    
+
     function finish_mouse(){
         global_resize_state = false
         nav_el.style.transition = "width 0.5s"
-    if(nav_el.clientWidth < 20){
-        nav_el.classList.add("closed")
-        nav_el.classList.remove("open")
-        nav_el.setAttribute("data-width","20vw")
-    }else{
-        nav_el.classList.add("open")
-        nav_el.classList.remove("closed")
-    }
-    resize_el.style.backgroundColor = content_bg_color()
+        if(nav_el.clientWidth < 20){
+            nav_el.classList.add("closed")
+            nav_el.classList.remove("open")
+            nav_el.setAttribute("data-width","20vw")
+        }else{
+            nav_el.classList.add("open")
+            nav_el.classList.remove("closed")
+        }
+        resize_el.style.backgroundColor = content_bg_color()
     }
 
     resize_el.addEventListener("mouseenter",(e)=>{
@@ -85,23 +105,14 @@ function configure_nav(fixed_el,resize_el,nav_el,left_to_right){
 }
 
 function menu_interactions_activation(){
-	console.log("Layout script")
-	//root.style.setProperty('--header-bg-color', 'blue');
+    const pages_nav = document.querySelector("#wide-nav nav.pages_menu")
+    const toc_nav   = document.querySelector("#toc-nav-div nav.toc_menu")
 
-	
-	const fixed_left = document.getElementById("fixed-left")
-	if(fixed_left.classList.contains("active")){
-		const resize_left = document.getElementById("resize-left")
-		const nav = resize_left.previousElementSibling.firstElementChild
-		configure_nav(fixed_left,resize_left,nav,true)
-	}
-	const fixed_right = document.getElementById("fixed-right")
-	if(fixed_right.classList.contains("active")){
-		const resize_right = document.getElementById("resize-right")
-		const nav = resize_right.nextElementSibling.firstElementChild
-		configure_nav(fixed_right,resize_right,nav,false)
-	}
+    configure_toggle(document.getElementById("nav-toggle-left"),  pages_nav, "left_open")
+    configure_toggle(document.getElementById("nav-toggle-right"), toc_nav,   "right_open")
+
+    configure_resize(document.getElementById("resize-left"),  pages_nav, true)
+    configure_resize(document.getElementById("resize-right"), toc_nav,   false)
 }
 
 document.addEventListener('DOMContentLoaded', menu_interactions_activation, false);
-

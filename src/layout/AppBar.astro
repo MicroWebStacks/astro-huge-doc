@@ -12,9 +12,11 @@ export interface Props {
         align?: string;
         icon?: string;
     }>;
+    showLeftToggle?: boolean;
+    showRightToggle?: boolean;
 }
 
-const { menu: providedMenu = [] } = Astro.props as Props;
+const { menu: providedMenu = [], showLeftToggle = false, showRightToggle = false } = Astro.props as Props;
 const menu = providedMenu.length ? providedMenu : buildAppBarMenu(Astro.url.pathname);
 const left_side  = menu.filter((item)=>(!Object.hasOwn(item,"align") || !(item.align=="right")))
 const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.align=="right")))
@@ -22,6 +24,18 @@ const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.ali
 ---
 <div class="navbar">
     <ul class="navbar-left">
+        {showLeftToggle &&
+            <li class="nav-toggle-item">
+                <button id="nav-toggle-left" type="button" class="nav-toggle"
+                    title="Toggle pages menu" aria-label="Toggle pages menu" aria-expanded="true">
+                    <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+                        <rect x="1.5" y="2.5" width="13" height="11" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+                        <line x1="6" y1="2.5" x2="6" y2="13.5" stroke="currentColor" stroke-width="1.3"></line>
+                        <rect class="fill" x="2.7" y="4.2" width="2" height="7.6" rx="0.6" fill="currentColor"></rect>
+                    </svg>
+                </button>
+            </li>
+        }
         {left_side.map((item)=>(
         <li>
             <a href={item.link} class={item.active_class}>
@@ -42,6 +56,18 @@ const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.ali
         <li class="theme-toggle-item">
             <ThemeToggle />
         </li>
+        {showRightToggle &&
+            <li class="nav-toggle-item">
+                <button id="nav-toggle-right" type="button" class="nav-toggle"
+                    title="Toggle outline" aria-label="Toggle outline" aria-expanded="true">
+                    <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+                        <rect x="1.5" y="2.5" width="13" height="11" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+                        <line x1="10" y1="2.5" x2="10" y2="13.5" stroke="currentColor" stroke-width="1.3"></line>
+                        <rect class="fill" x="11.3" y="4.2" width="2" height="7.6" rx="0.6" fill="currentColor"></rect>
+                    </svg>
+                </button>
+            </li>
+        }
     </ul>
 </div>
 
@@ -95,5 +121,43 @@ a.active{
 .theme-toggle-item{
     display:flex;
     align-items:center;
+}
+
+/* Side-menu toggles — the app bar is the single authority for opening and
+   closing the page tree (left) and outline (right). */
+.nav-toggle-item{
+    display:flex;
+    align-items:center;
+}
+.nav-toggle{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:transparent;
+    border:0;
+    border-radius:var(--radius-sm);
+    margin:6px;
+    padding:6px;
+    color:var(--content-color-muted);
+    cursor:pointer;
+}
+.nav-toggle:hover{
+    background-color:var(--header-active-color);
+    color:var(--content-color);
+}
+.nav-toggle:focus-visible{
+    outline:2px solid var(--front-blue);
+    outline-offset:2px;
+}
+/* Open state: accent the icon and light its sidebar cell so the button
+   reads as "panel is showing". */
+.nav-toggle[aria-expanded="true"]{
+    color:var(--content-color);
+}
+.nav-toggle[aria-expanded="true"] .fill{
+    fill:var(--front-blue);
+}
+.nav-toggle[aria-expanded="false"] .fill{
+    opacity:0;
 }
 </style>

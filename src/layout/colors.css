@@ -21,8 +21,6 @@
   /* Chrome / shell surfaces */
   --header-bg-color: #3C3C3C;
   --header-active-color: #454646;
-  --fixed-nav-bg-color: #333333;
-  --fixed-nav-hover-color: #545454;
   --nav-bg-color: #252526;
 
   /* Content surface + text */
@@ -115,8 +113,6 @@
   /* Chrome / shell surfaces */
   --header-bg-color: #E4E4E4;
   --header-active-color: #D2D2D2;
-  --fixed-nav-bg-color: #ECECEC;
-  --fixed-nav-hover-color: #DADADA;
   --nav-bg-color: #F3F3F3;
 
   /* Content surface + text */

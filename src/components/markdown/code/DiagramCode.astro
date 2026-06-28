@@ -1,6 +1,7 @@
 ---
 import Highlighter from './Highlighter.astro'
 import Panzoom from '@/components/panzoom/panzoom.astro'
+import SvgIcons from '@/components/svgicons.astro';
 import { config } from '@/config.js';
 import { getAssetBlob } from '@/libs/structure-db';
 
@@ -25,15 +26,53 @@ if(params && (params.length > 0)){
 }
 
 ---
-{hasDiagram && <button class="toggler" data-uid={uid}>code/diagram</button>}
-{hasDiagram && diagram_url &&
-    <div class="diagram visible" data-uid={uid}>
-        <Panzoom src={diagram_url} alt={alt} title={title} meta={meta} hash={uid}/>
+{hasDiagram &&
+    <div class="diagram-shell" data-uid={uid} data-view="diagram">
+        <div class="diagram-toolbar" role="toolbar" aria-label="Diagram controls">
+            <div class="view-toggle" aria-label="Diagram view mode">
+                <button
+                    type="button"
+                    class="toolbar-btn"
+                    data-action="code"
+                    title="Show code"
+                    aria-label="Show code"
+                    aria-pressed="false">
+                    <SvgIcons filename="code" />
+                </button>
+                <button
+                    type="button"
+                    class="toolbar-btn"
+                    data-action="diagram"
+                    title="Show diagram"
+                    aria-label="Show diagram"
+                    aria-pressed="true">
+                    <SvgIcons filename="diagram" />
+                </button>
+            </div>
+            <button
+                type="button"
+                class="toolbar-btn"
+                data-action="expand"
+                title="Open full view"
+                aria-label="Open full view">
+                <SvgIcons filename="full-screen" />
+            </button>
+        </div>
+        {diagram_url &&
+            <div class="diagram visible" data-role="diagram" data-uid={uid}>
+                <Panzoom src={diagram_url} alt={alt} title={title} meta={meta} hash={uid} showOpenButton={false}/>
+            </div>
+        }
+        <div class="code hidden" data-role="code" data-uid={uid}>
+            <Highlighter uid={uid} code={code} language={language} params={params} />
+        </div>
     </div>
 }
-<div class={`code ${hasDiagram ? 'hidden' : 'visible'}`} data-uid={uid}>
-    <Highlighter uid={uid} code={code} language={language} params={params} />
-</div>
+{!hasDiagram &&
+    <div class="code visible standalone-code" data-uid={uid}>
+        <Highlighter uid={uid} code={code} language={language} params={params} />
+    </div>
+}
 
 <style>
 .visible{
@@ -44,26 +83,157 @@ if(params && (params.length > 0)){
 }
 .diagram{
     background-color: var(--diagram-surface-bg);
+    border-radius: 0 0 8px 8px;
+}
+.diagram-shell{
+    display: flex;
+    flex-direction: column;
+    width: fit-content;
+    max-width: 100%;
+    margin-top: 12px;
+    margin-bottom: 20px;
+    background-color: var(--diagram-surface-bg);
+    border: 1px solid var(--soft-border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.diagram-toolbar{
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 4px;
+    min-height: 28px;
+    padding: 2px 5px;
+    background: var(--surface-2-bg);
+    border-bottom: 1px solid var(--soft-border-color);
+    opacity: 0;
+    transition: opacity 0.16s ease;
+}
+.diagram-shell:hover .diagram-toolbar,
+.diagram-shell:focus-within .diagram-toolbar{
+    opacity: 1;
+}
+.view-toggle{
+    display: inline-flex;
+    overflow: hidden;
+    border: 1px solid var(--soft-border-color);
+    border-radius: 6px;
+}
+.toolbar-btn{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 24px;
+    padding: 0;
+    color: var(--content-color);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+.toolbar-btn[data-action="expand"]{
+    border: 1px solid var(--soft-border-color);
+    border-radius: 6px;
+}
+.view-toggle .toolbar-btn + .toolbar-btn{
+    border-left: 1px solid var(--soft-border-color);
+}
+.toolbar-btn:hover{
+    background: var(--menu-span-hover-color);
+}
+.toolbar-btn[aria-pressed="true"]{
+    background: var(--content-bg-color);
+    color: var(--front-blue);
+}
+.diagram-shell[data-view="code"] .toolbar-btn[data-action="expand"]{
+    opacity: 0.45;
+}
+.toolbar-btn :global(svg){
+    width: 15px;
+    height: 15px;
+}
+.toolbar-btn :global(svg path),
+.toolbar-btn :global(svg circle),
+.toolbar-btn :global(svg rect),
+.toolbar-btn :global(svg polyline),
+.toolbar-btn :global(svg line){
+    stroke: currentColor;
+}
+.toolbar-btn :global(svg path),
+.toolbar-btn :global(svg rect){
+    fill: currentColor;
+}
+.toolbar-btn[data-action="diagram"] :global(svg path),
+.toolbar-btn[data-action="code"] :global(svg path){
+    fill: none;
+}
+.standalone-code{
+    margin-top: 12px;
 }
 </style>
 
 <script>
-const buttons = document.querySelectorAll('button.toggler');
-
-buttons.forEach(button => {
-    button.addEventListener('click', () => {
-        const uid = button.getAttribute('data-uid');
-        const diagramDiv = document.querySelector(`.diagram[data-uid="${uid}"]`);
-        const codeDiv = document.querySelector(`.code[data-uid="${uid}"]`);
-
-        // Toggle classes to switch visibility
-        if (codeDiv.classList.contains('hidden')) {
-                codeDiv.classList.replace('hidden', 'visible');
-                diagramDiv.classList.replace('visible', 'hidden');
-            } else {
-                codeDiv.classList.replace('visible', 'hidden');
-                diagramDiv.classList.replace('hidden', 'visible');
+const initDiagramControls = () => {
+    const shells = document.querySelectorAll('.diagram-shell[data-uid]');
+    shells.forEach(shell => {
+        if (shell.getAttribute('data-controls-ready') === 'true') {
+            return;
         }
+
+        shell.setAttribute('data-controls-ready', 'true');
+
+        const diagramDiv = shell.querySelector('[data-role="diagram"]');
+        const codeDiv = shell.querySelector('[data-role="code"]');
+        const diagramButton = shell.querySelector('button[data-action="diagram"]');
+        const codeButton = shell.querySelector('button[data-action="code"]');
+        const expandButton = shell.querySelector('button[data-action="expand"]');
+
+        const setView = (view) => {
+            const showDiagram = view === 'diagram';
+            shell.setAttribute('data-view', view);
+
+            if (diagramDiv) {
+                diagramDiv.classList.toggle('visible', showDiagram);
+                diagramDiv.classList.toggle('hidden', !showDiagram);
+            }
+
+            if (codeDiv) {
+                codeDiv.classList.toggle('visible', !showDiagram);
+                codeDiv.classList.toggle('hidden', showDiagram);
+            }
+
+            if (diagramButton) {
+                diagramButton.setAttribute('aria-pressed', String(showDiagram));
+            }
+
+            if (codeButton) {
+                codeButton.setAttribute('aria-pressed', String(!showDiagram));
+            }
+
+        };
+
+        diagramButton?.addEventListener('click', () => setView('diagram'));
+        codeButton?.addEventListener('click', () => setView('code'));
+        expandButton?.addEventListener('click', () => {
+            if (shell.getAttribute('data-view') !== 'diagram') {
+                setView('diagram');
+            }
+
+            const modal = shell.querySelector('.modal-background');
+            if (modal) {
+                modal.dispatchEvent(new CustomEvent('open'));
+            }
+        });
+
+        setView(shell.getAttribute('data-view') ?? 'diagram');
     });
-});
+};
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDiagramControls, false);
+} else {
+    initDiagramControls();
+}
 </script>

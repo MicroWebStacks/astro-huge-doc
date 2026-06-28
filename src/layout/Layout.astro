@@ -54,10 +54,9 @@ const appbar_menu = navigation.appBarMenu ?? []
 		</script>
 	</head>
 	<body >
-		<div id="fixed-left" class="fixed-nav active" />
 		<div class="appbar-nav_content-footer">
 			<header>
-				<AppBar menu={appbar_menu} />
+				<AppBar menu={appbar_menu} showLeftToggle={pages_menu_items.length > 0} showRightToggle={toc_menu_items.visible} />
 			</header>
 			<main>
 				<div id="wide-nav" class="scroll">
@@ -80,7 +79,6 @@ const appbar_menu = navigation.appBarMenu ?? []
 				</div>
 			</main>
 		</div>
-		<div id="fixed-right" class={`fixed-nav ${toc_menu_items.visible?"active":""}`}/>
 	</body>
 </html>
 
@@ -96,7 +94,7 @@ body{
 	background-color: var(--content-bg-color);
 	color: var(--content-color);
 }
-/* Body => #fixed-left, .appbar-nav_content-footer, #fixed-right */
+/* Body => .appbar-nav_content-footer (full width; the app bar owns nav toggles) */
 .appbar-nav_content-footer{
 	flex-grow:1;
 	display:flex;
@@ -115,7 +113,7 @@ main{
 	display:flex;
 	flex-direction: row;
 	height:80vh;
-	max-width: calc(100vw - 6em);
+	max-width: 100vw;
 }
 /* main => #wide-nav, resize-left, article.content, #resize-right, #toc-nav-div */
 
@@ -141,24 +139,6 @@ main{
 }
 
 
-.fixed-nav{
-	width:3em;
-	background-color: var(--fixed-nav-bg-color);
-	height:100vh;
-    flex-shrink: 0;
-	display:flex;
-	flex-direction: column;
-	justify-content: start;
-	align-items: center;
-	overflow: hidden;
-}
-.active.fixed-nav{
-	cursor:pointer;
-}
-.active.fixed-nav:hover{
-	background-color: var(--fixed-nav-hover-color);
-	transition: background-color 0.3s;
-}
 .nav-resize{
 	width:0.5rem;
 	background-color: var(--content-bg-color);
@@ -184,7 +164,7 @@ main{
 }
 
 @media only screen and (max-width: 700px) {
-	#fixed-left, #fixed-right, #resize-right, #resize-left, #toc-nav-div {
+	#resize-right, #resize-left, #toc-nav-div {
 		display:none;
 	}
 	.content{
