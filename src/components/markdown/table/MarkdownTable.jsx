@@ -192,8 +192,8 @@ export default function MarkdownTable({node = null, assetUrl = null}) {
                                                 onClick={header.column.getToggleSortingHandler()}
                                             >
                                                 <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
-                                                <span className="markdown-table-sort-state">
-                                                    {sortState === 'asc' ? 'asc' : sortState === 'desc' ? 'desc' : ''}
+                                                <span className={`markdown-table-sort-state${sortState ? ' sorted' : ''}`} aria-hidden="true">
+                                                    {sortState === 'asc' ? '▲' : sortState === 'desc' ? '▼' : '▾'}
                                                 </span>
                                             </button>
                                         ) : (

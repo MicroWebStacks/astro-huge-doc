@@ -125,11 +125,24 @@ const nextLevel = level + 1;
         background-color: var(--menu-span-hover-color);
     }
 
-    /* scroll-spy cross-highlight: toc link matching the heading in view */
+    /* scroll-spy cross-highlight: toc link matching the heading in view.
+       Accent bar sits in a small gutter with a gap before the text (rather
+       than an inset line flush against it). */
     a.toc_href.active > span.text{
+        position: relative;
         background-color: var(--menu-active-color);
-        box-shadow: inset 3px 0 0 var(--front-blue);
         color: var(--content-color);
+        padding-left: 12px;
+    }
+    a.toc_href.active > span.text::before{
+        content: "";
+        position: absolute;
+        left: 3px;
+        top: 0.15em;
+        bottom: 0.15em;
+        width: 3px;
+        border-radius: 2px;
+        background: var(--front-blue);
     }
     a.toc_href.hover > span.text{
         background-color: var(--menu-span-hover-color);

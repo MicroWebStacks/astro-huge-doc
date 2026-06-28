@@ -3,7 +3,6 @@ import Highlighter from './Highlighter.astro'
 import ModelViewerCode from '../model/ModelViewerCode.astro';
 import Cards from '../cards/Cards.astro'
 import Gallery from '../../gallery/gallery.astro';
-import kroki from './kroki.yaml'
 import { config } from '@/config.js';
 import { getAssetInfoBlob_version } from '@/libs/structure-db';
 import DiagramCode from './DiagramCode.astro';
@@ -22,12 +21,18 @@ export interface Props {
 const { item } = Astro.props as Props;
 const {asset, buffer} = getAssetInfoBlob_version(item.asset_uid, config.collect.version_id)
 const code = new TextDecoder().decode(buffer)
-let language = asset.ext ?? 'text'
-const krokiLanguage = asset.ext ? kroki.formats[asset.ext] : undefined
-if(asset.type == "linked_file" && krokiLanguage){
-    console.log("Kroki format detected for extension:", asset.ext)
-    language = krokiLanguage
+const diagramLanguages = config.diagram?.languages ?? {}
+const diagramAliases = config.diagram?.aliases ?? {}
+function normalizeDiagramLanguage(value) {
+    const normalized = String(value ?? '').trim().toLowerCase()
+    if (!normalized) {
+        return ''
+    }
+    const trimmed = normalized.startsWith('.') ? normalized.slice(1) : normalized
+    return diagramAliases[trimmed] ?? trimmed
 }
+const assetLanguage = normalizeDiagramLanguage(asset.ext)
+let language = assetLanguage || 'text'
 const params = asset.params?asset.params.split(' '):[]
 const asset_uid = item.asset_uid
 
@@ -36,7 +41,7 @@ const yaml_cards    = ((language == "yaml") && (asset.params?.startsWith("cards"
 const yaml_gallery  = ((language == "yaml") && (asset.params?.startsWith("gallery")))
 const yaml_chart    = ((language == "yaml") && (asset.params?.startsWith("chart")))
 
-const is_diagram = kroki.languages.includes(language)
+const is_diagram = Boolean(diagramLanguages[language])
 const custom_yaml = yaml_glb || yaml_cards || yaml_gallery || yaml_chart
 const other_language = (!is_diagram && !custom_yaml)
 

@@ -127,9 +127,12 @@ function segmentCount(url) {
 
 function loadDocuments() {
     const db = openDatabase(config.collect.db_path, {readonly: true});
+    // Scope the nav to the active build. The documents table accumulates a row
+    // per doc per version, so without this filter the menu shows every historical
+    // build's docs (stale/duplicated entries).
     return db
-        .prepare('SELECT url, title, level, "order" AS sort_order, url_type FROM documents ORDER BY level, sort_order, url')
-        .all();
+        .prepare('SELECT url, title, level, "order" AS sort_order, url_type FROM documents WHERE version_id = ? ORDER BY level, sort_order, url')
+        .all(config.collect.version_id);
 }
 
 /* The set of top-level names that are real folders (sections of their own).

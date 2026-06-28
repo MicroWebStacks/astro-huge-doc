@@ -20,10 +20,27 @@ const DEFAULT_MANIFEST = {
     kroki: {
         server: 'https://kroki.io'
     },
+    diagram: {
+        default_renderer: 'kroki',
+        renderers: {
+            kroki: {
+                server: 'https://kroki.io'
+            }
+        },
+        languages: {
+            plantuml: 'kroki',
+            blockdiag: 'kroki',
+            mermaid: 'kroki'
+        },
+        aliases: {
+            puml: 'plantuml',
+            mmd: 'mermaid'
+        }
+    },
     collect: {
         folder_single_doc: false,
-        file_link_ext: ['svg', 'webp', 'png', 'jpeg', 'jpg', 'xlsx', 'glb', 'puml'],
-        file_compress_ext: ['txt', 'md', 'json', 'csv', 'tsv', 'yaml', 'yml'],
+        file_link_ext: ['svg', 'webp', 'png', 'jpeg', 'jpg', 'xlsx', 'glb', 'puml', 'mermaid', 'mmd'],
+        file_compress_ext: ['txt', 'md', 'json', 'csv', 'tsv', 'yaml', 'yml', 'mermaid', 'mmd'],
         external_storage_kb: 512,
         inline_compression_kb: 32
     },
@@ -46,6 +63,27 @@ function mergeManifest(manifest = {}) {
         output: {...DEFAULT_MANIFEST.output, ...(manifest.output ?? {})},
         server: {...DEFAULT_MANIFEST.server, ...(manifest.server ?? {})},
         kroki: {...DEFAULT_MANIFEST.kroki, ...(manifest.kroki ?? {})},
+        diagram: {
+            ...DEFAULT_MANIFEST.diagram,
+            ...(manifest.diagram ?? {}),
+            renderers: {
+                ...DEFAULT_MANIFEST.diagram.renderers,
+                ...(manifest.diagram?.renderers ?? {}),
+                kroki: {
+                    ...DEFAULT_MANIFEST.diagram.renderers.kroki,
+                    server: manifest.kroki?.server ?? DEFAULT_MANIFEST.diagram.renderers.kroki.server,
+                    ...(manifest.diagram?.renderers?.kroki ?? {})
+                }
+            },
+            languages: {
+                ...DEFAULT_MANIFEST.diagram.languages,
+                ...(manifest.diagram?.languages ?? {})
+            },
+            aliases: {
+                ...DEFAULT_MANIFEST.diagram.aliases,
+                ...(manifest.diagram?.aliases ?? {})
+            }
+        },
         collect: {...DEFAULT_MANIFEST.collect, ...(manifest.collect ?? {})},
         render: {
             ...DEFAULT_MANIFEST.render,
@@ -102,6 +140,7 @@ const manifestPath = process.env.MICROWEBSTACKS_MANIFEST_PATH
     ? resolve(process.env.MICROWEBSTACKS_MANIFEST_PATH)
     : join(workspaceRoot, "manifest.yaml");
 const manifest = await loadManifest(manifestPath);
+const krokiServer = manifest.diagram.renderers.kroki?.server ?? manifest.kroki.server;
 const docsRoot = process.env.MICROWEBSTACKS_DOCS_ROOT
     ? resolve(process.env.MICROWEBSTACKS_DOCS_ROOT)
     : resolvePath(workspaceRoot, manifest.output.content);
@@ -125,7 +164,8 @@ const config = {
     manifestPath,
     outDir,
     content_path: docsRoot,
-    kroki_server: manifest.kroki.server,
+    kroki_server: krokiServer,
+    diagram: manifest.diagram,
     highlighter:manifest.render.highlighter,
     fetch: manifest.fetch,
     html_cache: manifest.html_cache,

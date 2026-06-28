@@ -49,11 +49,14 @@
 }
 
 .markdown-table-sort-state {
-    min-width: 2.25em;
-    color: var(--content-color-muted);
-    font-size: var(--text-xs, 0.75rem);
-    font-weight: 500;
-    text-transform: uppercase;
+    min-width: 1em;
+    color: var(--content-color-faint);
+    font-size: 0.95em;
+    line-height: 1;
+}
+/* sortable-but-inactive triangle stays faint; the active direction lights up */
+.markdown-table-sort-state.sorted {
+    color: var(--front-blue);
 }
 
 .markdown-table-message {

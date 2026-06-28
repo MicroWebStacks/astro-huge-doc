@@ -29,8 +29,8 @@ async function codeToHtml(code, highlighter_config){
     }
     if( (requested_language!= "text") &&
         !Object.keys(bundledLanguages).includes(requested_language)){
-        log_debug(`  highlighter> (X) '${requested_language}' is not available, fall back on 'js'`)
-        lang = 'js'
+        log_debug(`  highlighter> (X) '${requested_language}' is not available, fall back on 'text'`)
+        lang = 'text'
     }
 
     const html = highlighter.codeToHtml(code, { lang: lang, themes, defaultColor: false })

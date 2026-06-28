@@ -25,10 +25,22 @@ server:
   port: 4321
 kroki:
   server: https://kroki.io
+diagram:
+  default_renderer: kroki
+  renderers:
+    kroki:
+      server: https://kroki.io
+  languages:
+    plantuml: kroki
+    blockdiag: kroki
+    mermaid: kroki
+  aliases:
+    puml: plantuml
+    mmd: mermaid
 collect:
   folder_single_doc: false
-  file_link_ext: ["svg","webp","png","jpeg","jpg","xlsx","glb","puml"]
-  file_compress_ext: ['txt','md','json','csv','tsv','yaml','yml']
+  file_link_ext: ["svg","webp","png","jpeg","jpg","xlsx","glb","puml","mermaid","mmd"]
+  file_compress_ext: ['txt','md','json','csv','tsv','yaml','yml','mermaid','mmd']
   external_storage_kb: 512
   inline_compression_kb: 32
 render:

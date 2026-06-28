@@ -1,6 +1,5 @@
 ---
 import ModelViewer from './model/ModelViewer.astro';
-import kroki from './code/kroki.yaml'
 import { getAssetBlob, getAssetInfo } from '@/libs/structure-db';
 import Code from './code/Code.astro';
 import { config } from '@/config';
@@ -30,8 +29,12 @@ let is_link = true
 
 if (hasAsset){
   const asset_info = getAssetInfo(item);
+  const diagramAliases = config.diagram?.aliases ?? {}
+  const normalizedExt = String(asset_info.ext ?? '').trim().toLowerCase()
+  const trimmedExt = normalizedExt.startsWith('.') ? normalizedExt.slice(1) : normalizedExt
+  const diagramLanguage = diagramAliases[trimmedExt] ?? trimmedExt
   is_model3d = (asset_info.ext === "glb")
-  is_diagram = Object.keys(kroki.formats).includes(asset_info.ext)
+  is_diagram = Boolean(config.diagram?.languages?.[diagramLanguage])
   is_link = !is_model3d && !is_table && !is_diagram
 }
 

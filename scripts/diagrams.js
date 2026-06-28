@@ -6,9 +6,11 @@ import {createHash} from 'crypto';
 import {config} from '../config.js';
 import Database from 'better-sqlite3';
 
-const diagramExts = new Set(['plantuml', 'blockdiag', 'mermaid']);
 const diagramTypeMap = {codeblock: 'code_diagram', linked_file: 'file_diagram'};
-const languageAliases = {puml: 'plantuml'};
+const diagramConfig = config.diagram ?? {};
+const diagramLanguages = diagramConfig.languages ?? {plantuml: 'kroki', blockdiag: 'kroki', mermaid: 'kroki'};
+const diagramExts = new Set(Object.keys(diagramLanguages));
+const languageAliases = diagramConfig.aliases ?? {puml: 'plantuml', mmd: 'mermaid'};
 const db = new Database(config.collect.db_path, {readonly: false});
 
 db.pragma('journal_mode = WAL');
@@ -99,13 +101,20 @@ function clearHtmlCache() {
 }
 
 async function renderDiagram(language, code) {
-    const response = await fetch(`${config.kroki_server}/${language}/svg/`, {
+    const rendererName = diagramLanguages[language] ?? diagramConfig.default_renderer;
+    const renderer = diagramConfig.renderers?.[rendererName];
+    const server = renderer?.server ?? renderer?.base_url ?? config.kroki_server;
+    if (!server) {
+        throw new Error(`No diagram renderer server configured for ${language}`);
+    }
+    const serverUrl = String(server).replace(/\/+$/, '');
+    const response = await fetch(`${serverUrl}/${language}/svg/`, {
         method: 'POST',
         body: code,
         headers: {'Content-Type': 'text/plain'}
     });
     if (!response.ok) {
-        throw new Error(`Kroki render failed (${response.status})`);
+        throw new Error(`${rendererName ?? 'diagram'} render failed (${response.status})`);
     }
     return response.text();
 }
@@ -150,16 +159,18 @@ async function main() {
                 payload.buffer
             );
         }
-        insertAssetInfo.run(
-            payload.diagramUid,
-            payload.diagramType,
-            payload.blobUid,
-            payload.parentDocUid,
-            'svg',
-            payload.now,
-            payload.now
-        );
-        if (payload.docSid) {
+        if (payload.insertAssetInfo) {
+            insertAssetInfo.run(
+                payload.diagramUid,
+                payload.diagramType,
+                payload.blobUid,
+                payload.parentDocUid,
+                'svg',
+                payload.now,
+                payload.now
+            );
+        }
+        if (payload.insertAssetLink && payload.docSid) {
             insertAssetLink.run(
                 payload.diagramUid,
                 versionId,
@@ -182,12 +193,30 @@ async function main() {
         }
 
         const diagramUid = `${asset.uid}.svg`;
-        const existing = db.prepare('SELECT uid FROM asset_info WHERE uid = ?').get(diagramUid);
+        const existing = db
+            .prepare('SELECT uid, blob_uid FROM asset_info WHERE uid = ? ORDER BY id DESC LIMIT 1')
+            .get(diagramUid);
         const existingLink = db
             .prepare('SELECT asset_uid FROM assets WHERE asset_uid = ? AND version_id = ?')
             .get(diagramUid, versionId);
         if (existing && existingLink) {
             console.log(`Skipping existing diagram ${diagramUid} for version ${versionId}`);
+            continue;
+        }
+
+        const docSid = getDocSid(asset.parent_doc_uid);
+        if (existing?.blob_uid) {
+            writeDiagram({
+                insertBlob: false,
+                insertAssetInfo: false,
+                insertAssetLink: !existingLink,
+                blobUid: existing.blob_uid,
+                now: new Date().toISOString(),
+                diagramUid,
+                docSid,
+                diagramType
+            });
+            console.log(`${diagramUid} [${diagramType}]: linked existing blob ${existing.blob_uid}`);
             continue;
         }
 
@@ -217,9 +246,10 @@ async function main() {
             insertedBlob = true;
         }
 
-        const docSid = getDocSid(asset.parent_doc_uid);
         writeDiagram({
-            insertBlob: insertedBlob && !existing,
+            insertBlob: insertedBlob,
+            insertAssetInfo: true,
+            insertAssetLink: !existingLink,
             blobUid,
             hash,
             now,

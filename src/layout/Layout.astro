@@ -12,7 +12,10 @@ export interface Props {
 }
 
 const { headings } = Astro.props;
-const { title } = Astro.props.frontmatter || Astro.props;
+const rawTitle = ((Astro.props as any).frontmatter || Astro.props).title;
+// The root content doc carries "." as its title; show "Home" instead
+// (mirrors homeLabel() used for the nav).
+const title = (!rawTitle || rawTitle === '.') ? 'Home' : rawTitle;
 const toc_menu_items = process_toc_list(headings)
 const navigation = buildNavigationMenus(Astro.url.pathname)
 const pages_menu_items = navigation.sectionMenu ?? []
@@ -215,8 +218,10 @@ main{
 	color:var(--article-anchor-color);
 }
 
-/* Body paragraphs: capped measure for legibility, even block spacing. */
-.article-slot :global(.paragraph.text){
+/* Body paragraphs: capped measure for legibility, even block spacing.
+   Standalone paragraphs render as <p>; text that flows around inline links
+   stays as loose nodes and inherits the article line-height. */
+.article-slot :global(p){
 	max-width: 80ch;
 	margin-block: 0 var(--space-4);
 	line-height: var(--leading-body);

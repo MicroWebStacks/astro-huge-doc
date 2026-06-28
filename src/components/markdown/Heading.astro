@@ -34,10 +34,11 @@ const HeadingLevel = `h${item.level}`
 
 <style>
 .heading.bar{
+  position: relative;
   width: fit-content;
   display: flex;
   gap: 10px;
-  transition: background-color 0.2s, box-shadow 0.2s;
+  transition: background-color 0.2s;
 }
 /* Cross-highlight driven by the toc menu (scroll-spy active / hover).
    Kept quiet per the calm, content-first principle: hover is a soft
@@ -45,8 +46,15 @@ const HeadingLevel = `h${item.level}`
 .heading.bar.hover{
   background-color: var(--menu-active-color);
 }
-.heading.bar.active{
-  box-shadow: -3px 0 0 0 var(--front-blue);
+.heading.bar.active::before{
+  content: "";
+  position: absolute;
+  left: -0.6rem;
+  top: 0.15em;
+  bottom: 0.15em;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--front-blue);
 }
 .icon{
   opacity: 0;
