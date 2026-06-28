@@ -145,3 +145,48 @@ Known gaps:
 - No bootstrap/packaging code written or validated yet.
 - Registry-install requires network + npm tooling on the user machine at first
   run; offline path not yet available.
+
+## 2026-06-28 - Phase 2 Implementation (Bootstrap + Stage Script)
+
+Expected:
+
+- Add Option B engine bootstrap to the extension while keeping the local
+  workspace checkout as a guaranteed, always-available fallback.
+- Add a script that stages the @microwebstacks/md-render engine package.
+- Do not move any repo source files; do not break standalone repo flows.
+
+Actual:
+
+- Created `plans/2026-06-28-vscode-marketplace-readiness/implementation.md`.
+- Refactored `packages/vscode-extension/extension.js`: replaced
+  `resolveEngineRoot()` with async `resolveEngine(context)` implementing the
+  tiered order enginePath -> local repo -> installed storage -> registry
+  install, plus `installEngine()` and `isEngineRoot()` helpers.
+- Added `microwebstacks.preview.engineSource` setting (auto|local|registry)
+  with `local` guaranteeing offline/local-only resolution.
+- Bumped extension version 0.0.2 -> 0.0.3 and added pinned `engineVersion`.
+- Added `scripts/stage-engine.js` and `pnpm ext:stage-engine`.
+- Ignored `packages/md-render/` staging output in `.gitignore`.
+
+Commands run:
+
+```txt
+node --check packages/vscode-extension/extension.js      # OK
+node scripts/stage-engine.js                              # staged @0.0.1
+ls -la packages/md-render/                                # config.js, server, scripts, dist, package.json
+rg resolveEngineRoot packages/vscode-extension            # no matches (old fn fully removed)
+```
+
+Verified:
+
+- Stage script validates the SSR build, copies config.js/server/scripts/dist,
+  generates a package.json with 47 prod deps, and warns that
+  `content-structure: ../content-structure` is an unpublishable local-path dep.
+- Local fallback is intact: the repo root satisfies isEngineRoot (config.js +
+  server/server.js + scripts/collect.js), so tier 2 resolves without network.
+
+Known gaps:
+
+- Tier 4 (registry install) is unexercised end to end because
+  `@microwebstacks/md-render` is unpublished (blocked on `content-structure`).
+- Full bootstrap not yet run inside a real VS Code host / clean profile.

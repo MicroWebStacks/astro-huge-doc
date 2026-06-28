@@ -10,7 +10,9 @@ function cloneHeading(heading) {
         depth: heading.depth ?? heading.level ?? 1,
         link: heading.link ?? '',
         uid: heading.uid ?? null,
-        nodeKey: heading.nodeKey ?? heading.uid ?? heading.slug ?? heading.link ?? label
+        nodeKey: heading.nodeKey ?? heading.uid ?? heading.slug ?? heading.link ?? label,
+        hasTable: Boolean(heading.hasTable),
+        hasDiagram: Boolean(heading.hasDiagram)
     };
 }
 

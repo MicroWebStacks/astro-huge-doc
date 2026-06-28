@@ -1,4 +1,5 @@
-import {useEffect, useMemo, useState} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
+import {createPortal} from 'react-dom';
 import {
     flexRender,
     getCoreRowModel,
@@ -112,6 +113,9 @@ export default function MarkdownTable({node = null, assetUrl = null}) {
     const [assetRows, setAssetRows] = useState(null);
     const [error, setError] = useState('');
     const [sorting, setSorting] = useState([]);
+    const [expanded, setExpanded] = useState(false);
+    const [overflowing, setOverflowing] = useState(false);
+    const scrollRef = useRef(null);
 
     useEffect(() => {
         if (node?.type === 'table' || !assetUrl) {
@@ -156,6 +160,36 @@ export default function MarkdownTable({node = null, assetUrl = null}) {
         getSortedRowModel: getSortedRowModel()
     });
 
+    useEffect(() => {
+        if (!expanded) {
+            return undefined;
+        }
+        const onKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                setExpanded(false);
+            }
+        };
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
+    }, [expanded]);
+
+    // Only offer the full view when the inline table is wider than its
+    // container (horizontal scroll); fully visible tables need no expand.
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el || typeof ResizeObserver === 'undefined') {
+            return undefined;
+        }
+        const update = () => setOverflowing(el.scrollWidth - el.clientWidth > 1);
+        update();
+        const observer = new ResizeObserver(update);
+        observer.observe(el);
+        if (el.firstElementChild) {
+            observer.observe(el.firstElementChild);
+        }
+        return () => observer.disconnect();
+    }, [columns, data]);
+
     if (error) {
         return <p className="markdown-table-message">{error}</p>;
     }
@@ -164,62 +198,123 @@ export default function MarkdownTable({node = null, assetUrl = null}) {
         return <p className="markdown-table-message">No table data available.</p>;
     }
 
+    const renderTable = (full) => (
+        <table className={`markdown-table${full ? ' markdown-table--full' : ''}`}>
+            <thead>
+                {table.getHeaderGroups().map((headerGroup) => (
+                    <tr key={headerGroup.id}>
+                        {headerGroup.headers.map((header) => {
+                            const sortState = header.column.getIsSorted();
+                            const align = header.column.columnDef.meta?.align;
+                            return (
+                                <th
+                                    key={header.id}
+                                    style={{textAlign: align ?? undefined}}
+                                    aria-sort={
+                                        sortState === 'asc'
+                                            ? 'ascending'
+                                            : sortState === 'desc'
+                                              ? 'descending'
+                                              : 'none'
+                                    }
+                                >
+                                    {header.column.getCanSort() ? (
+                                        <button
+                                            className="markdown-table-sort"
+                                            type="button"
+                                            onClick={header.column.getToggleSortingHandler()}
+                                        >
+                                            <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                                            <span className={`markdown-table-sort-state${sortState ? ' sorted' : ''}`} aria-hidden="true">
+                                                {sortState === 'asc' ? '▲' : sortState === 'desc' ? '▼' : '▾'}
+                                            </span>
+                                        </button>
+                                    ) : (
+                                        flexRender(header.column.columnDef.header, header.getContext())
+                                    )}
+                                </th>
+                            );
+                        })}
+                    </tr>
+                ))}
+            </thead>
+            <tbody>
+                {table.getRowModel().rows.map((row) => (
+                    <tr key={row.id}>
+                        {row.getVisibleCells().map((cell) => {
+                            const align = cell.column.columnDef.meta?.align;
+                            return (
+                                <td key={cell.id} style={{textAlign: align ?? undefined}}>
+                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                </td>
+                            );
+                        })}
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    );
+
     return (
-        <div className="markdown-table-scroll">
-            <table className="markdown-table">
-                <thead>
-                    {table.getHeaderGroups().map((headerGroup) => (
-                        <tr key={headerGroup.id}>
-                            {headerGroup.headers.map((header) => {
-                                const sortState = header.column.getIsSorted();
-                                const align = header.column.columnDef.meta?.align;
-                                return (
-                                    <th
-                                        key={header.id}
-                                        style={{textAlign: align ?? undefined}}
-                                        aria-sort={
-                                            sortState === 'asc'
-                                                ? 'ascending'
-                                                : sortState === 'desc'
-                                                  ? 'descending'
-                                                  : 'none'
-                                        }
-                                    >
-                                        {header.column.getCanSort() ? (
-                                            <button
-                                                className="markdown-table-sort"
-                                                type="button"
-                                                onClick={header.column.getToggleSortingHandler()}
-                                            >
-                                                <span>{flexRender(header.column.columnDef.header, header.getContext())}</span>
-                                                <span className={`markdown-table-sort-state${sortState ? ' sorted' : ''}`} aria-hidden="true">
-                                                    {sortState === 'asc' ? '▲' : sortState === 'desc' ? '▼' : '▾'}
-                                                </span>
-                                            </button>
-                                        ) : (
-                                            flexRender(header.column.columnDef.header, header.getContext())
-                                        )}
-                                    </th>
-                                );
-                            })}
-                        </tr>
-                    ))}
-                </thead>
-                <tbody>
-                    {table.getRowModel().rows.map((row) => (
-                        <tr key={row.id}>
-                            {row.getVisibleCells().map((cell) => {
-                                const align = cell.column.columnDef.meta?.align;
-                                return (
-                                    <td key={cell.id} style={{textAlign: align ?? undefined}}>
-                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                    </td>
-                                );
-                            })}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+        <div className="markdown-table-shell">
+            {overflowing ? (
+            <div className="markdown-table-toolbar" role="toolbar" aria-label="Table controls">
+                <button
+                    type="button"
+                    className="markdown-table-btn"
+                    title="Open full view"
+                    aria-label="Open full view"
+                    onClick={() => setExpanded(true)}
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.25"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                    >
+                        <polyline points="9 3 3 3 3 9" />
+                        <polyline points="15 3 21 3 21 9" />
+                        <polyline points="3 15 3 21 9 21" />
+                        <polyline points="21 15 21 21 15 21" />
+                    </svg>
+                </button>
+            </div>
+            ) : null}
+            <div className="markdown-table-scroll" ref={scrollRef}>{renderTable(false)}</div>
+
+            {expanded && typeof document !== 'undefined'
+                ? createPortal(
+                      <div
+                          className="markdown-table-modal-background visible"
+                          onClick={() => setExpanded(false)}
+                      >
+                          <div
+                              className="markdown-table-modal"
+                              role="dialog"
+                              aria-modal="true"
+                              aria-label="Table full view"
+                              onClick={(event) => event.stopPropagation()}
+                          >
+                              <div
+                                  className="markdown-table-modal-header"
+                                  role="button"
+                                  tabIndex={0}
+                                  title="Close full view"
+                                  aria-label="Close full view"
+                                  onClick={() => setExpanded(false)}
+                              >
+                                  <span className="markdown-table-modal-close">&times;</span>
+                              </div>
+                              <div className="markdown-table-modal-content">{renderTable(true)}</div>
+                          </div>
+                      </div>,
+                      document.body
+                  )
+                : null}
         </div>
     );
 }

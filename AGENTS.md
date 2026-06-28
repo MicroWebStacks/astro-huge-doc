@@ -31,6 +31,20 @@ This repository reserves `specification/` for stable requirements and uses
 When a plan changes during implementation, update the dated plan folder so the
 plan, implementation notes, and test proof stay consistent.
 
+## Temporary Files
+
+- Never create temporary files, scratch scripts, or captured logs in the
+  workspace root. This includes any `*.tmp`, `.tmp_*`, `*.log`, ad-hoc
+  `*.mjs`/`*.js` probe scripts, server output dumps, or one-off HTML/profile
+  dumps.
+- Put all such throwaway artifacts inside the `.tmp/` folder, which is already
+  gitignored. Create subfolders under `.tmp/` to group a session's artifacts
+  (for example `.tmp/menu-state-smoke/`).
+- Do not invent root-level escape hatches such as a `.tmp_` prefix; only the
+  `.tmp/` directory is sanctioned and ignored.
+- Clean up after a task when practical; the `.tmp/` folder is disposable and
+  must never hold anything the repo depends on.
+
 ## Repo Practices
 
 - Respect existing Astro, React, Node, and script patterns before introducing

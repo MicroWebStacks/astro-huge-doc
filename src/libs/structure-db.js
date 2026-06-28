@@ -474,6 +474,61 @@ function buildItems(items, assets, docUid, documentPath) {
     return {items: renderItems, headings};
 }
 
+/* Mark each heading whose section directly contains a table or a diagram so
+   the TOC can show an indicator icon next to the label. The "section" of a
+   heading is the run of items between it and the next heading; the nearest
+   preceding heading is the one annotated. Diagrams are code blocks whose
+   asset language is a configured diagram language (see config.diagram). */
+function annotateHeadingSections(items) {
+    const headings = items.filter((i) => i.type === 'heading');
+    if (headings.length === 0) {
+        return headings;
+    }
+    const diagramLanguages = config.diagram?.languages ?? {};
+    const diagramAliases = config.diagram?.aliases ?? {};
+    const normalizeLang = (ext) => {
+        const value = String(ext ?? '').trim().toLowerCase();
+        if (!value) {
+            return '';
+        }
+        const trimmed = value.startsWith('.') ? value.slice(1) : value;
+        return diagramAliases[trimmed] ?? trimmed;
+    };
+    const codeUids = items
+        .filter((i) => i.type === 'code' && i.asset_uid)
+        .map((i) => i.asset_uid);
+    const extByUid = new Map();
+    if (codeUids.length) {
+        const db = ensureDb();
+        const placeholders = codeUids.map(() => '?').join(',');
+        const rows = db
+            .prepare(`SELECT uid, ext FROM asset_info WHERE uid IN (${placeholders})`)
+            .all(...codeUids);
+        for (const row of rows) {
+            extByUid.set(row.uid, row.ext);
+        }
+    }
+    let current = null;
+    for (const item of items) {
+        if (item.type === 'heading') {
+            current = item;
+            continue;
+        }
+        if (!current) {
+            continue;
+        }
+        if (item.type === 'table') {
+            current.hasTable = true;
+        } else if (item.type === 'code') {
+            const lang = normalizeLang(extByUid.get(item.asset_uid));
+            if (diagramLanguages[lang]) {
+                current.hasDiagram = true;
+            }
+        }
+    }
+    return headings;
+}
+
 function getEntry(match){
     const versionId = match?.version_id ?? config.collect.version_id ?? null;
     const document = getDocument(match, versionId);
@@ -490,7 +545,7 @@ function getEntry(match){
     const items = getItems(match, undefined, versionId);
     let headings = document?.toc;
     if (!headings) {
-        headings = items.filter((i) => i.type === 'heading');
+        headings = annotateHeadingSections(items);
     }
     const data = {
         ...document,

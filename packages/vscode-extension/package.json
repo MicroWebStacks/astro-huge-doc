@@ -2,7 +2,8 @@
   "name": "microwebstacks-docs-preview",
   "displayName": "MicroWebStacks Docs Preview",
   "description": "Preview astro-huge-doc rendered Markdown documentation inside VS Code.",
-  "version": "0.0.2",
+  "version": "0.0.3",
+  "engineVersion": "0.0.1",
   "publisher": "microwebstacks",
   "private": true,
   "engines": {
@@ -40,10 +41,25 @@
     "configuration": {
       "title": "MicroWebStacks Docs Preview",
       "properties": {
+        "microwebstacks.preview.engineSource": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "local",
+            "registry"
+          ],
+          "enumDescriptions": [
+            "Prefer a local workspace checkout, then a previously installed engine, then install from the npm registry.",
+            "Only use a local workspace checkout or enginePath. Never contacts the npm registry (fully offline).",
+            "Skip local checkout discovery and use (or install) the published @microwebstacks/md-render engine."
+          ],
+          "default": "auto",
+          "description": "Where the docs rendering engine is sourced from. 'auto' always falls back to a local checkout before installing from the registry."
+        },
         "microwebstacks.preview.enginePath": {
           "type": "string",
           "default": "",
-          "description": "Path to an astro-huge-doc repository checkout. Only needed when the extension cannot infer the engine path."
+          "description": "Path to an astro-huge-doc repository checkout used as the engine. Highest priority in every engineSource mode. Only needed when the extension cannot infer the engine path."
         },
         "microwebstacks.preview.docsRoot": {
           "type": "string",

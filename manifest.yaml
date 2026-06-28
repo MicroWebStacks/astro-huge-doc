@@ -1,5 +1,5 @@
 fetch:
-  select: VectorMind/alm-ontology
+  select: VectorMind/evidence-engine
   github:
     - repo: MicroWebStacks/astro-big-doc
       branch: main

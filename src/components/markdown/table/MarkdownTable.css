@@ -1,12 +1,123 @@
-.markdown-table-scroll {
+.markdown-table-shell {
+    position: relative;
     margin: var(--space-3, 12px) 0;
+}
+
+.markdown-table-scroll {
     max-width: 100%;
     overflow-x: auto;
+}
+
+/* Hover-revealed toolbar mirroring the diagram full-view affordance. */
+.markdown-table-toolbar {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 1;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.16s ease;
+}
+
+.markdown-table-shell:hover .markdown-table-toolbar,
+.markdown-table-shell:focus-within .markdown-table-toolbar {
+    opacity: 1;
+}
+
+.markdown-table-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 24px;
+    padding: 0;
+    color: var(--content-color);
+    background: var(--surface-2-bg);
+    border: 1px solid var(--soft-border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.markdown-table-btn:hover {
+    background: var(--menu-span-hover-color);
+}
+
+.markdown-table-btn svg {
+    width: 15px;
+    height: 15px;
+}
+
+/* Full-view modal */
+.markdown-table-modal-background {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    inset: 0;
+    padding: 5vh 5vw;
+    overflow: auto;
+    background-color: var(--lightbox-overlay-color);
+}
+
+.markdown-table-modal-background.visible {
+    display: block;
+}
+
+.markdown-table-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin: auto;
+    max-width: 90vw;
+    max-height: 90vh;
+    padding: 5px;
+    /* Follow the page content theme so the table stays readable in dark mode. */
+    color: var(--content-color);
+    background-color: var(--content-bg-color);
+    border: 1px solid var(--soft-border-color);
+    border-radius: 4px;
+}
+
+/* Full-width clickable close bar, matching the diagram lightbox. */
+.markdown-table-modal-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex: none;
+    min-height: 28px;
+    border-radius: 5px;
+    background: var(--surface-2-bg);
+    cursor: pointer;
+}
+
+.markdown-table-modal-header:hover {
+    background: var(--lightbox-header-hover-bg);
+}
+
+.markdown-table-modal-close {
+    color: var(--lightbox-close-color);
+    font-size: 20px;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.markdown-table-modal-header:hover .markdown-table-modal-close {
+    color: var(--lightbox-close-hover-color);
+}
+
+.markdown-table-modal-content {
+    overflow: auto;
+    /* Vertical scroll only — the table fits the modal width, never wider. */
+    overflow-x: hidden;
 }
 
 .markdown-table {
     width: max-content;
     min-width: min(100%, 36rem);
+    /* allow up to ~2x the visible width (floor 600px), then scroll;
+       within that bound long cells wrap instead of stretching forever */
+    max-width: max(600px, 200%);
     border-collapse: collapse;
     color: inherit;
     font-size: var(--text-sm, 0.9375rem);
@@ -17,6 +128,24 @@
     border: 1px solid var(--table-border-color);
     padding: var(--space-2, 8px);
     vertical-align: top;
+    /* cap individual columns so verbose cells wrap to a readable width */
+    max-width: 32rem;
+    overflow-wrap: break-word;
+}
+
+/* In the full view the table fills the modal and wraps so nothing
+   ever exceeds the modal width — every cell is fully visible. */
+.markdown-table--full {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    table-layout: auto;
+}
+
+.markdown-table--full th,
+.markdown-table--full td {
+    max-width: none;
+    overflow-wrap: anywhere;
 }
 
 .markdown-table th {

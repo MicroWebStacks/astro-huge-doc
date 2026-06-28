@@ -99,21 +99,84 @@ function findNodeExecutable(runtime) {
   return process.platform === 'win32' ? 'node.exe' : 'node';
 }
 
-function resolveEngineRoot() {
-  const configured = vscode.workspace.getConfiguration('microwebstacks.preview').get('enginePath');
-  const candidates = [];
-  if (configured) {
-    candidates.push(path.resolve(configured));
-  }
-  candidates.push(path.resolve(__dirname, '..', '..'));
-  candidates.push(path.resolve(__dirname));
+const ENGINE_PACKAGE = '@microwebstacks/md-render';
+const ENGINE_VERSION = extensionPackage.engineVersion || extensionPackage.version;
 
-  for (const candidate of candidates) {
-    if (exists(path.join(candidate, 'server', 'server.js')) && exists(path.join(candidate, 'scripts', 'collect.js'))) {
-      return candidate;
+function isEngineRoot(candidate) {
+  return (
+    exists(path.join(candidate, 'server', 'server.js')) &&
+    exists(path.join(candidate, 'scripts', 'collect.js')) &&
+    exists(path.join(candidate, 'config.js'))
+  );
+}
+
+function getInstalledEngineRoot(context) {
+  return path.join(context.globalStorageUri.fsPath, 'engine', 'node_modules', '@microwebstacks', 'md-render');
+}
+
+function installEngine(context) {
+  const enginePrefix = path.join(context.globalStorageUri.fsPath, 'engine');
+  fs.mkdirSync(enginePrefix, {recursive: true});
+  log(`Installing ${ENGINE_PACKAGE}@${ENGINE_VERSION} into ${enginePrefix} (this runs once and needs network access).`);
+  return new Promise((resolve, reject) => {
+    const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const child = cp.spawn(
+      npmExecutable,
+      ['install', `${ENGINE_PACKAGE}@${ENGINE_VERSION}`, '--prefix', enginePrefix, '--no-audit', '--no-fund'],
+      {cwd: enginePrefix, env: process.env, shell: process.platform === 'win32', windowsHide: true}
+    );
+    child.stdout.on('data', (chunk) => output.append(chunk.toString()));
+    child.stderr.on('data', (chunk) => output.append(chunk.toString()));
+    child.on('error', reject);
+    child.on('exit', (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`Installing ${ENGINE_PACKAGE} failed (npm exited with code ${code}). See the MicroWebStacks Docs output channel.`));
+    });
+  });
+}
+
+// Resolves the engine root. The local workspace checkout is always a valid
+// fallback (see engineSource: local|auto); the registry install is additive.
+async function resolveEngine(context) {
+  const config = vscode.workspace.getConfiguration('microwebstacks.preview');
+  const source = config.get('engineSource') || 'auto';
+
+  const configured = config.get('enginePath');
+  if (configured) {
+    const root = path.resolve(configured);
+    if (isEngineRoot(root)) {
+      return root;
+    }
+    throw new Error(`microwebstacks.preview.enginePath is set to "${root}" but no engine was found there (missing server/server.js, scripts/collect.js, or config.js).`);
+  }
+
+  if (source !== 'registry') {
+    for (const candidate of [path.resolve(__dirname, '..', '..'), path.resolve(__dirname)]) {
+      if (isEngineRoot(candidate)) {
+        log(`Using local workspace engine at ${candidate}.`);
+        return candidate;
+      }
+    }
+    if (source === 'local') {
+      throw new Error('engineSource is "local" but no local engine checkout was found. Set microwebstacks.preview.enginePath to an astro-huge-doc checkout, or switch engineSource to "auto".');
     }
   }
-  throw new Error('Unable to find astro-huge-doc engine. Set microwebstacks.preview.enginePath to this repository checkout.');
+
+  const installed = getInstalledEngineRoot(context);
+  if (isEngineRoot(installed)) {
+    log(`Using installed engine at ${installed}.`);
+    return installed;
+  }
+
+  await installEngine(context);
+  if (isEngineRoot(installed)) {
+    log(`Using installed engine at ${installed}.`);
+    return installed;
+  }
+  throw new Error(`Engine ${ENGINE_PACKAGE} was installed but could not be located at ${installed}.`);
 }
 
 function resolveDocsRoot(workspaceRoot, manifestPath) {
@@ -146,7 +209,7 @@ async function buildRuntime(context) {
     throw new Error('Open a workspace folder before starting the docs preview.');
   }
 
-  const engineRoot = resolveEngineRoot();
+  const engineRoot = await resolveEngine(context);
   const workspaceRoot = workspaceFolder.uri.fsPath;
   const manifestPath = path.join(workspaceRoot, 'manifest.yaml');
   const docsRoot = resolveDocsRoot(workspaceRoot, manifestPath);

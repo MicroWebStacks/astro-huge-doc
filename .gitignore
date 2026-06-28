@@ -7,3 +7,4 @@ content/
 dataset/
 .tmp/
 *.vsix
+packages/md-render/
