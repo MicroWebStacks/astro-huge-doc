@@ -61,6 +61,9 @@ function paragraphStyle(node){
     if (item.type === 'link') {
         return <Link item={item}  />;
     }
+    if (item.type === 'textDirective') {
+        return <Directive name={item.ast?.name} attributes={item.ast?.attributes ?? {}} />;
+    }
     if (item.type === 'containerDirective') {
         return (
             <ContainerDirective name={item.ast.name} attributes={item.ast.attributes}>

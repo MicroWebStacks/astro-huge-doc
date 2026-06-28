@@ -53,16 +53,18 @@ The shell is an IDE-style three-pane layout, familiar from VS Code:
 
 ### Typography
 
-- **Family:** a single sans-serif stack for UI and body. Today that is
-  Arial/Helvetica; the intended baseline is a system font stack
-  (`system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`) declared
-  once at the root and inherited everywhere. Monospace is owned by the code
-  highlighter theme.
-- **Scale:** a modest, rounded scale rather than ad-hoc sizes —
-  roughly `0.8 · 0.9 · 1 · 1.15 · 1.4 · 1.8 · 2.2 rem`. Headings step down the
-  scale; UI affordances (menus, controls) sit at `0.85–0.9rem`.
-- **Weight & rhythm:** regular for body, 600–700 for headings and emphasis.
-  Body line-height ~1.5; comfortable paragraph spacing (~1em between blocks).
+- **Family:** a single sans-serif stack for UI and body — the system stack
+  `--font-sans` (`system-ui, -apple-system, "Segoe UI", Roboto, Arial,
+  sans-serif`), declared once at the root and inherited everywhere. Monospace
+  is owned by the code highlighter theme.
+- **Scale:** body at `1rem` (16px); headings step up on a GitHub-aligned
+  scale — `h1 2 · h2 1.5 · h3 1.25 · h4–h6 1 rem` — chosen because GitHub's
+  markdown rendering is the maintainer's reference for reading comfort. UI
+  affordances (menus, controls) sit at `~0.85rem` (`--text-sm`). Sizes are
+  tokens (`--text-*` in `tokens.css`), never ad-hoc.
+- **Weight & rhythm:** regular for body, 600 for headings and emphasis. Body
+  line-height `1.5` (`--leading-body`), headings `~1.25` (`--leading-heading`);
+  ~`1rem` (`--space-4`) between blocks, more space above headings.
 
 ### Spacing
 
@@ -168,10 +170,10 @@ site works today. Tracked in `plans/2026-06-27-ui-redesign/plan.md`.
 | R1 | Color tokens | ✅ Centralized in `colors.css`, light/dark complete | Keep; add tokens only in pairs |
 | R2 | Spacing | Mixed `px`/`rem`, one-off values | Adopt the step scale; optionally `--space-*` tokens |
 | R3 | Radius | Literal `3/5/10px` scattered | Two tokens `--radius-sm` / `--radius-md` |
-| R4 | Typography | Per-file `font-family`, ad-hoc sizes | One root font stack + a type scale |
+| R4 | Typography | ✅ Root system font stack + GitHub-aligned type scale (`tokens.css`) | Map remaining ad-hoc sizes onto `--text-*` |
 | R5 | Elevation | Some heavy `2px 2px 3px 3px` shadows | Single-layer, token-driven subtle shadows |
 | R6 | Focus states | Inconsistent / some `outline:none` | Consistent visible focus on all controls |
-| R7 | Footer | `hidden`, literal `color:white` | Decide: real footer or remove; tokenize if kept |
+| R7 | Footer | ✅ Removed (was a `hidden` placeholder) | Done — re-add as a real, tokenized footer only if content exists |
 | R8 | Reduced motion | Not handled | Honor `prefers-reduced-motion` |
 
 Anything that only re-skins (R1) is low risk; anything touching layout rhythm

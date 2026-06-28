@@ -1,8 +1,18 @@
 fetch:
+  select: VectorMind/alm-ontology
   github:
     - repo: MicroWebStacks/astro-big-doc
       branch: main
       folders: [content]
+      dest: content
+    - repo: VectorMind/alm-ontology
+      branch: main
+      dest: content
+    - repo: VectorMind/evidence-engine
+      branch: main
+      dest: content
+    - repo: HomeSmartMesh/homesmartmesh.github.io
+      branch: main
       dest: content
 output:
   ssr: dist

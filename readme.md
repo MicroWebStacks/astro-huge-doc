@@ -37,16 +37,23 @@ cache libraries considerations :
 
 # Usage
 ## fetching
-- Configure `fetch.github` in `manifest.yaml` (single object or list). Example:
+- Configure `fetch.github` in `manifest.yaml` (single object or list). Use
+  `fetch.select` to run one repo from a list of examples, or omit it/use `all`
+  to fetch every entry. Example:
   ```yaml
   fetch:
+    select: MicroWebStacks/astro-big-doc
     github:
       - repo: MicroWebStacks/astro-big-doc
         branch: main
         folders: [content]
         dest: content
+      - repo: VectorMind/alm-ontology
+        branch: main
+        dest: content
   ```
 - `folders` pulls those subfolders and flattens their contents into `dest`; omit `folders` to copy the whole repo. `dest` defaults to the repo name and is cleared before copying.
+- Switch examples by changing `fetch.select` to another `repo` value.
 - Set `GITHUB_TOKEN` to avoid GitHub rate limits.
 - Run `pnpm fetch` (or `node scripts/fetch.js`) after installing dependencies.
 

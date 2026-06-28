@@ -43,7 +43,6 @@
     "content-structure": "../content-structure",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
-    "datatables.net-dt": "^1.13.7",
     "dotenv": "^16.4.7",
     "duckdb": "^1.1.3",
     "express": "^4.21.2",

@@ -30,19 +30,43 @@ function normalizeGithubConfigs(fetchConfig) {
   }
 
   const entries = Array.isArray(githubConfig) ? githubConfig : [githubConfig];
-  const seenDestPaths = new Set();
-
-  return entries.map((entry, index) => {
+  const parsedEntries = entries.map((entry, index) => {
     if (!entry || typeof entry !== "object") {
       throw new Error(`fetch.github[${index}] must be an object`);
     }
 
-    const { repo, branch = "main", folders, dest } = entry;
-
+    const { repo } = entry;
     if (!repo || typeof repo !== "string" || !repo.includes("/")) {
       throw new Error('fetch.github.repo must be a string in the format "owner/name"');
     }
 
+    return { entry, index, repo };
+  });
+  if (!parsedEntries.length) {
+    throw new Error("fetch.github must contain at least one repo");
+  }
+
+  const selectedRepos = normalizeGithubSelection(fetchConfig?.select);
+  const selectedEntries = selectedRepos
+    ? parsedEntries.filter(({ repo }) => selectedRepos.has(repo))
+    : parsedEntries;
+
+  if (!selectedEntries.length) {
+    const expected = selectedRepos ? [...selectedRepos].join(", ") : "at least one repo";
+    throw new Error(`fetch.select did not match any fetch.github repo: ${expected}`);
+  }
+  if (selectedRepos) {
+    const matchedRepos = new Set(selectedEntries.map(({ repo }) => repo));
+    const missingRepos = [...selectedRepos].filter((repo) => !matchedRepos.has(repo));
+    if (missingRepos.length) {
+      throw new Error(`fetch.select did not match fetch.github repos: ${missingRepos.join(", ")}`);
+    }
+  }
+
+  const seenDestPaths = new Set();
+
+  return selectedEntries.map(({ entry, index }) => {
+    const { repo, branch = "main", folders, dest } = entry;
     const [owner, repoName] = repo.split("/");
 
     let folderList = folders ?? [];
@@ -82,11 +106,32 @@ function normalizeGithubConfigs(fetchConfig) {
     return {
       owner,
       repoName,
+      repo,
       branch,
       folders: folderList,
       destPath,
     };
   });
+}
+
+function normalizeGithubSelection(selection) {
+  if (selection === undefined || selection === null || selection === "" || selection === "all") {
+    return null;
+  }
+
+  const selections = Array.isArray(selection) ? selection : [selection];
+  const repos = selections.map((item) => {
+    if (typeof item !== "string") {
+      throw new Error("fetch.select must be a repo string, a list of repo strings, or all");
+    }
+    return item.trim();
+  }).filter(Boolean);
+
+  if (!repos.length || repos.includes("all")) {
+    return null;
+  }
+
+  return new Set(repos);
 }
 
 async function ensureDir(dirPath) {

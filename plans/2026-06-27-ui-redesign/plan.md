@@ -35,12 +35,15 @@ Durable design intent: `specification/ui_design.md` (Refactor Flags table R1–R
 
 ## Open points
 
-- OP-001 — Token home: extend `colors.css` vs. add `tokens.css`. Leaning
-  `tokens.css` so color and non-color concerns stay separable. **Open.**
-- OP-002 — Footer (R7): restore a real footer or remove it. Currently `hidden`.
-  **Open — needs maintainer call.**
-- OP-003 — How far to push a formal type scale vs. leaving headings as-is.
-  **Open.**
+- OP-001 — Token home: extend `colors.css` vs. add `tokens.css`.
+  **Resolved → `tokens.css`** (added, holds `--font-sans`, `--text-*`,
+  `--leading-*`, `--space-*`, `--radius-sm/md`).
+- OP-002 — Footer (R7): restore a real footer or remove it.
+  **Resolved → removed.** It was an empty placeholder; can be re-added as a
+  real, tokenized footer later if a downstream site needs one.
+- OP-003 — How far to push a formal type scale.
+  **Resolved → GitHub-aligned scale** (`h1 2 / h2 1.5 / h3 1.25 / h4–6 1 rem`,
+  body 1rem, line-height 1.6), per maintainer reference (GitHub markdown).
 
 ## Phases
 
@@ -57,6 +60,30 @@ Each phase is independently shippable and verifiable in both themes.
    `prefers-reduced-motion`. (R6, R8)
 6. **Footer** — resolve OP-002. (R7)
 
+## Change inventory
+
+Concrete changes derived from an audit of `src/**`, grouped by phase. *Impact* =
+how much it shifts the rendered UI; *Confidence* = how sure the change is correct
+and safe to land as described.
+
+**Landed (2026-06-28):** C1 (`tokens.css`), C2 (root system font stack), C4
+(GitHub-aligned heading scale + article reading rhythm: line-height 1.5, block
+spacing, lists/inline-code/blockquote), C11 (footer removed). Remaining: C3, C5–C10.
+
+| # | Phase | Change | Files / count | Impact | Confidence |
+|---|-------|--------|---------------|--------|------------|
+| C1 | 1 Tokens | Add non-color token layer: `--space-*`, `--radius-sm/md`, font stack, type-scale vars (no usage yet) | new `tokens.css` (OP-001) | None (additive) | High |
+| C2 | 2 Type | Replace `font-family: Arial, Helvetica` with system stack at the root; inherited everywhere | `Layout.astro:90` (only 1 decl, not per-file) | Subtle global font shift | High (correct); Med (look) |
+| C3 | 2 Type | Map ad-hoc sizes to the scale: `24/20/17/12px`, `large`, `0.8rem` | 404, panzoommodal, AppBar, Highlighter, NotesDirective, SideMenu | Localized size tweaks | High |
+| C4 | 2 Type | Apply heading type-scale — **net-new**, headings use browser defaults today | `Heading.astro` + global md styles | Heading sizes change site-wide | Med (OP-003 open) |
+| C5 | 3 Radius | Collapse `3/4/5px`→`--radius-sm`, `8/10px`→`--radius-md` | 12 spots / 10 files | Tiny (3→4, 10→8) | High |
+| C6 | 3 Spacing | Replace one-off padding/margin/gap with the step scale | **97 occurrences / 24 files** | Largest; rhythm shifts | Med |
+| C7 | 4 Elevation | Normalize `2px 2px 3px 3px` shadows to single-layer token shadow | Cards, ButtonDirective, DataTable | Cards/buttons look lighter | High |
+| C8 | 4 Elevation | **Exclude** decorative accent bars from C7 — these are not elevation | `SubMenu:131` inset, `Heading:48` `-8px` | None (guardrail) | High |
+| C9 | 5 Focus | Remove `outline:none`; add visible focus ring to all controls | Highlighter (`:46`) + toggle, copy btn, menu rows, buttons, details summary | New focus rings on :focus-visible | High |
+| C10 | 5 Motion | Wrap non-essential transitions in `prefers-reduced-motion` guard | menu/caret/heading transitions | A11y only, no default change | High |
+| C11 | 6 Footer | Resolve OP-002: remove the `hidden` stub or build a real footer; drop literal `color:white` | `Layout.astro:78,117–120` | Depends on decision | Low (needs maintainer call) |
+
 ## Risks
 
 - Spacing/type swaps (R2, R4) subtly shift layout rhythm; review before/after at
@@ -64,6 +91,9 @@ Each phase is independently shippable and verifiable in both themes.
 - Removing `outline:none` without a replacement focus style would regress
   keyboard accessibility — pair the two in the same change.
 - Touching the highlighter chrome must not disturb the Shiki dual-theme variables.
+- The "normalize shadows" pass (R5) must not flatten the two decorative accent
+  bars (`SubMenu` inset, `Heading` left bar) — they read as `box-shadow` but are
+  accent indicators, not elevation. Exclude them explicitly (C8).
 
 ## Exit criteria
 

@@ -9,9 +9,18 @@ export interface Props {
   title: string;
   meta: object;
   hash: string;
+  height?: string;
+  width?: string;
+  center?: boolean;
 }
 
-const { src, alt, title, meta } = Astro.props as Props;
+const { src, alt, title, meta, height, width, center } = Astro.props as Props;
+// Inline image-directive options. A bare numeric value gets a px unit.
+const withUnit = (v?: string) => (v == null || v === '' ? undefined : /^\d+$/.test(v) ? `${v}px` : v);
+const figureStyle = [
+  withUnit(height) ? `height:${withUnit(height)}` : '',
+  withUnit(width) ? `width:${withUnit(width)}` : '',
+].filter(Boolean).join(';');
 const asseturl = src;
 const assetname = asseturl.substring(asseturl.lastIndexOf('/') + 1)
 let data_name: string;
@@ -28,7 +37,7 @@ const isSvg = asseturl.endsWith(".svg")
 const isImg = !isSvg
 
 ---
-<div class="container panzoom" 
+<div class={`container panzoom ${center?"center":""}`}
       data-type={isSvg?"svg":"img"}
       data-name={data_name}
       data-meta={JSON.stringify(meta)}
@@ -38,10 +47,10 @@ const isImg = !isSvg
   </div>
   <div class="figure">
     {isSvg&&
-      <object data={asseturl} name={title} data-alt={alt} />
+      <object data={asseturl} name={title} data-alt={alt} style={figureStyle} />
     }
     {isImg&&
-      <img src={asseturl} title={title} alt={alt} />
+      <img src={asseturl} title={title} alt={alt} style={figureStyle} />
     }
   </div>
   <PanZoomModal url={asseturl} />
@@ -59,6 +68,10 @@ const isImg = !isSvg
   padding-top:20px;
   width:fit-content;
   border-top: 4px solid transparent;
+}
+/* `center` option on an inline image directive */
+.container.center{
+  margin-inline: auto;
 }
 .container:hover{
   border: 0px solid transparent;

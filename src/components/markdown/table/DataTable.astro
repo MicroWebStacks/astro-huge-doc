@@ -1,30 +1,18 @@
 ---
 import { getAssetBlob } from '@/libs/structure-db';
 import { config } from '@/config';
+import MarkdownTable from './MarkdownTable.jsx';
 
 export interface Props {
     item: {
-        asset_uid: string;
+        asset_uid?: string;
+        ast?: object;
     };
 }
 
 const { item } = Astro.props as Props;
-const blob_uid = getAssetBlob(item.asset_uid, config.collect.version_id);
-const asset_url = `/assets/${blob_uid}:${item.asset_uid}`;
+const tableNode = item.ast?.type === 'table' ? item.ast : null;
+const blob_uid = item.asset_uid ? getAssetBlob(item.asset_uid, config.collect.version_id) : null;
+const asset_url = blob_uid && item.asset_uid ? `/assets/${blob_uid}:${item.asset_uid}` : null;
 ---
-<div class="container">
-    <table class="data-table" data-table-url={asset_url}>
-        <!-- Data will be populated dynamically using JavaScript -->
-    </table>
-</div>
-
-<style>
-.container{
-    padding:5px;
-    border-radius: 5px;
-    box-shadow: 2px 2px 3px 3px var(--card-shadow-color);
-    display: inline-block;
-}
-</style>
-
-<script src="./data-tables.js" />
+<MarkdownTable client:load node={tableNode} assetUrl={asset_url} />

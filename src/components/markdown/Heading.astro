@@ -39,13 +39,14 @@ const HeadingLevel = `h${item.level}`
   gap: 10px;
   transition: background-color 0.2s, box-shadow 0.2s;
 }
-/* cross-highlight driven by the toc menu (scroll-spy active / hover) */
-.heading.bar.active,
+/* Cross-highlight driven by the toc menu (scroll-spy active / hover).
+   Kept quiet per the calm, content-first principle: hover is a soft
+   background; the current heading gets a thin accent line, no heavy fill. */
 .heading.bar.hover{
-  background-color: var(--header-active-color);
+  background-color: var(--menu-active-color);
 }
 .heading.bar.active{
-  box-shadow: -8px 0 0 0 var(--front-blue);
+  box-shadow: -3px 0 0 0 var(--front-blue);
 }
 .icon{
   opacity: 0;

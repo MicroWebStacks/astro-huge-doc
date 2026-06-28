@@ -1,0 +1,62 @@
+.markdown-table-scroll {
+    margin: var(--space-3, 12px) 0;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.markdown-table {
+    width: max-content;
+    min-width: min(100%, 36rem);
+    border-collapse: collapse;
+    color: inherit;
+    font-size: var(--text-sm, 0.9375rem);
+}
+
+.markdown-table th,
+.markdown-table td {
+    border: 1px solid var(--table-border-color);
+    padding: var(--space-2, 8px);
+    vertical-align: top;
+}
+
+.markdown-table th {
+    background: color-mix(in srgb, var(--content-bg-color) 88%, var(--content-color) 12%);
+    font-weight: 600;
+}
+
+.markdown-table tbody tr:nth-child(even) {
+    background: color-mix(in srgb, var(--content-bg-color) 94%, var(--content-color) 6%);
+}
+
+.markdown-table-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1, 4px);
+    width: 100%;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: inherit;
+    text-align: inherit;
+    cursor: pointer;
+}
+
+.markdown-table-sort:focus-visible {
+    outline: 2px solid var(--front-blue);
+    outline-offset: 2px;
+}
+
+.markdown-table-sort-state {
+    min-width: 2.25em;
+    color: var(--content-color-muted);
+    font-size: var(--text-xs, 0.75rem);
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.markdown-table-message {
+    margin: var(--space-3, 12px) 0;
+    color: var(--content-color-muted);
+}

@@ -9,6 +9,7 @@ export interface Props {
         slug: string;
         asset_uid: string;
         blob_uid: string;
+        ast?: { options?: { height?: string; width?: string; center?: boolean } };
     };
 }
 
@@ -18,6 +19,9 @@ const alt = item.slug;
 const blob_uid = getAssetBlob(item.asset_uid, config.collect.version_id);
 const asseturl = `/assets/${blob_uid}:${item.asset_uid}`;
 const meta = {};
+// Inline image directives may carry display options (height/width/center).
+const options = item.ast?.options ?? {};
 log_debug(`  - MarkdownImage> asseturl: ${asseturl}`);
 ---
-<Panzoom src={asseturl} alt={alt} title={""} meta={meta}/>
+<Panzoom src={asseturl} alt={alt} title={""} meta={meta}
+  height={options.height} width={options.width} center={options.center} />
