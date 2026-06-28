@@ -27,7 +27,7 @@ const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.ali
         {showLeftToggle &&
             <li class="nav-toggle-item">
                 <button id="nav-toggle-left" type="button" class="nav-toggle"
-                    title="Toggle pages menu" aria-label="Toggle pages menu" aria-expanded="true">
+                    title="Toggle pages menu" aria-label="Toggle pages menu" aria-expanded="false">
                     <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
                         <rect x="1.5" y="2.5" width="13" height="11" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
                         <line x1="6" y1="2.5" x2="6" y2="13.5" stroke="currentColor" stroke-width="1.3"></line>
@@ -59,7 +59,7 @@ const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.ali
         {showRightToggle &&
             <li class="nav-toggle-item">
                 <button id="nav-toggle-right" type="button" class="nav-toggle"
-                    title="Toggle outline" aria-label="Toggle outline" aria-expanded="true">
+                    title="Toggle outline" aria-label="Toggle outline" aria-expanded="false">
                     <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
                         <rect x="1.5" y="2.5" width="13" height="11" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
                         <line x1="10" y1="2.5" x2="10" y2="13.5" stroke="currentColor" stroke-width="1.3"></line>
@@ -83,7 +83,7 @@ const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.ali
     flex-wrap: wrap;
 }
 .navbar-right {
-    padding-right: 50px;
+    padding-right: 0;
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
@@ -91,6 +91,7 @@ const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.ali
 
 ul{
     margin:0px;
+    padding:0px;
 }
 li{
     list-style: none;
@@ -136,7 +137,7 @@ a.active{
     background:transparent;
     border:0;
     border-radius:var(--radius-sm);
-    margin:6px;
+    margin:4px 2px;
     padding:6px;
     color:var(--content-color-muted);
     cursor:pointer;

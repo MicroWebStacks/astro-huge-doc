@@ -6,13 +6,14 @@ import MarkdownTable from './MarkdownTable.jsx';
 export interface Props {
     item: {
         asset_uid?: string;
+        version_id?: string;
         ast?: object;
     };
 }
 
 const { item } = Astro.props as Props;
 const tableNode = item.ast?.type === 'table' ? item.ast : null;
-const blob_uid = item.asset_uid ? getAssetBlob(item.asset_uid, config.collect.version_id) : null;
+const blob_uid = item.asset_uid ? getAssetBlob(item.asset_uid, item.version_id ?? config.collect.version_id) : null;
 const asset_url = blob_uid && item.asset_uid ? `/assets/${blob_uid}:${item.asset_uid}` : null;
 ---
 <MarkdownTable client:load node={tableNode} assetUrl={asset_url} />

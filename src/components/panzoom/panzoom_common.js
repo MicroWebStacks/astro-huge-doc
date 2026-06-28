@@ -21,10 +21,10 @@ async function processSVG(svg,container){
   const meta_string = container.getAttribute("data-meta");
   if(meta_string){
     const meta = JSON.parse(meta_string);
-    if(Object.hasOwn(meta,"links")){
+    if(meta && typeof meta === "object" && Object.hasOwn(meta,"links")){
       await svg_add_links(svg, meta.links);
     }
-    if(Object.hasOwn(meta,"highlights")){
+    if(meta && typeof meta === "object" && Object.hasOwn(meta,"highlights")){
       await svg_highlight(svg, meta.highlights);
     }
   }

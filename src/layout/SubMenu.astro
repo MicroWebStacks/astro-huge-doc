@@ -17,7 +17,7 @@ const nextLevel = level + 1;
     <ul class:list={[root?"root":"nested",{hidden:(!root && level > visibleLevel && !forceVisible)}]} data-level={level}>
         {items.map((item)=>(
             <li >
-                <div class:list={[{entry_container:true, active:item.active, parent:item.parent, expanded:(item.parent && (nextLevel <= visibleLevel || forceVisible || activePath?.has(item.link??'')))}]}>
+                <div class:list={[{entry_container:true, active:item.active, parent:item.parent, expanded:(item.parent && (nextLevel <= visibleLevel || forceVisible || activePath?.has(item.link??'')))}]} data-node-key={item.nodeKey ?? item.link ?? item.label}>
                     {item.parent &&
                         <span class="icon expand">
                             <svg viewBox="0 0 100 100" width="60" height="60" fill="none" xmlns="http://www.w3.org/2000/svg">

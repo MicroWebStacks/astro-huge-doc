@@ -29,7 +29,8 @@ const {url} = Astro.props as Props;
 .modal-background{
   display: none;
   position: fixed;
-  z-index: 1;
+  /* Keep the lightbox above sticky page chrome such as the TOC controls. */
+  z-index: 1000;
   padding-top: 5vh;
   left: 0;
   top: 0;

@@ -9,6 +9,7 @@ export interface Props {
         slug: string;
         asset_uid: string;
         blob_uid: string;
+        version_id?: string;
         ast?: { options?: { height?: string; width?: string; center?: boolean } };
     };
 }
@@ -16,7 +17,7 @@ export interface Props {
 const {item} = Astro.props as Props;
 
 const alt = item.slug;
-const blob_uid = getAssetBlob(item.asset_uid, config.collect.version_id);
+const blob_uid = getAssetBlob(item.asset_uid, item.version_id ?? config.collect.version_id);
 const asseturl = `/assets/${blob_uid}:${item.asset_uid}`;
 const meta = {};
 // Inline image directives may carry display options (height/width/center).

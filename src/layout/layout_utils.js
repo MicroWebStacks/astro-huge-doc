@@ -9,7 +9,8 @@ function cloneHeading(heading) {
         slug: heading.slug ?? '',
         depth: heading.depth ?? heading.level ?? 1,
         link: heading.link ?? '',
-        uid: heading.uid ?? null
+        uid: heading.uid ?? null,
+        nodeKey: heading.nodeKey ?? heading.uid ?? heading.slug ?? heading.link ?? label
     };
 }
 
@@ -135,6 +136,38 @@ function loadDocuments() {
         .all(config.collect.version_id);
 }
 
+function loadSourceEntries() {
+    const db = openDatabase(config.collect.db_path, {readonly: true});
+    try {
+        const table = db
+            .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'source_entries'")
+            .get();
+        if (!table) {
+            return [];
+        }
+        return db
+            .prepare(`
+                SELECT
+                    path,
+                    parent_path,
+                    name,
+                    entry_type,
+                    ext,
+                    document_url,
+                    document_title,
+                    document_url_type,
+                    sort_order
+                FROM source_entries
+                WHERE version_id = ?
+                ORDER BY parent_path, entry_type, name
+            `)
+            .all(config.collect.version_id);
+    } catch (error) {
+        console.warn(`source tree menu unavailable: ${error.message}`);
+        return [];
+    }
+}
+
 /* The set of top-level names that are real folders (sections of their own).
  * Anything not in this set — the root index and loose root files — belongs to "home".
  */
@@ -235,6 +268,7 @@ function buildSectionMenuFromDocs(docs, pathname) {
             node = {
                 url,
                 label,
+                nodeKey: url || 'home',
                 order: doc?.sort_order ?? 0,
                 active: false,
                 expanded: true,
@@ -349,11 +383,141 @@ function buildSectionMenuFromDocs(docs, pathname) {
     return roots;
 }
 
+function sortSourceNodes(a, b) {
+    if (a.entryType !== b.entryType) {
+        return a.entryType === 'dir' ? -1 : 1;
+    }
+    const orderA = a.order ?? 0;
+    const orderB = b.order ?? 0;
+    if (orderA !== orderB) {
+        return orderA - orderB;
+    }
+    return (a.label ?? '').localeCompare(b.label ?? '');
+}
+
+function labelFromSourceEntry(entry) {
+    if (entry.document_title && entry.document_title !== '.') {
+        if (entry.entry_type === 'dir') {
+            return entry.document_title;
+        }
+    }
+    if (entry.entry_type === 'file' && entry.name.toLowerCase().endsWith('.md')) {
+        return entry.name.slice(0, -3);
+    }
+    return entry.name;
+}
+
+function renderedSourceEntries(sourceEntries) {
+    const byPath = new Map(sourceEntries.map((entry) => [entry.path, entry]));
+    const visiblePaths = new Set();
+
+    for (const entry of sourceEntries) {
+        if (entry.document_url === null || entry.document_url === undefined) {
+            continue;
+        }
+        let current = entry.path;
+        while (current && byPath.has(current)) {
+            visiblePaths.add(current);
+            current = byPath.get(current)?.parent_path;
+        }
+    }
+
+    return sourceEntries.filter((entry) => visiblePaths.has(entry.path));
+}
+
+function activePathForUrl(sourceEntries, activeUrl) {
+    const match = sourceEntries.find((entry) => (entry.document_url ?? null) === activeUrl);
+    return match?.path ?? null;
+}
+
+function buildSectionMenuFromSourceEntries(sourceEntries, pathname) {
+    if (!Array.isArray(sourceEntries) || sourceEntries.length === 0) {
+        return [];
+    }
+
+    const renderedEntries = renderedSourceEntries(sourceEntries);
+    if (renderedEntries.length === 0) {
+        return [];
+    }
+
+    const activeUrl = docUrlFromPathname(pathname);
+    const activePath = activePathForUrl(renderedEntries, activeUrl);
+    const nodes = new Map();
+
+    for (const entry of renderedEntries) {
+        const link = entry.document_url !== null && entry.document_url !== undefined
+            ? buildDocLink(entry.document_url)
+            : null;
+        nodes.set(entry.path, {
+            path: entry.path,
+            nodeKey: entry.path,
+            label: labelFromSourceEntry(entry),
+            entryType: entry.entry_type,
+            order: entry.sort_order ?? 0,
+            active: activePath === entry.path,
+            expanded: true,
+            items: [],
+            ...(link ? {link} : {})
+        });
+    }
+
+    for (const entry of renderedEntries) {
+        const node = nodes.get(entry.path);
+        const parentPath = entry.parent_path ?? '';
+        if (parentPath && nodes.has(parentPath)) {
+            nodes.get(parentPath).items.push(node);
+        }
+    }
+
+    const activeAncestors = new Set();
+    if (activePath) {
+        let current = activePath;
+        while (current) {
+            activeAncestors.add(current);
+            const parent = renderedEntries.find((entry) => entry.path === current)?.parent_path;
+            if (!parent) {
+                break;
+            }
+            current = parent;
+        }
+    }
+
+    const finalize = (node) => {
+        if (node.items.length > 0) {
+            node.items.sort(sortSourceNodes);
+            node.items.forEach(finalize);
+            node.parent = true;
+            node.expanded = activeAncestors.has(node.path);
+        } else {
+            delete node.items;
+            node.parent = false;
+            delete node.expanded;
+        }
+        delete node.entryType;
+        delete node.path;
+        delete node.order;
+    };
+
+    const roots = [];
+    for (const entry of renderedEntries) {
+        if (!entry.parent_path) {
+            roots.push(nodes.get(entry.path));
+        }
+    }
+
+    roots.sort(sortSourceNodes);
+    roots.forEach(finalize);
+    return roots;
+}
+
 function buildNavigationMenus(pathname) {
     const docs = loadDocuments();
+    const sourceEntries = loadSourceEntries();
     return {
         appBarMenu: buildAppBarMenuFromDocs(docs, pathname),
-        sectionMenu: buildSectionMenuFromDocs(docs, pathname)
+        sectionMenu: sourceEntries.length
+            ? buildSectionMenuFromSourceEntries(sourceEntries, pathname)
+            : buildSectionMenuFromDocs(docs, pathname)
     };
 }
 

@@ -1,6 +1,7 @@
 import { config } from '../config.js';
 import { collect } from 'content-structure';
 import Database from 'better-sqlite3';
+import {indexSourceTree} from './source-tree.js';
 
 function clearHtmlCache() {
   const db = new Database(config.collect.db_path, {readonly: false});
@@ -22,6 +23,11 @@ async function main() {
   console.log("content-structure: starting collect()");
   collectConfig.version_id = await collect(collectConfig);
   console.log(`content-structure: collect() finished (version: ${collectConfig.version_id})`);
+  await indexSourceTree({
+    dbPath: collectConfig.db_path,
+    contentRoot: collectConfig.contentdir,
+    versionId: collectConfig.version_id
+  });
   clearHtmlCache();
 
 }

@@ -20,6 +20,7 @@ const {
   alt,
   title,
   meta,
+  hash,
   height,
   width,
   center,
@@ -50,6 +51,7 @@ const isImg = !isSvg
 <div class={`container panzoom ${center?"center":""} ${showOpenButton ? 'with-open-button' : 'without-open-button'}`}
       data-type={isSvg?"svg":"img"}
       data-name={data_name}
+      data-sid={hash}
       data-meta={JSON.stringify(meta)}
       >
   {showOpenButton &&

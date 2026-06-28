@@ -60,7 +60,7 @@ const appbar_menu = navigation.appBarMenu ?? []
 			</header>
 			<main>
 				<div id="wide-nav" class="scroll">
-					<SideMenu items={pages_menu_items} category="pages_menu"/>
+					<SideMenu items={pages_menu_items} category="pages_menu" initialOpen={false}/>
 				</div>
 				<div id="resize-left" class="nav-resize active"/>
 				<article class="content scroll">
@@ -74,7 +74,7 @@ const appbar_menu = navigation.appBarMenu ?? []
 				<div id="resize-right" class="nav-resize active"/>
 				<div id="toc-nav-div">
 					{toc_menu_items.visible && 
-						<SideMenu items={toc_menu_items.items} category="toc_menu"/>
+						<SideMenu items={toc_menu_items.items} category="toc_menu" initialOpen={false}/>
 					}
 				</div>
 			</main>
@@ -135,7 +135,8 @@ main{
 }
 #toc-nav-div{
 	background: var(--nav-bg-color);
-	flex-grow: 1;
+	flex-grow: 0;
+	flex-shrink: 0;
 }
 
 
@@ -161,6 +162,9 @@ main{
 }
 .scroll::-webkit-scrollbar-thumb:hover {
   background: var(--scroll-thumb-hover-color); 
+}
+.scroll::-webkit-scrollbar-corner {
+	background: var(--content-bg-color);
 }
 
 @media only screen and (max-width: 700px) {

@@ -12,6 +12,13 @@ function content_bg_color(){ return cssVar('--content-bg-color'); }
 // aria-expanded so the icon styling and the persisted preference stay in sync.
 function configure_toggle(btn, nav_el, storageKey){
     if(!btn || !nav_el){ return; }
+    const scopedStorageKey = `${nav_el.getAttribute("data-state-key") || "microwebstacks:default"}:${storageKey}:open`;
+
+    function notify_visibility(open){
+        nav_el.dispatchEvent(new CustomEvent("microwebstacks:nav-visibility", {
+            detail: {open}
+        }));
+    }
 
     function apply(open){
         if(open){
@@ -24,10 +31,11 @@ function configure_toggle(btn, nav_el, storageKey){
             nav_el.style.width = "0px";
         }
         btn.setAttribute("aria-expanded", open ? "true" : "false");
+        notify_visibility(open);
     }
 
     // Restore the last choice; default to whatever the server rendered.
-    const saved = localStorage.getItem(storageKey);
+    const saved = localStorage.getItem(scopedStorageKey);
     if(saved === "true" || saved === "false"){
         apply(saved === "true");
     }else{
@@ -37,7 +45,7 @@ function configure_toggle(btn, nav_el, storageKey){
     btn.addEventListener("click",(e)=>{
         const open = !nav_el.classList.contains("open");
         apply(open);
-        localStorage.setItem(storageKey, open ? "true" : "false");
+        localStorage.setItem(scopedStorageKey, open ? "true" : "false");
         e.preventDefault();
     });
 }
@@ -51,7 +59,7 @@ function configure_resize(resize_el,nav_el,left_to_right){
 
     function finish_mouse(){
         global_resize_state = false
-        nav_el.style.transition = "width 0.5s"
+        nav_el.style.transition = "none"
         if(nav_el.clientWidth < 20){
             nav_el.classList.add("closed")
             nav_el.classList.remove("open")
@@ -61,6 +69,9 @@ function configure_resize(resize_el,nav_el,left_to_right){
             nav_el.classList.remove("closed")
         }
         resize_el.style.backgroundColor = content_bg_color()
+        nav_el.dispatchEvent(new CustomEvent("microwebstacks:nav-visibility", {
+            detail: {open: nav_el.classList.contains("open")}
+        }));
     }
 
     resize_el.addEventListener("mouseenter",(e)=>{

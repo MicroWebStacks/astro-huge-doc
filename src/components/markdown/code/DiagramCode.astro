@@ -11,13 +11,17 @@ export interface Props {
     language: string;
     params: object;
     meta: object;
+    versionId?: string;
 }
 
-const {uid, code, language, params, meta} = Astro.props as Props;
-console.log("Rendering DiagramCode for uid:", uid, "with verison:", config.collect.version_id);
-const diag_blob_uid = getAssetBlob(`${uid}.svg`, config.collect.version_id);
+const {uid, code, language, params, meta, versionId = config.collect.version_id} = Astro.props as Props;
+console.log("Rendering DiagramCode for uid:", uid, "with verison:", versionId);
+const diagramAssetUid = `${uid}.svg`;
+const diag_blob_uid = getAssetBlob(diagramAssetUid, versionId)
+    ?? getAssetBlob(diagramAssetUid, config.collect.version_id)
+    ?? getAssetBlob(diagramAssetUid);
 const hasDiagram = Boolean(diag_blob_uid);
-const diagram_url = hasDiagram ? `/assets/${diag_blob_uid}:${uid}.svg` : null;
+const diagram_url = hasDiagram ? `/assets/${diag_blob_uid}:${diagramAssetUid}` : null;
 let alt = ""
 let title = ""
 if(params && (params.length > 0)){

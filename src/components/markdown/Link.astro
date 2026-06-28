@@ -7,6 +7,7 @@ import { config } from '@/config';
 export interface Props {
     item: {
       asset_uid?: string;
+      version_id?: string;
       body_text: string;
       ast: {
           title: string;
@@ -19,7 +20,8 @@ const { item } = Astro.props as Props;
 
 const hasAsset = (item.asset_uid != null)
 const external = !hasAsset && item.ast.url.startsWith('http')
-const blob_uid = hasAsset ? getAssetBlob(item.asset_uid!, config.collect.version_id) : null
+const versionId = item.version_id ?? config.collect.version_id
+const blob_uid = hasAsset ? getAssetBlob(item.asset_uid!, versionId) : null
 const url = hasAsset ? `/assets/${blob_uid}:${item.asset_uid}` : item.ast.url
 
 let is_model3d = false
