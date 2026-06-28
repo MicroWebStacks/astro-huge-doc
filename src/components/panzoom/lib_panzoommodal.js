@@ -53,6 +53,37 @@ function serializeAndDeserializeSVG(svg) {
   return new_svg;
 }
 
+// The diagram <object> loads its SVG asynchronously. On a heavy page the user
+// can click "open full view" before contentDocument is populated; reading the
+// svg too early returns null and later throws in the serializer, leaving the
+// modal closed. Wait for the SVG to become available (object already loaded,
+// its load event, or a short poll) before cloning.
+function waitForObjectSvg(obj, timeout = 5000){
+  const ready = obj.contentDocument?.querySelector("svg")
+  if(ready){
+    return Promise.resolve(ready)
+  }
+  return new Promise((resolve)=>{
+    let settled = false
+    const finish = (svg)=>{
+      if(settled) return
+      settled = true
+      obj.removeEventListener("load", onLoad)
+      clearInterval(poll)
+      clearTimeout(timer)
+      resolve(svg)
+    }
+    const onLoad = ()=> finish(obj.contentDocument?.querySelector("svg") ?? null)
+    obj.addEventListener("load", onLoad)
+    // Safety net: the load event may have already fired before this ran.
+    const poll = setInterval(()=>{
+      const svg = obj.contentDocument?.querySelector("svg")
+      if(svg) finish(svg)
+    }, 100)
+    const timer = setTimeout(()=> finish(obj.contentDocument?.querySelector("svg") ?? null), timeout)
+  })
+}
+
 async function cloneAsset(center){
     const container = center.parentElement.parentElement.parentElement.parentElement
     const obj = container.querySelector("object")
@@ -61,7 +92,10 @@ async function cloneAsset(center){
     let svg_img
     if(obj){
       is_svg = true
-      svg = obj.contentDocument.querySelector("svg")
+      svg = await waitForObjectSvg(obj)
+      if(!svg){
+        return {is_svg, svg_img: null}
+      }
       svg_img = await appendShadowSVG(center,svg)
     }else{
       const img = container.querySelector("img")
@@ -164,6 +198,10 @@ async function openModal(event){
   const center = modal.querySelector(".modal-center")
 
   const {is_svg,svg_img} = await cloneAsset(center)
+  if(!svg_img){
+    console.warn("panzoom: diagram asset is not ready yet, cannot open full view")
+    return
+  }
   if(pzref){
     pzref.dispose()
   }
