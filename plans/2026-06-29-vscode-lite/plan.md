@@ -251,9 +251,26 @@ never wrong out of the box.
    plain link); xlsx is collect-only (not in render path), three not imported in src. Aliased
    `@google/model-viewer` → empty stub in the lite build, dropping its ~980 kB (+three) chunk: lite
    `dist/client` is **634 kB** (largest chunk MarkdownTable/tanstack 56 kB). Full build unchanged.
-8. Update `stage-engine.js` `EXCLUDED_DEPS` (drop better-sqlite3, duckdb, sharp, plotly, three,
+8. **JSON output in content-structure (CS)** — DONE (pending review/publish). `collect(config)` picks
+   writer by `config.format` ('sqlite'|'json'); new `src/structure_json.js` reuses `buildDocumentRow`/
+   `getStructureSchema` (no parsing dup); `sqlite_utils` + `sharp` made lazy/optional in CS so JSON mode
+   loads no native deps. huge-doc: `config.collect.format`, `collect.js` skips sqlite-only steps in json.
+   Verified: `format:json` collect (no sqlite) → renders. CS not committed (awaiting review; publish 2.3.0,
+   then switch huge-doc to the npm dep).
+9. **Content-addressed static asset serving (unify both profiles)** — IN PROGRESS. Decisions: files at
+   `<store>/blobs/<hash>.<ext>` (immutable → ETag/Cache-Control), served by `express.static`, both
+   profiles. Additive/gated sequence:
+   - 9a. CS: both writers materialize `<hash>.<ext>` blob files (json writer + sqlite writer finalize).
+   - 9b. huge-doc: `getAssetUrl(uid,version)` → `/blobs/<hash>.<ext>` in both structure-db backends.
+   - 9c. Serve `/blobs` statically (server.js + an astro dev middleware) with immutable cache headers,
+     alongside the existing dynamic `/assets` route (no break).
+   - 9d. Switch components (DiagramCode, MarkdownImage, gallery, Link, CardsMeta) to `getAssetUrl`.
+   - 9e. Rework `diagrams.js`: render SVG → `<hash>.svg` file + register asset_info/assets (sqlite) /
+     append to content.json (json). json-aware.
+   - 9f. Verify both profiles render diagrams+assets as static cached files; retire `/assets` route.
+10. Update `stage-engine.js` `EXCLUDED_DEPS` (drop better-sqlite3, duckdb, sharp, plotly, three,
    model-viewer, xlsx, octokit, passport); package + install extension; measure size drop.
-9. Decide duckdb full-fate (keep behind API routes, or drop entirely).
+11. Decide duckdb full-fate (keep behind API routes, or drop entirely).
 
 Gate after step 2: full build must be identical before proceeding.
 

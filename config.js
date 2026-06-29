@@ -215,7 +215,12 @@ const config = {
         outdir: storePath,//dist does not persist before build
         debug: manifest.collect.debug ?? false,
         db_path: abs_db_path,
-        json_dir: jsonDir
+        json_dir: jsonDir,
+        // Output format for content-structure collect(): 'sqlite' (canonical) or
+        // 'json' (lite, no native deps). Mirrors the data backend.
+        format: docsBackend,
+        // Baked into the JSON dataset so it is self-describing for diagram detection.
+        diagram: manifest.diagram
     }
 }
 
