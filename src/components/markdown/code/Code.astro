@@ -45,12 +45,18 @@ const is_diagram = Boolean(diagramLanguages[language])
 const custom_yaml = yaml_glb || yaml_cards || yaml_gallery
 const other_language = (!is_diagram && !custom_yaml)
 
+// 3D / model-viewer is a full-only island (heavy deps, no native build in lite).
+const isLite = config.profile === 'lite'
+
 ---
 {(is_diagram)&&
     <DiagramCode uid={asset_uid} code={code} language={language} params={params} meta={asset?.params} versionId={versionId} />
 }
-{yaml_glb &&
+{yaml_glb && !isLite &&
     <ModelViewerCode uid={asset_uid} code={code} model={item.ast.model}/>
+}
+{yaml_glb && isLite &&
+    <Highlighter uid={item.asset_uid} code={code} language={language} params={params} />
 }
 {yaml_cards &&
     <Cards code={code} />

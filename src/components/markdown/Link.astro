@@ -35,7 +35,8 @@ if (hasAsset){
   const normalizedExt = String(asset_info.ext ?? '').trim().toLowerCase()
   const trimmedExt = normalizedExt.startsWith('.') ? normalizedExt.slice(1) : normalizedExt
   const diagramLanguage = diagramAliases[trimmedExt] ?? trimmedExt
-  is_model3d = (asset_info.ext === "glb")
+  // 3D / model-viewer is full-only; in lite a glb link degrades to a plain link.
+  is_model3d = (asset_info.ext === "glb") && (config.profile !== 'lite')
   is_diagram = Boolean(config.diagram?.languages?.[diagramLanguage])
   is_link = !is_model3d && !is_table && !is_diagram
 }

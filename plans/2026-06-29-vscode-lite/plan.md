@@ -245,7 +245,12 @@ never wrong out of the box.
    serves `image/svg+xml`. Full lite parity for std MD + diagrams + images. _Remaining for the
    production `server/server.js` path: the SQLite html-cache middleware still needs profile-gating
    (the dev/extension path already works without it)._
-7. Profile-gate plotly/3D/xlsx islands; set lite image service to passthrough; gate html-cache for lite.
+7. ✅ **Lite profile gates** — DONE. (plotly already deleted, not gated.) astro.config.mjs uses
+   `passthroughImageService()` in lite (no sharp). server.js skips the SQLite html-cache in json mode.
+   model-viewer render gated in Code.astro (glb block → highlighted source) and Link.astro (glb link →
+   plain link); xlsx is collect-only (not in render path), three not imported in src. Aliased
+   `@google/model-viewer` → empty stub in the lite build, dropping its ~980 kB (+three) chunk: lite
+   `dist/client` is **634 kB** (largest chunk MarkdownTable/tanstack 56 kB). Full build unchanged.
 8. Update `stage-engine.js` `EXCLUDED_DEPS` (drop better-sqlite3, duckdb, sharp, plotly, three,
    model-viewer, xlsx, octokit, passport); package + install extension; measure size drop.
 9. Decide duckdb full-fate (keep behind API routes, or drop entirely).

@@ -14,10 +14,15 @@ dotenv.config()
 const outdir = config.outDir;
 
 const app = express();
-const htmlCacheMiddleware = createHtmlCacheMiddleware({
-    dbPath: config.collect.db_path,
-    excludePaths: config.html_cache?.exclude_paths
-});
+// The HTML cache is SQLite-backed; the lite/json profile has no better-sqlite3,
+// so skip it there. Full keeps it for serving cached, pre-rendered pages.
+const useHtmlCache = config.dataBackend !== 'json';
+const htmlCacheMiddleware = useHtmlCache
+    ? createHtmlCacheMiddleware({
+          dbPath: config.collect.db_path,
+          excludePaths: config.html_cache?.exclude_paths
+      })
+    : null;
 
 if(process.env.ENABLE_CORS == "true"){
     app.use(cors());      
@@ -33,7 +38,9 @@ if(process.env.ENABLE_AUTH === "true"){
 }
 
 app.use(express.static(join(outdir, 'client')))
-app.use(htmlCacheMiddleware)
+if (htmlCacheMiddleware) {
+    app.use(htmlCacheMiddleware)
+}
 app.use(ssrHandler);//catches all other routes
 
 app.use((req, res, next) => {
