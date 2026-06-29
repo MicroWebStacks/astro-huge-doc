@@ -1,3 +1,4 @@
+import './src/libs/load-env.js';
 import {isAbsolute, join, resolve} from 'path'
 import path from "node:path";
 import fsp from "node:fs/promises";
@@ -18,13 +19,13 @@ const DEFAULT_MANIFEST = {
         port: 4321
     },
     kroki: {
-        server: 'https://kroki.io'
+        server: 'http://localhost:18000'
     },
     diagram: {
         default_renderer: 'kroki',
         renderers: {
             kroki: {
-                server: 'https://kroki.io'
+                server: 'http://localhost:18000'
             }
         },
         languages: {
@@ -140,7 +141,9 @@ const manifestPath = process.env.MICROWEBSTACKS_MANIFEST_PATH
     ? resolve(process.env.MICROWEBSTACKS_MANIFEST_PATH)
     : join(workspaceRoot, "manifest.yaml");
 const manifest = await loadManifest(manifestPath);
-const krokiServer = manifest.diagram.renderers.kroki?.server ?? manifest.kroki.server;
+const krokiServer = process.env.MICROWEBSTACKS_KROKI_SERVER
+    ?? manifest.diagram.renderers.kroki?.server
+    ?? manifest.kroki.server;
 const docsRoot = process.env.MICROWEBSTACKS_DOCS_ROOT
     ? resolve(process.env.MICROWEBSTACKS_DOCS_ROOT)
     : resolvePath(workspaceRoot, manifest.output.content);
@@ -158,14 +161,33 @@ const serverHost = process.env.MICROWEBSTACKS_HOST ?? manifest.server.host;
 const serverPort = parsePort(process.env.MICROWEBSTACKS_PORT, manifest.server.port);
 const serverProtocol = process.env.MICROWEBSTACKS_PROTOCOL ?? manifest.server.protocol;
 
+// Deployment profile + data backend.
+//   DOCS_PROFILE: 'full' (local website/warehouse) | 'lite' (VS Code extension engine)
+//   DOCS_BACKEND: 'sqlite' (canonical store) | 'json' (pre-exported, no native deps)
+// The dispatcher in src/libs/structure-db.js reads DOCS_BACKEND directly; it is
+// surfaced here too for introspection and so manifest/defaults stay discoverable.
+const docsProfile = (process.env.DOCS_PROFILE ?? 'full').trim().toLowerCase();
+const docsBackend = (process.env.DOCS_BACKEND ?? (docsProfile === 'lite' ? 'json' : 'sqlite')).trim().toLowerCase();
+
 const config = {
+    profile: docsProfile,
+    dataBackend: docsBackend,
     rootdir: engineRoot,
     workspaceRoot,
     manifestPath,
     outDir,
     content_path: docsRoot,
     kroki_server: krokiServer,
-    diagram: manifest.diagram,
+    diagram: {
+        ...manifest.diagram,
+        renderers: {
+            ...manifest.diagram.renderers,
+            kroki: {
+                ...manifest.diagram.renderers.kroki,
+                server: krokiServer
+            }
+        }
+    },
     highlighter:manifest.render.highlighter,
     fetch: manifest.fetch,
     html_cache: manifest.html_cache,

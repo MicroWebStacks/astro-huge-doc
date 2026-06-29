@@ -1,0 +1,22 @@
+# Local diagram rendering for MicroWebStacks.
+#
+# Runs kroki locally so the default MICROWEBSTACKS_KROKI_SERVER=http://localhost:18000
+# works out of the box with zero secrets and no Java on the host / in VS Code.
+#
+#   docker compose up -d     # start kroki on http://localhost:18000
+#   docker compose down      # stop
+#
+# Corporate users skip this and point MICROWEBSTACKS_KROKI_SERVER at their internal
+# kroki endpoint instead. Public opt-in: set it to https://kroki.io.
+services:
+  kroki:
+    image: yuzutech/kroki:latest
+    ports:
+      - "18000:8000"   # host 18000 → container 8000; non-default host port avoids clashes
+    environment:
+      KROKI_MERMAID_HOST: mermaid
+    depends_on: [mermaid]
+  mermaid:
+    image: yuzutech/kroki-mermaid:latest
+    expose:
+      - "8002"
