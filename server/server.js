@@ -4,7 +4,6 @@ import { fileURLToPath } from 'url';
 import { join, dirname } from 'path';
 import { readFileSync, } from 'fs';
 import { handler as ssrHandler } from '../dist/server/entry.mjs';
-import { createHtmlCacheMiddleware } from './cache/index.js';
 import cors from 'cors';
 import {config} from '../config.js';
 
@@ -14,15 +13,18 @@ dotenv.config()
 const outdir = config.outDir;
 
 const app = express();
-// The HTML cache is SQLite-backed; the lite/json profile has no better-sqlite3,
-// so skip it there. Full keeps it for serving cached, pre-rendered pages.
+// The HTML cache is SQLite-backed (better-sqlite3); the lite/json profile has
+// no native deps, so skip it there. The import is dynamic so merely starting
+// the lite engine never loads better-sqlite3. Full keeps it for cached pages.
 const useHtmlCache = config.dataBackend !== 'json';
-const htmlCacheMiddleware = useHtmlCache
-    ? createHtmlCacheMiddleware({
-          dbPath: config.collect.db_path,
-          excludePaths: config.html_cache?.exclude_paths
-      })
-    : null;
+let htmlCacheMiddleware = null;
+if (useHtmlCache) {
+    const { createHtmlCacheMiddleware } = await import('./cache/index.js');
+    htmlCacheMiddleware = createHtmlCacheMiddleware({
+        dbPath: config.collect.db_path,
+        excludePaths: config.html_cache?.exclude_paths
+    });
+}
 
 if(process.env.ENABLE_CORS == "true"){
     app.use(cors());      
