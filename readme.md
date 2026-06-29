@@ -36,6 +36,127 @@ cache libraries considerations :
 - interactive islands will be hydrated on the client with the shipped page js assets
 
 # Usage
+## environment and diagram rendering
+
+The engine reads environment overrides from a root `.env` file before it reads
+ambient shell variables, `manifest.yaml`, or built-in defaults. Start by copying
+the example file:
+
+```powershell
+copy .env.example .env
+```
+
+The diagram renderer is configured with:
+
+```dotenv
+MICROWEBSTACKS_KROKI_SERVER=http://localhost:18000
+```
+
+This URL is where the engine POSTs Mermaid, PlantUML, and BlockDiag source when
+`scripts/diagrams.js` runs. No Java renderer runs inside VS Code; the preview
+always calls a Kroki-compatible HTTP endpoint.
+
+### local Docker Kroki
+
+Use this for offline/local testing and for VS Code preview without sending
+diagram source to an external service:
+
+```dotenv
+MICROWEBSTACKS_KROKI_SERVER=http://localhost:18000
+```
+
+Start the local renderer:
+
+```powershell
+docker compose up -d
+```
+
+Then run one of the normal preview flows:
+
+```powershell
+pnpm dev
+```
+
+or regenerate the data explicitly:
+
+```powershell
+pnpm collect
+pnpm diagrams
+pnpm dev
+```
+
+To force a fresh diagram render before testing, clear generated diagram rows
+and static SVG blobs first:
+
+```powershell
+pnpm clean:diagrams
+pnpm diagrams
+pnpm dev
+```
+
+For the lite/JSON profile, a fresh collect already recreates
+`dataset/json/content.json` and `dataset/json/blobs`. To explicitly test
+diagram rendering from a clean JSON dataset:
+
+```powershell
+$env:DOCS_BACKEND="json"
+pnpm collect
+pnpm clean:diagrams
+pnpm diagrams
+pnpm dev
+```
+
+After `pnpm clean:diagrams`, the next `pnpm diagrams` run must call the
+configured Kroki URL again for every diagram.
+
+Rendered diagram SVG files are served from `/blobs/<12-hex>.svg`; the full
+content hash remains in the dataset metadata.
+
+When you are done with the local renderer:
+
+```powershell
+docker compose down
+```
+
+### public Kroki
+
+Use the public service only when it is acceptable to send diagram source to
+`kroki.io`:
+
+```dotenv
+MICROWEBSTACKS_KROKI_SERVER=https://kroki.io
+```
+
+Then run:
+
+```powershell
+pnpm collect
+pnpm diagrams
+pnpm dev
+```
+
+### custom or internal Kroki
+
+For a company-hosted or otherwise custom Kroki-compatible endpoint, set the
+same variable to the internal base URL:
+
+```dotenv
+MICROWEBSTACKS_KROKI_SERVER=https://kroki.example.internal
+```
+
+Then run the same commands:
+
+```powershell
+pnpm collect
+pnpm diagrams
+pnpm dev
+```
+
+For the VS Code extension, put the `.env` file in the opened documentation
+workspace or set the variable in the environment that launches VS Code. Restart
+the preview after changing the URL; the extension runs collect and diagram
+generation before starting the local preview server.
+
 ## fetching
 - Configure `fetch.github` in `manifest.yaml` (single object or list). Use
   `fetch.select` to run one repo from a list of examples, or omit it/use `all`

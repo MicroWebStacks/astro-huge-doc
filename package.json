@@ -13,6 +13,7 @@
     "server": "node server/server.js",
     "collect": "node scripts/collect.js",
     "diagrams": "node scripts/diagrams.js",
+    "clean:diagrams": "node scripts/clean-diagrams.js",
     "export-json": "node scripts/export-json.js",
     "ext:stage-engine": "node scripts/stage-engine.js",
     "ext:package": "pnpm build && cd packages/vscode-extension && vsce package --no-dependencies -o microwebstacks-docs-preview.vsix",

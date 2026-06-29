@@ -6,9 +6,17 @@ function normalizeBlobExt(ext) {
     return value.startsWith('.') ? value.slice(1) : value;
 }
 
+const BLOB_FILE_HASH_LENGTH = 12;
+
+function shortenBlobHash(hash) {
+    const value = String(hash ?? '');
+    return value.length > BLOB_FILE_HASH_LENGTH ? value.slice(0, BLOB_FILE_HASH_LENGTH) : value;
+}
+
 function blobFileName(hash, ext) {
     const normalized = normalizeBlobExt(ext);
-    return normalized ? `${hash}.${normalized}` : String(hash);
+    const visibleHash = shortenBlobHash(hash);
+    return normalized ? `${visibleHash}.${normalized}` : visibleHash;
 }
 
 function blobFileUrl(hash, ext) {
@@ -19,7 +27,9 @@ function blobFileUrl(hash, ext) {
 }
 
 export {
+    BLOB_FILE_HASH_LENGTH,
     normalizeBlobExt,
+    shortenBlobHash,
     blobFileName,
     blobFileUrl
 };

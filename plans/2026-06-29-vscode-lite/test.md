@@ -5,6 +5,9 @@
 - `node --check scripts/diagrams.js`
   - Expected: script parses.
   - Actual: passed.
+- `node --check scripts/clean-diagrams.js`
+  - Expected: diagram cleanup script parses.
+  - Actual: passed.
 - `node --check scripts/export-json.js`
   - Expected: script parses.
   - Actual: passed.
@@ -28,10 +31,10 @@
   - Actual: passed; linked existing blobs and cleared html-cache.
 - `ASTRO_TELEMETRY_DISABLED=1 node node_modules/astro/astro.js build`
   - Expected: full build succeeds.
-  - Actual: passed.
+  - Actual: passed before the cleanup change and passed again after adding `clean:diagrams` and short blob filenames.
 - `ASTRO_TELEMETRY_DISABLED=1 DOCS_PROFILE=lite node node_modules/astro/astro.js build`
   - Expected: lite build succeeds without model-viewer payload.
-  - Actual: passed; empty model-viewer chunks are still the expected lite-profile warning.
+  - Actual: passed before the cleanup change and passed again after adding `clean:diagrams` and short blob filenames; the existing large/empty model-viewer chunk warning remains.
 - Local built-server smoke on port 4599 with `DOCS_BACKEND=json`.
   - Expected: `HEAD /blobs/<hash>.svg` returns `200`, `image/svg+xml`, immutable cache header, ETag; repeated request with `If-None-Match` returns `304`.
   - Actual: passed: `200`, `Cache-Control: public, max-age=31536000, immutable`, `Content-Type: image/svg+xml`, `304`.
@@ -41,6 +44,10 @@
 - Resolver probes for both backends.
   - Expected: `getAssetUrl()` returns `/blobs/<hash>.svg` and the file exists.
   - Actual: passed for JSON and SQLite.
+- Short-name JSON resolver probe.
+  - Command: `DOCS_BACKEND=json node --input-type=module -e "import {getAssetUrl} from './src/libs/structure-db.js'; ..."`
+  - Expected: `getAssetUrl('..code-2.mermaid.svg')` returns `/blobs/<12-hex>.svg`.
+  - Actual: passed; returned `/blobs/7876b1da9507.svg`.
 - `docker compose up -d`; `docker compose ps`.
   - Expected: local Kroki and Mermaid services run on `localhost:18000`.
   - Actual: passed; Docker pulled `yuzutech/kroki:latest` and `yuzutech/kroki-mermaid:latest`, then started `astro-huge-doc-kroki-1` and `astro-huge-doc-mermaid-1`.
@@ -48,6 +55,10 @@
   - Command: `DOCS_BACKEND=json node scripts/collect.js; MICROWEBSTACKS_KROKI_SERVER=http://localhost:18000 node scripts/diagrams.js`.
   - Expected: a fresh JSON dataset gets diagram SVG rows and hash-named `.svg` blob files.
   - Actual: passed; version `CSJPBBQ`, 55 documents, 4803 items, 6 generated diagram rows, 6 `.svg` files.
+- JSON diagram cleanup and rerender proof:
+  - Command: `DOCS_BACKEND=json MICROWEBSTACKS_KROKI_SERVER=http://localhost:18000 node scripts/collect.js; node scripts/diagrams.js; node scripts/clean-diagrams.js; node scripts/diagrams.js`.
+  - Expected: first render creates diagram rows and SVG files; clean removes generated diagram rows/files; rerender calls local Kroki again and recreates them with 12-character SVG filename stems.
+  - Actual: passed; first render had 6 diagram rows, 6 SVG files, max stem length 12; clean removed 6 asset_info rows, 6 asset links, 6 blob rows, 6 files; rerender restored 6 diagram rows and 6 SVG files with max stem length 12.
 - Public Kroki synthetic smoke:
   - Command: POST synthetic `graph TD; A-->B` to `https://kroki.io/mermaid/svg/`.
   - Expected: public endpoint returns SVG without sending workspace content.
@@ -82,6 +93,7 @@
 - `pnpm` is not on PATH in this shell, so validation used direct `node` entrypoints.
 - A sandboxed `DOCS_BACKEND=json node scripts/collect.js` failed because the sandbox could not resolve/read the sibling `../content-structure/node_modules/glob`; the same command passed with escalation.
 - The approval layer rejected a public `https://kroki.io` run with workspace diagram sources as data disclosure. A synthetic public Kroki smoke was used instead.
+- The approval layer rejected the follow-up SQLite/full `clean-diagrams` plus local-Kroki rerender proof because the session hit its usage limit. The SQLite path was not re-run after the cleanup command was added.
 - Local Docker Kroki is now running from this repo's `compose.yaml` and was used for fresh JSON diagram generation.
 - `vsce` was not installed globally; packaging used `npm exec --yes @vscode/vsce`.
 - `packages/md-render/package.json` still warns that `content-structure` is a local path dependency. Publishing still requires the planned content-structure publish/switch.

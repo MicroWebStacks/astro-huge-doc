@@ -26,10 +26,17 @@
 - Updated `packages/vscode-extension/extension.js` so the extension runtime sets `DOCS_PROFILE=lite` and `DOCS_BACKEND=json`.
 - Rebuilt the engine with `DOCS_PROFILE=lite`, staged `packages/md-render`, packaged the VS Code extension with `npm exec @vscode/vsce`, and installed it with `code.cmd --install-extension --force`.
 - Confirmed DuckDB/dataset SQL did not reappear in package or runtime surfaces.
+- Updated `readme.md` with `.env`-based Kroki configuration for local Docker, public `https://kroki.io`, and custom/internal Kroki URLs, including the commands to run for each mode.
+- Shortened visible blob filenames from full SHA-512 strings to 12-character hash prefixes while keeping the full hash in `blob_store` metadata.
+- Added `scripts/clean-diagrams.js` and the `pnpm clean:diagrams` command to remove generated diagram asset rows, unreferenced diagram blobs, static SVG files, and SQLite html-cache entries.
+- Updated the sibling `content-structure/src/blob_files.js` helper to use the same 12-character blob filename formula as this engine, so collect output and runtime URL resolution stay aligned.
+- Updated `readme.md` with diagram-cache cleanup commands for local Docker, public/custom Kroki, and lite/JSON test flows.
 
 ## Notes
 
 - The top-level `handoff.md` note saying content-structure has uncommitted WIP appears stale in this checkout; `../content-structure` is clean and already contains the Step 9a blob materialization code.
 - After Docker Desktop was started, fresh JSON collect plus local Kroki diagram rendering succeeded against `http://localhost:18000`.
 - The public Kroki endpoint was verified with a synthetic Mermaid diagram. Running repository diagram sources against `https://kroki.io` was rejected by the approval layer as workspace-data disclosure, so no workspace diagram content was sent to the public service.
+- `pnpm clean:diagrams` was verified on the JSON/lite path by rendering 6 diagrams, cleaning them to 0 rows/files, then rerendering 6 diagrams through local Docker Kroki with 12-character SVG filenames.
+- A SQLite/full clean-plus-rerender proof was attempted but the approval layer rejected the escalated local-Kroki command because the session hit its usage limit. The SQLite cleanup code parses, and the JSON/lite behavior is verified live.
 - `packages/md-render/package.json` still carries `content-structure: ../content-structure`; this remains the known blocker before publishing the engine package.
