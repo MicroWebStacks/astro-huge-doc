@@ -55,7 +55,7 @@ const DEFAULT_MANIFEST = {
         }
     },
     html_cache: {
-        exclude_paths: ['/assets/', '.well-known/']
+        exclude_paths: ['/blobs/', '.well-known/']
     }
 };
 

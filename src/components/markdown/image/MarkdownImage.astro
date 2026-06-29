@@ -1,6 +1,6 @@
 ---
 import Panzoom from '@/components/panzoom/panzoom.astro'
-import { getAssetBlob } from '@/libs/structure-db';
+import { getAssetUrl } from '@/libs/structure-db';
 import { log_debug } from '@/libs/utils';
 import { config } from '@/config';
 
@@ -17,12 +17,13 @@ export interface Props {
 const {item} = Astro.props as Props;
 
 const alt = item.slug;
-const blob_uid = getAssetBlob(item.asset_uid, item.version_id ?? config.collect.version_id);
-const asseturl = `/assets/${blob_uid}:${item.asset_uid}`;
+const asseturl = getAssetUrl(item.asset_uid, item.version_id ?? config.collect.version_id);
 const meta = {};
 // Inline image directives may carry display options (height/width/center).
 const options = item.ast?.options ?? {};
 log_debug(`  - MarkdownImage> asseturl: ${asseturl}`);
 ---
-<Panzoom src={asseturl} alt={alt} title={""} meta={meta}
-  height={options.height} width={options.width} center={options.center} />
+{asseturl &&
+  <Panzoom src={asseturl} alt={alt} title={""} meta={meta}
+    height={options.height} width={options.width} center={options.center} />
+}

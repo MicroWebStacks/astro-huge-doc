@@ -268,9 +268,17 @@ never wrong out of the box.
    - 9e. Rework `diagrams.js`: render SVG → `<hash>.svg` file + register asset_info/assets (sqlite) /
      append to content.json (json). json-aware.
    - 9f. Verify both profiles render diagrams+assets as static cached files; retire `/assets` route.
+   Status 2026-06-29: 9b-9f implemented. `/blobs` is the active asset route with immutable
+   cache headers and ETag/304 support in production and Astro dev. The dynamic
+   `src/pages/assets/[...uid].js` route was removed. Fresh JSON diagram rendering
+   still requires a reachable local Kroki endpoint; Docker was not running during validation.
 10. Update `stage-engine.js` `EXCLUDED_DEPS` (drop better-sqlite3, duckdb, sharp, plotly, three,
    model-viewer, xlsx, octokit, passport); package + install extension; measure size drop.
 11. Decide duckdb full-fate (keep behind API routes, or drop entirely).
+   Status 2026-06-29: Step 10 implemented. The staged lite engine now excludes native/heavy/full-only
+   dependencies, includes required `src/libs` runtime helpers, and the VS Code extension launches the
+   engine with `DOCS_PROFILE=lite` and `DOCS_BACKEND=json`. VSIX `0.0.3` was packaged and installed.
+   Step 11 confirmed: DuckDB remains dropped from both profiles; only planning docs still mention it.
 
 Gate after step 2: full build must be identical before proceeding.
 

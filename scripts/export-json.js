@@ -10,7 +10,7 @@
  * Output (under config.collect.json_dir, default dataset/json):
  *   content.json        { version_id, diagram, documents[], items[],
  *                         asset_info[], assets[], images[] }
- *   blobs/<blob_uid>    raw, already-decompressed bytes for every blob
+ *   blobs/<hash>.<ext>  raw, already-decompressed bytes for every referenced blob
  *
  * Blobs are resolved exactly like structure-db-sqlite.js loadBlobBuffer
  * (inline payload, else outdir/blobs/<path>/<hash>) and gunzipped at export
@@ -21,6 +21,7 @@ import {mkdirSync, writeFileSync, readFileSync, rmSync, existsSync} from 'node:f
 import {gunzipSync} from 'node:zlib';
 import Database from 'better-sqlite3';
 import {config} from '../config.js';
+import {blobFileName} from '../src/libs/blob-files.js';
 
 const dbPath = config.collect.db_path;
 const outdir = config.collect.outdir; // store root; on-disk blobs live under <outdir>/blobs
@@ -82,15 +83,33 @@ function main() {
     }
     mkdirSync(blobsDir, {recursive: true});
 
+    const blobByUid = new Map(blobRows.map((row) => [String(row.blob_uid), row]));
+    const refs = [];
+    for (const asset of asset_info) {
+        refs.push({blob: blobByUid.get(String(asset.blob_uid)), ext: asset.ext});
+    }
+    for (const image of images) {
+        refs.push({blob: blobByUid.get(String(image.blob_uid)), ext: image.extension});
+    }
+
     let written = 0;
     let missing = 0;
-    for (const row of blobRows) {
-        const buffer = resolveBlobBuffer(row);
+    const writtenFiles = new Set();
+    for (const {blob, ext} of refs) {
+        if (!blob?.hash) {
+            continue;
+        }
+        const fileName = blobFileName(blob.hash, ext);
+        if (writtenFiles.has(fileName)) {
+            continue;
+        }
+        const buffer = resolveBlobBuffer(blob);
         if (!buffer) {
             missing += 1;
             continue;
         }
-        writeFileSync(join(blobsDir, String(row.blob_uid)), buffer);
+        writeFileSync(join(blobsDir, fileName), buffer);
+        writtenFiles.add(fileName);
         written += 1;
     }
 
@@ -101,7 +120,8 @@ function main() {
         items,
         asset_info,
         assets,
-        images
+        images,
+        blob_store: blobRows.map(({payload, ...row}) => row)
     };
     writeFileSync(join(jsonDir, 'content.json'), JSON.stringify(dataset));
 

@@ -1,6 +1,6 @@
 ---
 import SvgIcons from '@/components/svgicons.astro'
-import { getAssetBlob } from '@/libs/structure-db';
+import { getAssetUrl } from '@/libs/structure-db';
 import { log_debug } from '@/libs/utils';
 import yaml from 'js-yaml'
 import { config } from '@/config';
@@ -24,9 +24,14 @@ let environment_image = ""
 let error_text = ""
 //mandatory params
 if(Object.hasOwn(model,"src")){
-  const blob = getAssetBlob(model.src, config.collect.version_id);
-  src = `/assets/${blob}:${model.src}`
+  src = getAssetUrl(model.src, config.collect.version_id) ?? ""
   log_debug("  - ModelViewerCode src param:",src)
+  if (!src) {
+    should_render = false
+    const err = "ModelViewerCode could not resolve 'src' asset ; "
+    console.warn(err)
+    error_text += err
+  }
 }else{
   should_render = false
   const err = "ModelViewerCode missing 'src' param ; "
@@ -43,12 +48,10 @@ if(Object.hasOwn(code_data,"title")){
 }
 //optional params
 if(Object.hasOwn(model,"poster")){
-  const blob = getAssetBlob(model.poster, config.collect.version_id);
-  poster = `/assets/${blob}:${model.poster}`
+  poster = getAssetUrl(model.poster, config.collect.version_id) ?? ""
 }
 if(Object.hasOwn(model,"environment-image")){
-  const blob = getAssetBlob(model["environment-image"], config.collect.version_id);
-  environment_image = `/assets/${blob}:${model["environment-image"]}`
+  environment_image = getAssetUrl(model["environment-image"], config.collect.version_id) ?? ""
 }
 
 //potential additional params

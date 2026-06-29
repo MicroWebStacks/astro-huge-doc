@@ -18,10 +18,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
 
 const PACKAGE_NAME = '@microwebstacks/md-render';
-// Runtime files the engine needs to collect, render, and serve docs.
-const RUNTIME_PATHS = ['config.js', 'server', 'scripts', 'dist'];
-// Dependencies that only matter to repo tooling, not the runtime engine.
-const EXCLUDED_DEPS = new Set([]);
+// Runtime files the lite engine needs to collect, render, and serve docs.
+const RUNTIME_PATHS = ['config.js', 'server', 'scripts', 'src/libs', 'dist'];
+// Dependencies that only matter to full-site, fetch/auth, native, or heavy
+// client paths. The VS Code engine runs DOCS_PROFILE=lite + DOCS_BACKEND=json.
+const EXCLUDED_DEPS = new Set([
+  '@google/model-viewer',
+  '@octokit/rest',
+  'adm-zip',
+  'better-sqlite3',
+  'express-session',
+  'passport',
+  'passport-github',
+  'sharp',
+  'three',
+  'xlsx'
+]);
 
 function parseArgs(argv) {
   const args = {out: path.join('packages', 'md-render'), version: null};
@@ -58,6 +70,7 @@ async function main() {
     if (!fs.existsSync(from)) {
       throw new Error(`Required runtime path is missing: ${from}`);
     }
+    await fsp.mkdir(path.dirname(path.join(outDir, rel)), {recursive: true});
     await fsp.cp(from, path.join(outDir, rel), {recursive: true});
   }
 

@@ -3,7 +3,7 @@ import Highlighter from './Highlighter.astro'
 import Panzoom from '@/components/panzoom/panzoom.astro'
 import SvgIcons from '@/components/svgicons.astro';
 import { config } from '@/config.js';
-import { getAssetBlob } from '@/libs/structure-db';
+import { getAssetUrl } from '@/libs/structure-db';
 
 export interface Props {
     uid:string;
@@ -17,11 +17,10 @@ export interface Props {
 const {uid, code, language, params, meta, versionId = config.collect.version_id} = Astro.props as Props;
 console.log("Rendering DiagramCode for uid:", uid, "with verison:", versionId);
 const diagramAssetUid = `${uid}.svg`;
-const diag_blob_uid = getAssetBlob(diagramAssetUid, versionId)
-    ?? getAssetBlob(diagramAssetUid, config.collect.version_id)
-    ?? getAssetBlob(diagramAssetUid);
-const hasDiagram = Boolean(diag_blob_uid);
-const diagram_url = hasDiagram ? `/assets/${diag_blob_uid}:${diagramAssetUid}` : null;
+const diagram_url = getAssetUrl(diagramAssetUid, versionId)
+    ?? getAssetUrl(diagramAssetUid, config.collect.version_id)
+    ?? getAssetUrl(diagramAssetUid);
+const hasDiagram = Boolean(diagram_url);
 let alt = ""
 let title = ""
 if(params && (params.length > 0)){

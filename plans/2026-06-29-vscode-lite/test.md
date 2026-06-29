@@ -1,0 +1,87 @@
+# Test Proof
+
+## Commands Run
+
+- `node --check scripts/diagrams.js`
+  - Expected: script parses.
+  - Actual: passed.
+- `node --check scripts/export-json.js`
+  - Expected: script parses.
+  - Actual: passed.
+- `node --check server/server.js`
+  - Expected: production server entry parses.
+  - Actual: passed.
+- `node --check src/middleware.js`
+  - Expected: Astro middleware parses.
+  - Actual: passed.
+- `DOCS_BACKEND=json node scripts/collect.js` with escalation.
+  - Expected: content-structure JSON writer emits `dataset/json/content.json` and `dataset/json/blobs/<hash>.<ext>`.
+  - Actual: passed; version `CSJPAGJ`, 55 documents, 4803 items, 281 assets, 269 blob files.
+- `node scripts/export-json.js`
+  - Expected: SQLite export emits JSON with `blob_store` metadata and hash-named blob files.
+  - Actual: passed; version `CSJOWLI`, 55 documents, 4803 items, 438 asset_info rows, 308 assets, 21 images, 409 blob files, 7 missing legacy blobs.
+- `DOCS_BACKEND=json MICROWEBSTACKS_KROKI_SERVER=http://localhost:18000 node scripts/diagrams.js`
+  - Expected: JSON diagram pass registers or renders diagram SVG assets.
+  - Actual after export-json restore: passed by skipping existing diagram rows for version `CSJOWLI`.
+- `MICROWEBSTACKS_KROKI_SERVER=http://localhost:18000 node scripts/diagrams.js`
+  - Expected: SQLite diagram pass registers existing or rendered diagram SVG assets and materializes static files.
+  - Actual: passed; linked existing blobs and cleared html-cache.
+- `ASTRO_TELEMETRY_DISABLED=1 node node_modules/astro/astro.js build`
+  - Expected: full build succeeds.
+  - Actual: passed.
+- `ASTRO_TELEMETRY_DISABLED=1 DOCS_PROFILE=lite node node_modules/astro/astro.js build`
+  - Expected: lite build succeeds without model-viewer payload.
+  - Actual: passed; empty model-viewer chunks are still the expected lite-profile warning.
+- Local built-server smoke on port 4599 with `DOCS_BACKEND=json`.
+  - Expected: `HEAD /blobs/<hash>.svg` returns `200`, `image/svg+xml`, immutable cache header, ETag; repeated request with `If-None-Match` returns `304`.
+  - Actual: passed: `200`, `Cache-Control: public, max-age=31536000, immutable`, `Content-Type: image/svg+xml`, `304`.
+- Local Astro dev smoke on port 4598 with `DOCS_BACKEND=json`.
+  - Expected: middleware serves `/blobs/<hash>.svg` with same cache headers and `304`.
+  - Actual: passed.
+- Resolver probes for both backends.
+  - Expected: `getAssetUrl()` returns `/blobs/<hash>.svg` and the file exists.
+  - Actual: passed for JSON and SQLite.
+- `docker compose up -d`; `docker compose ps`.
+  - Expected: local Kroki and Mermaid services run on `localhost:18000`.
+  - Actual: passed; Docker pulled `yuzutech/kroki:latest` and `yuzutech/kroki-mermaid:latest`, then started `astro-huge-doc-kroki-1` and `astro-huge-doc-mermaid-1`.
+- Fresh local-Kroki JSON render:
+  - Command: `DOCS_BACKEND=json node scripts/collect.js; MICROWEBSTACKS_KROKI_SERVER=http://localhost:18000 node scripts/diagrams.js`.
+  - Expected: a fresh JSON dataset gets diagram SVG rows and hash-named `.svg` blob files.
+  - Actual: passed; version `CSJPBBQ`, 55 documents, 4803 items, 6 generated diagram rows, 6 `.svg` files.
+- Public Kroki synthetic smoke:
+  - Command: POST synthetic `graph TD; A-->B` to `https://kroki.io/mermaid/svg/`.
+  - Expected: public endpoint returns SVG without sending workspace content.
+  - Actual: passed; status `200`, `Content-Type: image/svg+xml`, SVG body.
+- `node --check scripts/stage-engine.js`; `node --check packages/vscode-extension/extension.js`.
+  - Expected: Step 10 changes parse.
+  - Actual: passed.
+- `ASTRO_TELEMETRY_DISABLED=1 DOCS_PROFILE=lite node node_modules/astro/astro.js build; node scripts/stage-engine.js`.
+  - Expected: lite build succeeds and stages `packages/md-render`.
+  - Actual: passed; staged dependency list has 24 dependencies and none of the excluded native/heavy/full-only packages.
+- Staged engine smoke from `packages/md-render`.
+  - Expected: staged engine collects JSON and renders diagrams using local Kroki with `DOCS_PROFILE=lite` and `DOCS_BACKEND=json`.
+  - Actual: passed; version `CSJPBMD`, 55 documents, 4803 items, 6 diagram rows, 6 `.svg` files.
+- Staged engine server smoke on port 4601.
+  - Expected: home page returns `200`; `/blobs/<hash>.svg` returns SVG with immutable cache header and `304` on matching ETag.
+  - Actual: passed.
+- `npm exec --yes @vscode/vsce -- package --no-dependencies -o microwebstacks-docs-preview.vsix`.
+  - Expected: extension VSIX package is generated.
+  - Actual: passed; `packages/vscode-extension/microwebstacks-docs-preview.vsix`, 7019 bytes. `vsce` warned about missing repository, license, and ignore/files metadata.
+- `code.cmd --install-extension packages/vscode-extension/microwebstacks-docs-preview.vsix --force`.
+  - Expected: local VS Code installs the updated extension.
+  - Actual: passed; installed `microwebstacks.microwebstacks-docs-preview@0.0.3`.
+- Installed extension check.
+  - Expected: installed `extension.js` contains `DOCS_PROFILE: 'lite'` and `DOCS_BACKEND: 'json'`.
+  - Actual: passed at `C:\Users\wassi\.vscode\extensions\microwebstacks.microwebstacks-docs-preview-0.0.3\extension.js`.
+- DuckDB/full-fate check.
+  - Expected: no runtime/package references to DuckDB or removed dataset SQL UI packages.
+  - Actual: passed; only plan/handoff text mentions `duckdb`, `dataset-sql`, removed ServerTable/API/table paths, Plotly, MUI, or Mantine.
+
+## Environment Notes
+
+- `pnpm` is not on PATH in this shell, so validation used direct `node` entrypoints.
+- A sandboxed `DOCS_BACKEND=json node scripts/collect.js` failed because the sandbox could not resolve/read the sibling `../content-structure/node_modules/glob`; the same command passed with escalation.
+- The approval layer rejected a public `https://kroki.io` run with workspace diagram sources as data disclosure. A synthetic public Kroki smoke was used instead.
+- Local Docker Kroki is now running from this repo's `compose.yaml` and was used for fresh JSON diagram generation.
+- `vsce` was not installed globally; packaging used `npm exec --yes @vscode/vsce`.
+- `packages/md-render/package.json` still warns that `content-structure` is a local path dependency. Publishing still requires the planned content-structure publish/switch.

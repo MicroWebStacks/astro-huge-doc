@@ -1,16 +1,45 @@
 import express from 'express';
 import https from 'https'
 import { fileURLToPath } from 'url';
-import { join, dirname } from 'path';
+import { join, dirname, basename } from 'path';
 import { readFileSync, } from 'fs';
+import { readFile, stat } from 'fs/promises';
 import { handler as ssrHandler } from '../dist/server/entry.mjs';
 import cors from 'cors';
 import {config} from '../config.js';
+import {file_mime} from '../src/libs/utils.js';
 
 import * as dotenv from 'dotenv'
 dotenv.config()
 
 const outdir = config.outDir;
+const blobsDir = config.dataBackend === 'json'
+    ? join(config.collect.json_dir, 'blobs')
+    : join(config.collect.outdir, 'blobs');
+
+function safeBlobName(requestPath) {
+    let name;
+    try {
+        name = decodeURIComponent(String(requestPath ?? '').replace(/^\/?/, ''));
+    } catch {
+        return null;
+    }
+    if (!name || name.includes('/') || name.includes('\\') || name !== basename(name)) {
+        return null;
+    }
+    return name;
+}
+
+function buildEtag(fileStat) {
+    return `"${fileStat.size.toString(16)}-${Math.trunc(fileStat.mtimeMs).toString(16)}"`;
+}
+
+function requestMatchesEtag(header, etag) {
+    return String(header ?? '')
+        .split(',')
+        .map((entry) => entry.trim())
+        .includes(etag);
+}
 
 const app = express();
 // The HTML cache is SQLite-backed (better-sqlite3); the lite/json profile has
@@ -39,6 +68,48 @@ if(process.env.ENABLE_AUTH === "true"){
     console.log("\n -- !!! no auth !!! -- Authentication is disabled -- \n")
 }
 
+app.use('/blobs', async (req, res, next) => {
+    const method = req.method.toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD') {
+        next();
+        return;
+    }
+
+    const blobName = safeBlobName(req.path);
+    if (!blobName) {
+        next();
+        return;
+    }
+
+    const filePath = join(blobsDir, blobName);
+    let fileStat;
+    try {
+        fileStat = await stat(filePath);
+    } catch {
+        next();
+        return;
+    }
+    if (!fileStat.isFile()) {
+        next();
+        return;
+    }
+
+    const etag = buildEtag(fileStat);
+    res.set({
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Content-Type': file_mime(blobName),
+        ETag: etag
+    });
+    if (requestMatchesEtag(req.headers['if-none-match'], etag)) {
+        res.status(304).end();
+        return;
+    }
+    if (method === 'HEAD') {
+        res.status(200).end();
+        return;
+    }
+    res.status(200).send(await readFile(filePath));
+});
 app.use(express.static(join(outdir, 'client')))
 if (htmlCacheMiddleware) {
     app.use(htmlCacheMiddleware)

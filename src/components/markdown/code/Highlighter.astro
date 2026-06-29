@@ -101,19 +101,18 @@ buttons.forEach(button => {
         const message = document.querySelector(`.copy-message[data-uid="${uid}"]`);
         
         try {
-            const response = await fetch(`/assets/${uid}`);
-            if (response.ok) {
-                const codeText = await response.text();
+            const container = button.closest('.highlighter.container');
+            const codeText = container?.querySelector('pre')?.textContent ?? '';
+            if (codeText) {
                 await navigator.clipboard.writeText(codeText);
                 
-                // Show the "Copied!" message and hide it after 1 second
                 message.style.display = 'block';
                 setTimeout(() => {
                     message.style.display = 'none';
                 }, 1000);
                 
             } else {
-                console.error('Failed to fetch code content');
+                console.error('Failed to read code content');
             }
         } catch (error) {
             console.error('Error:', error);

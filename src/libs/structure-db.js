@@ -35,5 +35,6 @@ export const {
     getAssetInfo,
     parseAssetLink,
     getImageInfo,
-    getAssetBlob
+    getAssetBlob,
+    getAssetUrl
 } = impl;

@@ -2,6 +2,7 @@ import {existsSync, readFileSync} from 'fs';
 import {join, dirname, extname} from 'path';
 import {gunzipSync} from 'zlib';
 import {config} from '../../config.js';
+import {blobFileUrl} from './blob-files.js';
 import {log_debug, shortMD5} from './utils.js';
 import {openDatabase} from 'content-structure/src/sqlite_utils/index.js';
 
@@ -590,6 +591,31 @@ function getAssetBlob(assetUid, versionId = null) {
     return row?.blob_uid ?? null;
 }
 
+function getAssetUrl(assetUid, versionId = null) {
+    if (!assetUid) {
+        return null;
+    }
+    const db = ensureDb();
+    const fetchRow = (resolvedVersion) => {
+        const params = [assetUid];
+        let sql = `
+            SELECT bs.hash AS hash, ai.ext AS ext
+            FROM assets a
+            JOIN asset_info ai ON ai.uid = a.asset_uid AND ai.blob_uid = a.blob_uid
+            JOIN blob_store bs ON bs.blob_uid = a.blob_uid
+            WHERE a.asset_uid = ?
+        `;
+        if (resolvedVersion) {
+            sql += ' AND a.version_id = ?';
+            params.push(resolvedVersion);
+        }
+        sql += ' ORDER BY a.version_id DESC LIMIT 1';
+        return db.prepare(sql).get(...params);
+    };
+    const row = fetchRow(versionId) ?? (versionId ? fetchRow(null) : null);
+    return blobFileUrl(row?.hash, row?.ext);
+}
+
 export {
     getEntry, 
     getFirstDocument,
@@ -601,5 +627,6 @@ export {
     getAssetInfo, 
     parseAssetLink,
     getImageInfo,
-    getAssetBlob
+    getAssetBlob,
+    getAssetUrl
 };

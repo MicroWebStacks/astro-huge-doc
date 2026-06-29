@@ -269,6 +269,8 @@ async function getFreePort() {
 function createRuntimeEnv(runtime, port) {
   return {
     ...process.env,
+    DOCS_PROFILE: 'lite',
+    DOCS_BACKEND: 'json',
     MICROWEBSTACKS_ENGINE_ROOT: runtime.engineRoot,
     MICROWEBSTACKS_WORKSPACE_ROOT: runtime.workspaceRoot,
     MICROWEBSTACKS_DB_PATH: runtime.dbPath,

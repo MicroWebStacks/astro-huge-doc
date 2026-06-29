@@ -1,6 +1,6 @@
 ---
 import ModelViewer from './model/ModelViewer.astro';
-import { getAssetBlob, getAssetInfo } from '@/libs/structure-db';
+import { getAssetInfo, getAssetUrl } from '@/libs/structure-db';
 import Code from './code/Code.astro';
 import { config } from '@/config';
 
@@ -21,8 +21,7 @@ const { item } = Astro.props as Props;
 const hasAsset = (item.asset_uid != null)
 const external = !hasAsset && item.ast.url.startsWith('http')
 const versionId = item.version_id ?? config.collect.version_id
-const blob_uid = hasAsset ? getAssetBlob(item.asset_uid!, versionId) : null
-const url = hasAsset ? `/assets/${blob_uid}:${item.asset_uid}` : item.ast.url
+const url = hasAsset ? getAssetUrl(item.asset_uid!, versionId) : item.ast.url
 
 let is_model3d = false
 let is_table = false
@@ -47,7 +46,7 @@ if (hasAsset){
   <ModelViewer src={url} title={item.body_text} />
 }
 {is_link &&
-  <a href={url} class={`link ${external?"external":""}`} target={external?"_blank":"_self"}>
+  <a href={url ?? '#'} class={`link ${external?"external":""}`} target={external?"_blank":"_self"}>
         {item.body_text}
   </a>
 }
