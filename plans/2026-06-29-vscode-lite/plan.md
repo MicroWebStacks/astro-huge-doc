@@ -233,9 +233,19 @@ never wrong out of the box.
    `diagram.renderers.kroki.server` so `scripts/diagrams.js` honors it); added `compose.yaml`
    (yuzutech/kroki + mermaid, `18000:8000`). NOTE: root `manifest.yaml` still pins `https://kroki.io`,
    which (by design) overrides the code default — left untouched as the user's active config. README pending.
-5. `scripts/export-json.js` + minimal `structure-db-json.js`; render one page with `DOCS_BACKEND=json`.
-6. Asset-from-disk resolution for JSON backend (the hard part) → full lite parity for std MD + diagrams.
-7. Profile-gate plotly/3D/xlsx islands; set lite image service to passthrough.
+5. ✅ **JSON export + backend** — DONE. Added `scripts/export-json.js` (`pnpm export-json`): dumps the
+   latest version's documents/items/assets + all asset_info/images to `dataset/json/content.json` and
+   materializes every blob (decompressed) to `dataset/json/blobs/<blob_uid>`. Implemented full
+   `structure-db-json.js` mirroring the sqlite surface over in-memory indexes + disk blobs (no native
+   deps). Hardened `config.js`: better-sqlite3 import is now lazy, version resolution skipped in json
+   mode, added `config.collect.json_dir` (`MICROWEBSTACKS_JSON_DIR`). Parity verified vs sqlite
+   (firstDoc, item counts, getAssetBlob, blob lengths all identical).
+6. ✅ **Asset-from-disk for JSON backend** — DONE (folded into the export design). Verified end-to-end
+   via `astro dev` with `DOCS_BACKEND=json`: home + /WORKFLOW + /AGENTS render 200; diagram SVG asset
+   serves `image/svg+xml`. Full lite parity for std MD + diagrams + images. _Remaining for the
+   production `server/server.js` path: the SQLite html-cache middleware still needs profile-gating
+   (the dev/extension path already works without it)._
+7. Profile-gate plotly/3D/xlsx islands; set lite image service to passthrough; gate html-cache for lite.
 8. Update `stage-engine.js` `EXCLUDED_DEPS` (drop better-sqlite3, duckdb, sharp, plotly, three,
    model-viewer, xlsx, octokit, passport); package + install extension; measure size drop.
 9. Decide duckdb full-fate (keep behind API routes, or drop entirely).

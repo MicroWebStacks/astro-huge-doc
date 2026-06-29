@@ -4,7 +4,9 @@ import path from "node:path";
 import fsp from "node:fs/promises";
 import yaml from "js-yaml";
 import {existsSync} from 'node:fs';
-import Database from 'better-sqlite3';
+// NOTE: better-sqlite3 is imported lazily inside resolveLatestVersion (sqlite
+// backend only) so the json/lite profile can import this config without the
+// native dependency being present.
 
 const DEFAULT_MANIFEST = {
     output: {
@@ -118,12 +120,13 @@ function parsePort(value, fallback) {
     return Number.isFinite(port) ? port : fallback;
 }
 
-function resolveLatestVersion(structurePath) {
+async function resolveLatestVersion(structurePath) {
     if (!existsSync(structurePath)) {
         return null;
     }
     let db;
     try {
+        const {default: Database} = await import('better-sqlite3');
         db = new Database(structurePath, {readonly: true, fileMustExist: true});
         const row = db.prepare('SELECT version_id FROM versions ORDER BY version_id DESC LIMIT 1').get();
         return row?.version_id ?? null;
@@ -141,6 +144,15 @@ const manifestPath = process.env.MICROWEBSTACKS_MANIFEST_PATH
     ? resolve(process.env.MICROWEBSTACKS_MANIFEST_PATH)
     : join(workspaceRoot, "manifest.yaml");
 const manifest = await loadManifest(manifestPath);
+
+// Deployment profile + data backend (env-only; needed before version resolution).
+//   DOCS_PROFILE: 'full' (local website/warehouse) | 'lite' (VS Code extension engine)
+//   DOCS_BACKEND: 'sqlite' (canonical store) | 'json' (pre-exported, no native deps)
+// The dispatcher in src/libs/structure-db.js reads DOCS_BACKEND directly; it is
+// surfaced here too for introspection and so manifest/defaults stay discoverable.
+const docsProfile = (process.env.DOCS_PROFILE ?? 'full').trim().toLowerCase();
+const docsBackend = (process.env.DOCS_BACKEND ?? (docsProfile === 'lite' ? 'json' : 'sqlite')).trim().toLowerCase();
+
 const krokiServer = process.env.MICROWEBSTACKS_KROKI_SERVER
     ?? manifest.diagram.renderers.kroki?.server
     ?? manifest.kroki.server;
@@ -156,18 +168,16 @@ const storePath = process.env.MICROWEBSTACKS_STORE_PATH
 const abs_db_path = process.env.MICROWEBSTACKS_DB_PATH
     ? resolve(process.env.MICROWEBSTACKS_DB_PATH)
     : resolvePath(workspaceRoot, manifest.output.db_path);
-const latestVersion = resolveLatestVersion(abs_db_path);
+// Pre-exported JSON dataset (json backend). Sits beside the sqlite store.
+const jsonDir = process.env.MICROWEBSTACKS_JSON_DIR
+    ? resolve(process.env.MICROWEBSTACKS_JSON_DIR)
+    : join(storePath, 'json');
+// Version resolution requires sqlite; the json backend carries its own version
+// in the exported dataset, so skip the native lookup entirely in json mode.
+const latestVersion = docsBackend === 'json' ? null : await resolveLatestVersion(abs_db_path);
 const serverHost = process.env.MICROWEBSTACKS_HOST ?? manifest.server.host;
 const serverPort = parsePort(process.env.MICROWEBSTACKS_PORT, manifest.server.port);
 const serverProtocol = process.env.MICROWEBSTACKS_PROTOCOL ?? manifest.server.protocol;
-
-// Deployment profile + data backend.
-//   DOCS_PROFILE: 'full' (local website/warehouse) | 'lite' (VS Code extension engine)
-//   DOCS_BACKEND: 'sqlite' (canonical store) | 'json' (pre-exported, no native deps)
-// The dispatcher in src/libs/structure-db.js reads DOCS_BACKEND directly; it is
-// surfaced here too for introspection and so manifest/defaults stay discoverable.
-const docsProfile = (process.env.DOCS_PROFILE ?? 'full').trim().toLowerCase();
-const docsBackend = (process.env.DOCS_BACKEND ?? (docsProfile === 'lite' ? 'json' : 'sqlite')).trim().toLowerCase();
 
 const config = {
     profile: docsProfile,
@@ -204,7 +214,8 @@ const config = {
         contentdir: docsRoot,
         outdir: storePath,//dist does not persist before build
         debug: manifest.collect.debug ?? false,
-        db_path: abs_db_path
+        db_path: abs_db_path,
+        json_dir: jsonDir
     }
 }
 
