@@ -3,6 +3,7 @@
   "type": "module",
   "version": "0.0.1",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "node scripts/dev.js",
     "start": "node scripts/dev.js",
@@ -30,7 +31,7 @@
     "adm-zip": "^0.5.16",
     "astro": "^5.16.0",
     "better-sqlite3": "^12.4.1",
-    "content-structure": "../content-structure",
+    "content-structure": "^2.2.4",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dayjs": "1.11.13",

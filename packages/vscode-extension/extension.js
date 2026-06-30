@@ -120,9 +120,11 @@ function installEngine(context) {
   log(`Installing ${ENGINE_PACKAGE}@${ENGINE_VERSION} into ${enginePrefix} (this runs once and needs network access).`);
   return new Promise((resolve, reject) => {
     const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    // --omit=optional skips content-structure's optional native deps
+    // (better-sqlite3, sharp), which the lite/JSON engine never loads.
     const child = cp.spawn(
       npmExecutable,
-      ['install', `${ENGINE_PACKAGE}@${ENGINE_VERSION}`, '--prefix', enginePrefix, '--no-audit', '--no-fund'],
+      ['install', `${ENGINE_PACKAGE}@${ENGINE_VERSION}`, '--prefix', enginePrefix, '--no-audit', '--no-fund', '--omit=optional'],
       {cwd: enginePrefix, env: process.env, shell: process.platform === 'win32', windowsHide: true}
     );
     child.stdout.on('data', (chunk) => output.append(chunk.toString()));

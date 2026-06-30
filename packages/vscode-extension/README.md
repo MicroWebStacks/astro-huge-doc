@@ -1,58 +1,37 @@
 # MicroWebStacks Docs Preview
 
-Preview large Markdown documentation sets inside VS Code. Open a folder of
-Markdown, run one command, and browse the rendered docs — with a file-tree and
-table-of-contents viewer, syntax highlighting, tables, image galleries, and
-diagrams (mermaid, plantuml, blockdiag).
+Browse large Markdown documentation sets inside VS Code — rendered like a real
+documentation site, not a single-file preview.
+
+## Features
+
+- **📁 File tree** — navigate a whole multi-folder docs repo from a sidebar, not one file at a time.
+- **🔖 Outline / table of contents** — jump between headings of the current page.
+- **📊 Diagrams** — mermaid, plantuml, and blockdiag blocks render to SVG.
+- **📋 Tables** — Markdown tables become sortable, readable data tables.
+- **🎨 Syntax highlighting** — fenced code blocks highlighted with Shiki.
+- **🖼️ Image gallery** — image sets open in a zoomable lightbox.
 
 ## Getting started
 
 1. Open a folder that contains your Markdown documentation.
-2. Run **MicroWebStacks: Preview Docs in VS Code** from the Command Palette
-   (`Ctrl+Shift+P`).
-3. The rendered docs open in a preview. Use **Open Docs in Browser** to view the
-   same preview in your external browser.
+2. Run **MicroWebStacks: Preview Docs in VS Code** from the Command Palette (`Ctrl+Shift+P`).
+3. Browse the rendered docs. Use **Open Docs in Browser** to view them in your external browser.
 
-By default the workspace folder is treated as the documentation root. If your
-docs live in a subfolder (or you use a `manifest.yaml`), point the extension at
-the right place with the `Docs root` setting.
+The workspace folder is the documentation root by default. Other commands:
+**Restart Docs Preview Server** and **Stop Docs Preview Server**.
 
-## Commands
+## Configuration
 
-- **MicroWebStacks: Preview Docs in VS Code**
-- **MicroWebStacks: Open Docs in Browser**
-- **MicroWebStacks: Restart Docs Preview Server**
-- **MicroWebStacks: Stop Docs Preview Server**
-
-## Diagrams: pointing at a renderer
-
-Diagrams are rendered by a [Kroki](https://kroki.io)-compatible server. The
-extension sends your diagram source to whatever URL you configure and displays
-the returned SVG. You choose where that goes:
-
-| You want… | Set the diagram server URL to |
-|---|---|
-| Local, offline rendering (nothing leaves your machine) | `http://localhost:18000` (run a local Kroki via Docker) |
-| The hosted public service | `https://kroki.io` |
-| Your company's internal renderer | e.g. `https://kroki.example.internal` |
-
-### Where to set it
-
-Open **Settings** (`Ctrl+,`), search for **MicroWebStacks**, and edit
-**Diagram server URL** (`microwebstacks.preview.krokiServer`). It defaults to
-`http://localhost:18000`. After changing it, run **Restart Docs Preview
-Server** so the new URL takes effect.
-
-> Local rendering needs a Kroki server listening on that URL. The simplest way
-> is Docker — see the repository for a ready-made `compose.yaml`
-> (`docker compose up -d`). Use the public or an internal URL if you'd rather
-> not run one locally.
-
-## Settings
-
-| Setting | Default | Purpose |
+| Setting | Default | What it does |
 |---|---|---|
-| `microwebstacks.preview.krokiServer` | `http://localhost:18000` | Base URL of the Kroki-compatible diagram renderer. |
-| `microwebstacks.preview.docsRoot` | _(workspace folder)_ | Documentation root inside the workspace. Defaults to manifest `output.content` when a `manifest.yaml` exists, otherwise the workspace folder. |
-| `microwebstacks.preview.engineSource` | `auto` | Where the rendering engine is sourced from: `auto`, `local`, or `registry`. |
-| `microwebstacks.preview.enginePath` | _(auto-detected)_ | Path to a local engine checkout, used as the engine (highest priority). |
+| `microwebstacks.preview.krokiServer` | `http://localhost:18000` | Diagram renderer URL. Point it at a local [Kroki](https://kroki.io) (Docker), the public `https://kroki.io`, or your own internal endpoint. |
+| `microwebstacks.preview.docsRoot` | _workspace folder_ | Documentation root, if your docs live in a subfolder. |
+
+Diagrams need a reachable Kroki server at the configured URL — the simplest is a
+local one via Docker. After changing a setting, run **Restart Docs Preview
+Server**.
+
+> Advanced: `microwebstacks.preview.engineSource` and
+> `microwebstacks.preview.enginePath` control where the rendering engine is
+> loaded from. The defaults are fine for most users.

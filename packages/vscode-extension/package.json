@@ -1,8 +1,9 @@
 {
   "name": "microwebstacks-docs-preview",
   "displayName": "MicroWebStacks Docs Preview",
-  "description": "Preview astro-huge-doc rendered Markdown documentation inside VS Code.",
+  "description": "Preview large Markdown documentation sets inside VS Code: file tree, outline, diagrams, and tables.",
   "version": "0.0.3",
+  "icon": "icon.png",
   "engineVersion": "0.0.1",
   "publisher": "microwebstacks",
   "private": true,
