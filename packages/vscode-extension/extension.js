@@ -267,8 +267,10 @@ async function getFreePort() {
 }
 
 function createRuntimeEnv(runtime, port) {
+  const krokiServer = (vscode.workspace.getConfiguration('microwebstacks.preview').get('krokiServer') || '').trim();
   return {
     ...process.env,
+    ...(krokiServer ? {MICROWEBSTACKS_KROKI_SERVER: krokiServer} : {}),
     DOCS_PROFILE: 'lite',
     DOCS_BACKEND: 'json',
     MICROWEBSTACKS_ENGINE_ROOT: runtime.engineRoot,

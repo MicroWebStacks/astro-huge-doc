@@ -232,7 +232,8 @@ never wrong out of the box.
    added `MICROWEBSTACKS_KROKI_SERVER` override (injected into both `kroki_server` and
    `diagram.renderers.kroki.server` so `scripts/diagrams.js` honors it); added `compose.yaml`
    (yuzutech/kroki + mermaid, `18000:8000`). NOTE: root `manifest.yaml` still pins `https://kroki.io`,
-   which (by design) overrides the code default — left untouched as the user's active config. README pending.
+   which (by design) overrides the code default — left untouched as the user's active config. README
+   now documents local Docker, public Kroki, and custom/internal Kroki URL setup.
 5. ✅ **JSON export + backend** — DONE. Added `scripts/export-json.js` (`pnpm export-json`): dumps the
    latest version's documents/items/assets + all asset_info/images to `dataset/json/content.json` and
    materializes every blob (decompressed) to `dataset/json/blobs/<blob_uid>`. Implemented full
@@ -257,7 +258,7 @@ never wrong out of the box.
    loads no native deps. huge-doc: `config.collect.format`, `collect.js` skips sqlite-only steps in json.
    Verified: `format:json` collect (no sqlite) → renders. CS not committed (awaiting review; publish 2.3.0,
    then switch huge-doc to the npm dep).
-9. **Content-addressed static asset serving (unify both profiles)** — IN PROGRESS. Decisions: files at
+9. **Content-addressed static asset serving (unify both profiles)** — DONE. Decisions: files at
    `<store>/blobs/<hash>.<ext>` (immutable → ETag/Cache-Control), served by `express.static`, both
    profiles. Additive/gated sequence:
    - 9a. CS: both writers materialize `<hash>.<ext>` blob files (json writer + sqlite writer finalize).
@@ -268,10 +269,12 @@ never wrong out of the box.
    - 9e. Rework `diagrams.js`: render SVG → `<hash>.svg` file + register asset_info/assets (sqlite) /
      append to content.json (json). json-aware.
    - 9f. Verify both profiles render diagrams+assets as static cached files; retire `/assets` route.
-   Status 2026-06-29: 9b-9f implemented. `/blobs` is the active asset route with immutable
-   cache headers and ETag/304 support in production and Astro dev. The dynamic
-   `src/pages/assets/[...uid].js` route was removed. Fresh JSON diagram rendering
-   still requires a reachable local Kroki endpoint; Docker was not running during validation.
+   Status 2026-06-30: 9b-9f implemented and verified. `/blobs` is the active asset route with
+   immutable cache headers and ETag/304 support in production and Astro dev. The dynamic
+   `src/pages/assets/[...uid].js` route was removed. Diagram rendering is format-aware for both
+   SQLite and JSON backends. Visible blob filenames now use 12-character hash prefixes while the
+   full content hash remains in dataset metadata. `pnpm clean:diagrams` clears generated diagram
+   rows/files so the next `pnpm diagrams` call must render through the configured Kroki endpoint.
 10. Update `stage-engine.js` `EXCLUDED_DEPS` (drop better-sqlite3, duckdb, sharp, plotly, three,
    model-viewer, xlsx, octokit, passport); package + install extension; measure size drop.
 11. Decide duckdb full-fate (keep behind API routes, or drop entirely).

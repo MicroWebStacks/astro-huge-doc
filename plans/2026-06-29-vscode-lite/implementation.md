@@ -34,9 +34,9 @@
 
 ## Notes
 
-- The top-level `handoff.md` note saying content-structure has uncommitted WIP appears stale in this checkout; `../content-structure` is clean and already contains the Step 9a blob materialization code.
 - After Docker Desktop was started, fresh JSON collect plus local Kroki diagram rendering succeeded against `http://localhost:18000`.
 - The public Kroki endpoint was verified with a synthetic Mermaid diagram. Running repository diagram sources against `https://kroki.io` was rejected by the approval layer as workspace-data disclosure, so no workspace diagram content was sent to the public service.
 - `pnpm clean:diagrams` was verified on the JSON/lite path by rendering 6 diagrams, cleaning them to 0 rows/files, then rerendering 6 diagrams through local Docker Kroki with 12-character SVG filenames.
 - A SQLite/full clean-plus-rerender proof was attempted but the approval layer rejected the escalated local-Kroki command because the session hit its usage limit. The SQLite cleanup code parses, and the JSON/lite behavior is verified live.
 - `packages/md-render/package.json` still carries `content-structure: ../content-structure`; this remains the known blocker before publishing the engine package.
+- `handoff.md` was deleted because it was a stale resume snapshot; the current status now lives in `plan.md`, `implementation.md`, and `test.md`.

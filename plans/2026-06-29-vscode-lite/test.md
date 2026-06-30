@@ -86,7 +86,7 @@
   - Actual: passed at `C:\Users\wassi\.vscode\extensions\microwebstacks.microwebstacks-docs-preview-0.0.3\extension.js`.
 - DuckDB/full-fate check.
   - Expected: no runtime/package references to DuckDB or removed dataset SQL UI packages.
-  - Actual: passed; only plan/handoff text mentions `duckdb`, `dataset-sql`, removed ServerTable/API/table paths, Plotly, MUI, or Mantine.
+  - Actual: passed; only planning text mentions `duckdb`, `dataset-sql`, removed ServerTable/API/table paths, Plotly, MUI, or Mantine.
 
 ## Environment Notes
 

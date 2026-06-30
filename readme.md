@@ -3,6 +3,49 @@ Scale doc up to huge amounts, virtually no more limits. Parses multi markdown re
 
 True content based ISR (Incremental Static Regenration) with cache warmup.
 
+# Profiles: lite vs full
+
+One codebase serves two profiles without forking, selected at runtime:
+
+- **full** — the standalone website / warehouse. SQLite backend, versioning,
+  blob store, image optimization, GitHub fetch.
+- **lite** — the engine shipped inside the VS Code extension. JSON data backend,
+  no native dependencies, diagrams rendered by an external Kroki endpoint.
+
+| Switch | full | lite |
+|---|---|---|
+| `DOCS_PROFILE` | `full` | `lite` |
+| `DOCS_BACKEND` | `sqlite` | `json` |
+
+## Feature coverage
+
+| Capability | Full (website) | Lite (extension engine) | Mechanism |
+|---|---|---|---|
+| Standard Markdown (headings, paragraphs, links, lists) | ✅ | ✅ | shared `structure-db` + components |
+| Code highlighting (shiki) | ✅ | ✅ | shared |
+| Diagrams (mermaid, plantuml, blockdiag) | ✅ | ✅ | external Kroki endpoint (`MICROWEBSTACKS_KROKI_SERVER`) |
+| File-tree + TOC viewer | ✅ | ✅ | shared layout components |
+| Markdown tables | ✅ | ✅ | `@tanstack/react-table` (only surviving react-table) |
+| Images in Markdown | ✅ optimized | ✅ passthrough | Astro image service swap (sharp in full, passthrough in lite) |
+| Gallery (PhotoSwipe) | ✅ | ✅ | dimensions baked into JSON / probed |
+| Content-addressed static assets `/blobs/<hash>.<ext>` | ✅ | ✅ | immutable cache + ETag/304, both profiles |
+| Data backend | SQLite (+ versioning, blob store) | JSON files | `DOCS_BACKEND` dispatcher (`src/libs/structure-db.js`) |
+| 3D / model-viewer | ✅ | ❌ | profile-gated island (stubbed out of the lite build) |
+| xlsx ingestion | ✅ | ❌ | collect-time only |
+| Image optimization (sharp) | ⚠️ optional | ❌ | full-only |
+| GitHub fetch / auth (octokit, passport) | ✅ | ❌ | server-only, full |
+| Native deps (better-sqlite3, sharp) | better-sqlite3 only | ❌ none | dynamic import + `EXCLUDED_DEPS` |
+
+**Dropped from both profiles:** Dataset SQL (duckdb) and Plotly charts, plus the
+MUI and Mantine UI kits that rode on them. May return later as full-only features.
+
+Principle: **lite = render what's on disk; full = generate, store, optimize.**
+Anything that is *generation* (collect, xlsx) is full-only; *rendering* is shared.
+The lite build loads no native dependencies: data comes from a `content.json`
+export plus a `blobs/` folder, images use Astro's passthrough image service, and
+`model-viewer` is aliased to an empty stub (dropping its ~980 kB chunk — the lite
+`dist/client` is ~634 kB).
+
 # Specification
 ## overview
 - list of github repo and folders to fetch
