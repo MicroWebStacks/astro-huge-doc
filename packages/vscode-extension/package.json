@@ -2,7 +2,7 @@
   "name": "microwebstacks-docs-preview",
   "displayName": "MicroWebStacks Docs Preview",
   "description": "Preview large Markdown documentation sets inside VS Code: file tree, outline, diagrams, and tables.",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "icon": "icon.png",
   "engineVersion": "0.0.2",
   "publisher": "microwebstacks",

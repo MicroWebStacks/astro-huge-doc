@@ -78,6 +78,16 @@ cleans old ones up best-effort.
 Always **npm publish the engine before uploading the extension** that pins it —
 otherwise fresh installs 404 trying to fetch a nonexistent engine version.
 
+## Never reuse a version number
+
+One version = one binary, forever — even for local-only rebuilds. If you change
+a single line after packaging, bump the version before repackaging. VS Code only
+offers an update when the Marketplace version is **strictly greater** than the
+installed one, so a fixed build re-labeled with an already-shipped version is
+invisible to every existing install, and the Marketplace refuses re-uploads of
+the same version anyway. (Learned 2026-07-02: two different 0.0.5 builds existed;
+the unfixed one reached the Marketplace, so the fix had to ship as 0.0.6.)
+
 ## Git
 
 Commit and push independently of the above (GitHub is not part of either publish
