@@ -126,8 +126,39 @@ function isEngineRoot(candidate) {
   );
 }
 
+// Each engine version gets its own prefix. In-place npm upgrades of a shared
+// 'engine' dir fail with EBUSY on Windows when an orphaned preview server
+// still holds the old folder; a fresh per-version folder never collides.
+function getEnginePrefix(context) {
+  return path.join(context.globalStorageUri.fsPath, `engine-${ENGINE_VERSION}`);
+}
+
 function getInstalledEngineRoot(context) {
-  return path.join(context.globalStorageUri.fsPath, 'engine', 'node_modules', '@microwebstacks', 'md-render');
+  return path.join(getEnginePrefix(context), 'node_modules', '@microwebstacks', 'md-render');
+}
+
+// Best-effort removal of previous engine installs (including the legacy
+// unversioned 'engine' dir). A locked folder is left behind and retried on a
+// later run; it never blocks the active engine.
+async function cleanupOldEngines(context) {
+  const storageRoot = context.globalStorageUri.fsPath;
+  const keep = `engine-${ENGINE_VERSION}`;
+  let entries = [];
+  try {
+    entries = await fsp.readdir(storageRoot);
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if ((entry === 'engine' || entry.startsWith('engine-')) && entry !== keep) {
+      try {
+        await fsp.rm(path.join(storageRoot, entry), {recursive: true, force: true});
+        log(`Removed old engine install ${entry}.`);
+      } catch (error) {
+        log(`Could not remove old engine install ${entry} (${error.message}); will retry on a later run.`);
+      }
+    }
+  }
 }
 
 function installedEngineVersion(engineRoot) {
@@ -153,7 +184,7 @@ function isUsableInstalledEngine(engineRoot) {
 }
 
 function installEngine(context) {
-  const enginePrefix = path.join(context.globalStorageUri.fsPath, 'engine');
+  const enginePrefix = getEnginePrefix(context);
   fs.mkdirSync(enginePrefix, {recursive: true});
   log(`Installing ${ENGINE_PACKAGE}@${ENGINE_VERSION} into ${enginePrefix} (this runs once and needs network access).`);
   return new Promise((resolve, reject) => {
@@ -214,6 +245,7 @@ async function resolveEngine(context) {
   await installEngine(context);
   if (isUsableInstalledEngine(installed)) {
     log(`Using installed engine at ${installed}.`);
+    await cleanupOldEngines(context);
     return installed;
   }
   throw new Error(`Engine ${ENGINE_PACKAGE}@${ENGINE_VERSION} was installed but could not be located at ${installed}.`);
