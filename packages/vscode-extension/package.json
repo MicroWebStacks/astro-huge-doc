@@ -2,11 +2,11 @@
   "name": "microwebstacks-docs-preview",
   "displayName": "MicroWebStacks Docs Preview",
   "description": "Preview large Markdown documentation sets inside VS Code: file tree, outline, diagrams, and tables.",
-  "version": "0.0.3",
+  "version": "0.0.5",
   "icon": "icon.png",
-  "engineVersion": "0.0.1",
+  "engineVersion": "0.0.2",
   "publisher": "microwebstacks",
-  "private": true,
+  "private": false,
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -50,12 +50,12 @@
             "registry"
           ],
           "enumDescriptions": [
-            "Prefer a local workspace checkout, then a previously installed engine, then install from the npm registry.",
-            "Only use a local workspace checkout or enginePath. Never contacts the npm registry (fully offline).",
-            "Skip local checkout discovery and use (or install) the published @microwebstacks/md-render engine."
+            "Use enginePath if set (or a source checkout when the extension runs from one), else a previously installed engine, else install from the npm registry.",
+            "Only use enginePath (or a source checkout when the extension runs from one). Never contacts the npm registry (fully offline).",
+            "Skip local discovery and use (or install) the published @microwebstacks/md-render engine."
           ],
           "default": "auto",
-          "description": "Where the docs rendering engine is sourced from. 'auto' always falls back to a local checkout before installing from the registry."
+          "description": "Where the docs rendering engine is sourced from. For an installed extension, local discovery requires enginePath pointing at an astro-huge-doc checkout; 'auto' otherwise installs the engine from the npm registry on first use."
         },
         "microwebstacks.preview.enginePath": {
           "type": "string",

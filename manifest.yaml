@@ -49,5 +49,5 @@ render:
     langs: ['javascript','js','python','yaml', 'markdown', 'text']
 html_cache:
   exclude_paths:
-    - /assets/
+    - /blobs/
     - .well-known/

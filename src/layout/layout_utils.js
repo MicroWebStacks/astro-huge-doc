@@ -1,6 +1,4 @@
-import {join} from 'path';
-import {config} from '@/config.js';
-import {openDatabase} from 'content-structure/src/sqlite_utils/index.js';
+import {getDocuments, getSourceEntries} from '@/libs/structure-db.js';
 
 function cloneHeading(heading) {
     const label = (heading.label ?? heading.body_text ?? '').trim();
@@ -126,48 +124,6 @@ function segmentCount(url) {
         return 0;
     }
     return url.split('/').filter(Boolean).length;
-}
-
-function loadDocuments() {
-    const db = openDatabase(config.collect.db_path, {readonly: true});
-    // Scope the nav to the active build. The documents table accumulates a row
-    // per doc per version, so without this filter the menu shows every historical
-    // build's docs (stale/duplicated entries).
-    return db
-        .prepare('SELECT url, title, level, "order" AS sort_order, url_type FROM documents WHERE version_id = ? ORDER BY level, sort_order, url')
-        .all(config.collect.version_id);
-}
-
-function loadSourceEntries() {
-    const db = openDatabase(config.collect.db_path, {readonly: true});
-    try {
-        const table = db
-            .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'source_entries'")
-            .get();
-        if (!table) {
-            return [];
-        }
-        return db
-            .prepare(`
-                SELECT
-                    path,
-                    parent_path,
-                    name,
-                    entry_type,
-                    ext,
-                    document_url,
-                    document_title,
-                    document_url_type,
-                    sort_order
-                FROM source_entries
-                WHERE version_id = ?
-                ORDER BY parent_path, entry_type, name
-            `)
-            .all(config.collect.version_id);
-    } catch (error) {
-        console.warn(`source tree menu unavailable: ${error.message}`);
-        return [];
-    }
 }
 
 /* The set of top-level names that are real folders (sections of their own).
@@ -513,8 +469,8 @@ function buildSectionMenuFromSourceEntries(sourceEntries, pathname) {
 }
 
 function buildNavigationMenus(pathname) {
-    const docs = loadDocuments();
-    const sourceEntries = loadSourceEntries();
+    const docs = getDocuments();
+    const sourceEntries = getSourceEntries();
     return {
         appBarMenu: buildAppBarMenuFromDocs(docs, pathname),
         sectionMenu: sourceEntries.length

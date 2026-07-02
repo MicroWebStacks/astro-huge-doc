@@ -102,6 +102,22 @@ function findNodeExecutable(runtime) {
 const ENGINE_PACKAGE = '@microwebstacks/md-render';
 const ENGINE_VERSION = extensionPackage.engineVersion || extensionPackage.version;
 
+// With shell:true, cmd.exe splits unquoted spaces (e.g. C:\Users\John Doe\...).
+// Windows paths cannot contain double quotes, so wrapping is sufficient.
+function quoteForShell(value) {
+  return /\s/.test(value) ? `"${value}"` : value;
+}
+
+function spawnLogged(executable, args, options) {
+  const useShell = process.platform === 'win32';
+  const command = useShell ? quoteForShell(executable) : executable;
+  const finalArgs = useShell ? args.map(quoteForShell) : args;
+  const child = cp.spawn(command, finalArgs, {...options, shell: useShell, windowsHide: true});
+  child.stdout.on('data', (chunk) => output.append(chunk.toString()));
+  child.stderr.on('data', (chunk) => output.append(chunk.toString()));
+  return child;
+}
+
 function isEngineRoot(candidate) {
   return (
     exists(path.join(candidate, 'server', 'server.js')) &&
@@ -114,6 +130,28 @@ function getInstalledEngineRoot(context) {
   return path.join(context.globalStorageUri.fsPath, 'engine', 'node_modules', '@microwebstacks', 'md-render');
 }
 
+function installedEngineVersion(engineRoot) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(engineRoot, 'package.json'), 'utf8')).version ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// A previously installed engine is only reusable when it matches the version
+// this extension release expects; otherwise npm install updates it in place.
+function isUsableInstalledEngine(engineRoot) {
+  if (!isEngineRoot(engineRoot)) {
+    return false;
+  }
+  const version = installedEngineVersion(engineRoot);
+  if (version !== ENGINE_VERSION) {
+    log(`Installed engine version ${version ?? 'unknown'} does not match expected ${ENGINE_VERSION}; reinstalling.`);
+    return false;
+  }
+  return true;
+}
+
 function installEngine(context) {
   const enginePrefix = path.join(context.globalStorageUri.fsPath, 'engine');
   fs.mkdirSync(enginePrefix, {recursive: true});
@@ -122,14 +160,14 @@ function installEngine(context) {
     const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm';
     // --omit=optional skips content-structure's optional native deps
     // (better-sqlite3, sharp), which the lite/JSON engine never loads.
-    const child = cp.spawn(
+    const child = spawnLogged(
       npmExecutable,
       ['install', `${ENGINE_PACKAGE}@${ENGINE_VERSION}`, '--prefix', enginePrefix, '--no-audit', '--no-fund', '--omit=optional'],
-      {cwd: enginePrefix, env: process.env, shell: process.platform === 'win32', windowsHide: true}
+      {cwd: enginePrefix, env: process.env}
     );
-    child.stdout.on('data', (chunk) => output.append(chunk.toString()));
-    child.stderr.on('data', (chunk) => output.append(chunk.toString()));
-    child.on('error', reject);
+    child.on('error', (error) => {
+      reject(new Error(`Could not run npm (${error.message}). The docs preview needs Node.js and npm installed and on PATH.`));
+    });
     child.on('exit', (code) => {
       if (code === 0) {
         resolve();
@@ -168,17 +206,17 @@ async function resolveEngine(context) {
   }
 
   const installed = getInstalledEngineRoot(context);
-  if (isEngineRoot(installed)) {
+  if (isUsableInstalledEngine(installed)) {
     log(`Using installed engine at ${installed}.`);
     return installed;
   }
 
   await installEngine(context);
-  if (isEngineRoot(installed)) {
+  if (isUsableInstalledEngine(installed)) {
     log(`Using installed engine at ${installed}.`);
     return installed;
   }
-  throw new Error(`Engine ${ENGINE_PACKAGE} was installed but could not be located at ${installed}.`);
+  throw new Error(`Engine ${ENGINE_PACKAGE}@${ENGINE_VERSION} was installed but could not be located at ${installed}.`);
 }
 
 function resolveDocsRoot(workspaceRoot, manifestPath) {
@@ -293,15 +331,13 @@ function runNodeScript(runtime, scriptPath, env) {
     const nodeExecutable = findNodeExecutable(runtime);
     log(`Running ${scriptPath}`);
     log(`Node executable: ${nodeExecutable}`);
-    const child = cp.spawn(nodeExecutable, [scriptPath], {
+    const child = spawnLogged(nodeExecutable, [scriptPath], {
       cwd: runtime.engineRoot,
-      env,
-      shell: process.platform === 'win32',
-      windowsHide: true
+      env
     });
-    child.stdout.on('data', (chunk) => output.append(chunk.toString()));
-    child.stderr.on('data', (chunk) => output.append(chunk.toString()));
-    child.on('error', reject);
+    child.on('error', (error) => {
+      reject(new Error(`Could not run Node.js (${error.message}). The docs preview needs Node.js 18+ installed and on PATH.`));
+    });
     child.on('exit', (code) => {
       if (code === 0) {
         resolve();
@@ -321,14 +357,10 @@ function startServer(runtime, port, env) {
   const nodeExecutable = findNodeExecutable(runtime);
   log(`Starting preview server on http://127.0.0.1:${port}/`);
   log(`Node executable: ${nodeExecutable}`);
-  const child = cp.spawn(nodeExecutable, [path.join('server', 'server.js')], {
+  const child = spawnLogged(nodeExecutable, [path.join('server', 'server.js')], {
     cwd: runtime.engineRoot,
-    env,
-    shell: process.platform === 'win32',
-    windowsHide: true
+    env
   });
-  child.stdout.on('data', (chunk) => output.append(chunk.toString()));
-  child.stderr.on('data', (chunk) => output.append(chunk.toString()));
   child.on('exit', (code, signal) => {
     if (serverProcess === child) {
       log(`Preview server exited (code: ${code}, signal: ${signal}).`);
@@ -339,7 +371,7 @@ function startServer(runtime, port, env) {
   serverProcess = child;
 }
 
-async function waitForServer(url, timeoutMs = 10000) {
+async function waitForServer(url, timeoutMs = 30000) {
   const deadline = Date.now() + timeoutMs;
   let lastError = null;
   while (Date.now() < deadline) {
@@ -374,22 +406,30 @@ async function ensureServer(context) {
   if (serverProcess && serverState) {
     return serverState;
   }
-  const runtime = await buildRuntime(context);
-  const port = await getFreePort();
-  const env = createRuntimeEnv(runtime, port);
-  await collect(runtime, env);
-  startServer(runtime, port, env);
-  const browserUrl = `http://127.0.0.1:${port}/`;
-  await waitForServer(browserUrl);
-  serverState = {
-    ...runtime,
-    port,
-    browserUrl,
-    webviewUrl: `http://localhost:${port}/`,
-    env
-  };
-  ensureWatcher(context, serverState);
-  return serverState;
+  return vscode.window.withProgress(
+    {location: vscode.ProgressLocation.Notification, title: 'MicroWebStacks Docs'},
+    async (progress) => {
+      progress.report({message: 'resolving engine (first run downloads it, which can take a few minutes)…'});
+      const runtime = await buildRuntime(context);
+      const port = await getFreePort();
+      const env = createRuntimeEnv(runtime, port);
+      progress.report({message: 'indexing documentation…'});
+      await collect(runtime, env);
+      progress.report({message: 'starting preview server…'});
+      startServer(runtime, port, env);
+      const browserUrl = `http://127.0.0.1:${port}/`;
+      await waitForServer(browserUrl);
+      serverState = {
+        ...runtime,
+        port,
+        browserUrl,
+        webviewUrl: `http://localhost:${port}/`,
+        env
+      };
+      ensureWatcher(context, serverState);
+      return serverState;
+    }
+  );
 }
 
 function ensureWatcher(context, state) {

@@ -32,7 +32,7 @@ function load() {
     }
     const file = join(config.collect.json_dir, 'content.json');
     if (!existsSync(file)) {
-        throw new Error(`structure-db-json: missing dataset at ${file}. Run \`pnpm export-json\` first.`);
+        throw new Error(`structure-db-json: missing dataset at ${file}. Run a JSON collect (DOCS_BACKEND=json pnpm collect) or \`pnpm export-json\` first.`);
     }
     dataset = JSON.parse(readFileSync(file, 'utf-8'));
 
@@ -348,6 +348,35 @@ function annotateHeadingSections(items) {
     return headings;
 }
 
+/* Navigation rows for the layout menus. The exported dataset holds a single
+   version, so no version filtering is needed; mirrors the sqlite backend's
+   row shape (sort_order alias) and ordering (level, sort_order, url). */
+function getDocuments(versionId = null) {
+    load();
+    return (dataset.documents ?? [])
+        .map((doc) => ({
+            url: doc.url ?? '',
+            title: doc.title ?? '',
+            level: doc.level ?? 0,
+            sort_order: doc.order ?? 0,
+            url_type: doc.url_type ?? null
+        }))
+        .sort((a, b) => {
+            const level = (a.level ?? 0) - (b.level ?? 0);
+            if (level !== 0) return level;
+            const order = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+            if (order !== 0) return order;
+            return String(a.url ?? '').localeCompare(String(b.url ?? ''));
+        });
+}
+
+/* The source tree index is built into SQLite only (scripts/source-tree.js is
+   skipped in json mode); returning [] makes the layout fall back to the
+   docs-derived section menu. */
+function getSourceEntries(versionId = null) {
+    return [];
+}
+
 function getFirstDocument(versionId = null) {
     load();
     const docs = [...(dataset.documents ?? [])];
@@ -393,6 +422,8 @@ function getEntry(match) {
 export {
     getEntry,
     getFirstDocument,
+    getDocuments,
+    getSourceEntries,
     getAssetByUIDVersion,
     getAssetInfoBlob_version,
     getAssetInfoBlob_blob,

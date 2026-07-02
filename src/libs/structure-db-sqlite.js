@@ -576,6 +576,61 @@ function getFirstDocument(versionId = null) {
     return normalizeDocumentRow(db.prepare(sql).get(...params));
 }
 
+/* Navigation rows for the layout menus. Scoped to the active build: the
+   documents table accumulates a row per doc per version, so without the
+   filter the menu would show every historical build's docs. */
+function getDocuments(versionId = null) {
+    const db = ensureDb();
+    let resolvedVersion = versionId ?? config.collect.version_id ?? null;
+    if (!resolvedVersion) {
+        resolvedVersion = db
+            .prepare('SELECT version_id FROM documents ORDER BY version_id DESC LIMIT 1')
+            .get()?.version_id ?? null;
+    }
+    if (!resolvedVersion) {
+        return [];
+    }
+    return db
+        .prepare('SELECT url, title, level, "order" AS sort_order, url_type FROM documents WHERE version_id = ? ORDER BY level, sort_order, url')
+        .all(resolvedVersion);
+}
+
+/* Source-tree rows for the file-tree menu (built by scripts/source-tree.js;
+   sqlite backend only — the json backend returns [] and the layout falls back
+   to the docs-derived menu). */
+function getSourceEntries(versionId = null) {
+    const db = ensureDb();
+    const resolvedVersion = versionId ?? config.collect.version_id ?? null;
+    try {
+        const table = db
+            .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'source_entries'")
+            .get();
+        if (!table) {
+            return [];
+        }
+        return db
+            .prepare(`
+                SELECT
+                    path,
+                    parent_path,
+                    name,
+                    entry_type,
+                    ext,
+                    document_url,
+                    document_title,
+                    document_url_type,
+                    sort_order
+                FROM source_entries
+                WHERE version_id = ?
+                ORDER BY parent_path, entry_type, name
+            `)
+            .all(resolvedVersion);
+    } catch (error) {
+        console.warn(`source tree menu unavailable: ${error.message}`);
+        return [];
+    }
+}
+
 function getAssetBlob(assetUid, versionId = null) {
     if (!assetUid) {
         return null;
@@ -617,8 +672,10 @@ function getAssetUrl(assetUid, versionId = null) {
 }
 
 export {
-    getEntry, 
+    getEntry,
     getFirstDocument,
+    getDocuments,
+    getSourceEntries,
     getAssetByUIDVersion,
     getAssetInfoBlob_version,
     getAssetInfoBlob_blob,

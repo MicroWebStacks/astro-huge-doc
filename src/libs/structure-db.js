@@ -27,6 +27,8 @@ const impl =
 export const {
     getEntry,
     getFirstDocument,
+    getDocuments,
+    getSourceEntries,
     getAssetByUIDVersion,
     getAssetInfoBlob_version,
     getAssetInfoBlob_blob,

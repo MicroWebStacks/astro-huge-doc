@@ -4,6 +4,33 @@
 
 [######] Steps 9-11 done - static blobs, lite engine staging, extension package/install, and DuckDB confirmation complete.
 
+## 2026-07-02 — Marketplace-blocker fix (dispatcher bypass) + extension hardening
+
+Root cause of the broken marketplace install, found by smoke-testing the registry-installed
+engine (`--omit=optional`, no repo tree above it): `src/layout/layout_utils.js` statically imported
+`content-structure/src/sqlite_utils/index.js` (top-level `import 'better-sqlite3'`) and queried
+SQLite directly — the one consumer that bypassed the structure-db dispatcher. Every SSR page
+500'd with ERR_MODULE_NOT_FOUND in the lite engine. Local tests never caught it because
+better-sqlite3 always resolves inside the repo tree.
+
+- Added `getDocuments(versionId)` / `getSourceEntries(versionId)` to both structure-db backends
+  (json: documents from `content.json`, source entries `[]` → layout falls back to the
+  docs-derived menu) and re-exported them through the dispatcher.
+- `layout_utils.js` now imports only from `@/libs/structure-db.js`; no direct DB access remains
+  outside the sqlite backend.
+- extension.js: installed engine is now reused only when its version matches `engineVersion`
+  (`isUsableInstalledEngine`); previously an old engine was kept forever.
+- extension.js: win32 spawns quote paths with spaces (`spawnLogged`), npm/node spawn errors say
+  Node.js 18+/npm on PATH is required, first-run install/collect/server-start shows a progress
+  notification, `waitForServer` timeout 10s → 30s.
+- Extension `package.json`: version 0.0.5, `engineVersion` 0.0.2, accurate `engineSource`
+  descriptions (local discovery for an installed extension requires `enginePath`).
+- Extension README: Requirements section (Node 18+/npm; Kroki optional).
+- Stale fixes: root `manifest.yaml` html_cache exclude `/assets/` → `/blobs/`;
+  structure-db-json missing-dataset error now suggests the json collect, not only export-json.
+- Publish chain note: `content-structure` shipped as **2.2.4** (not the planned 2.3.0);
+  `@microwebstacks/md-render@0.0.1` is live; the local-path-dependency blocker below is resolved.
+
 ## Changes
 
 - Added `src/libs/blob-files.js` with the shared `<hash>.<ext>` filename and `/blobs/...` URL formula.

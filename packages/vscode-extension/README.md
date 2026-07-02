@@ -12,6 +12,15 @@ documentation site, not a single-file preview.
 - **🎨 Syntax highlighting** — fenced code blocks highlighted with Shiki.
 - **🖼️ Image gallery** — image sets open in a zoomable lightbox.
 
+## Requirements
+
+- **Node.js 18+** (with npm) installed and on your PATH — the preview runs a local
+  rendering engine with it. On first use the engine (~a few MB download) is
+  installed automatically from the npm registry; later runs are offline.
+- Optional: a reachable [Kroki](https://kroki.io) server if your docs contain
+  diagrams (see Configuration below). Pages render fine without one — diagrams
+  are simply skipped.
+
 ## Getting started
 
 1. Open a folder that contains your Markdown documentation.
