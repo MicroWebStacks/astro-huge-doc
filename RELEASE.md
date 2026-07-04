@@ -7,7 +7,7 @@ exactly what to release:
 |---|---|---|---|
 | **Engine** (the renderer) | `src/`, `server/`, `scripts/`, `config.js` | `@microwebstacks/md-render` (staged build artifact in `packages/md-render/`, gitignored) | npm registry |
 | **Extension** (the thin VS Code launcher) | `packages/vscode-extension/` (`extension.js`, `package.json`, `README.md`) | `markdown-site-preview.vsix` | VS Code Marketplace |
-| **Repo** | everything | git commits | GitHub (branch `vscode_lite` → `main`) |
+| **Repo** | everything | git commits | GitHub (branch `main`) |
 
 The extension does not contain the renderer. At runtime it npm-installs the
 engine version pinned by `engineVersion` in `packages/vscode-extension/package.json`

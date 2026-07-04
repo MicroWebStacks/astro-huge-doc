@@ -2,7 +2,7 @@
   "name": "markdown-site-preview",
   "displayName": "Markdown Site Preview",
   "description": "Browse your whole Markdown documentation like a website — Mermaid/PlantUML diagrams, tables, file tree and outline navigation.",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "icon": "icon.png",
   "galleryBanner": {
     "color": "#1E1B4B",
@@ -19,7 +19,7 @@
     "site",
     "kroki"
   ],
-  "engineVersion": "0.0.3",
+  "engineVersion": "0.0.4",
   "publisher": "microwebstacks",
   "private": false,
   "license": "MIT",
@@ -28,10 +28,15 @@
     "url": "https://github.com/MicroWebStacks/astro-huge-doc.git",
     "directory": "packages/vscode-extension"
   },
+  "homepage": "https://github.com/MicroWebStacks/astro-huge-doc/tree/main/packages/vscode-extension#readme",
+  "bugs": {
+    "url": "https://github.com/MicroWebStacks/astro-huge-doc/issues"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },
   "categories": [
+    "Visualization",
     "Other"
   ],
   "main": "./extension.js",

@@ -6,7 +6,7 @@ documentation site, not a single-file preview.
 </p>
 
 <p align="center">
-<img src="images/markdown-site-preview.png" alt="Markdown source in the editor next to the rendered documentation site: pages tree, mermaid sequence diagram, data table, and outline with table and diagram markers" width="100%"/>
+<img src="https://raw.githubusercontent.com/MicroWebStacks/astro-huge-doc/main/packages/vscode-extension/images/markdown-site-preview.png" alt="Markdown source in the editor next to the rendered documentation site: pages tree, mermaid sequence diagram, data table, and outline with table and diagram markers" width="100%"/>
 </p>
 
 ## Features
