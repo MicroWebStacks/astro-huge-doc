@@ -23,11 +23,12 @@ const PACKAGE_NAME = '@microwebstacks/md-render';
 function parseArgs(argv) {
   const args = {otp: null, version: null, publishOnly: false};
   for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i] === '--otp') {
-      args.otp = argv[++i];
-    } else if (argv[i] === '--version') {
-      args.version = argv[++i];
-    } else if (argv[i] === '--publish-only') {
+    const [flag, inline] = argv[i].split('=', 2);
+    if (flag === '--otp') {
+      args.otp = inline ?? argv[++i];
+    } else if (flag === '--version') {
+      args.version = inline ?? argv[++i];
+    } else if (flag === '--publish-only') {
       args.publishOnly = true;
     }
   }

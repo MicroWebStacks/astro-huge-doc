@@ -8,11 +8,11 @@
 2. Publish (OTP = fresh code from your npm authenticator; `npm login` first if logged out):
 
 ```powershell
-node scripts/release-engine.js --otp <code>
+pnpm engine:release --otp=<code>
 ```
 
 If the OTP expires while the build runs, rerun with a fresh code:
-`node scripts/release-engine.js --otp <fresh-code> --publish-only`
+`pnpm engine:release --otp=<fresh-code> --publish-only`
 
 ### Extension
 
@@ -20,7 +20,7 @@ If the OTP expires while the build runs, rerun with a fresh code:
 2. Package (checks the pinned engine is on npm, then builds the vsix):
 
 ```powershell
-node scripts/release-extension.js
+pnpm ext:release
 ```
 
 3. Test locally: `pnpm ext:install`, reload VS Code, run **Markdown Site Preview: Open Preview** in a docs folder.
@@ -59,7 +59,7 @@ into VS Code's globalStorage (`engine-<version>/`). So:
 
 Always **npm publish the engine before uploading the extension** that pins it —
 otherwise fresh installs 404 trying to fetch a nonexistent engine version.
-`release-extension.js` enforces this check.
+`pnpm ext:release` enforces this check.
 
 ## Never reuse a version number
 
@@ -70,7 +70,7 @@ installed one, so a fixed build re-labeled with an already-shipped version is
 invisible to every existing install, and the Marketplace refuses re-uploads of
 the same version anyway. (Learned 2026-07-02: two different 0.0.5 builds existed;
 the unfixed one reached the Marketplace, so the fix had to ship as 0.0.6.)
-`release-engine.js` refuses versions that are already on npm.
+`pnpm engine:release` refuses versions that are already on npm.
 
 ## Clean-machine smoke gate (recommended for engine releases)
 
@@ -84,7 +84,7 @@ installed package (`DOCS_PROFILE=lite`, `DOCS_BACKEND=json`,
 
 The repo `.env` pins `DOCS_PROFILE=full` and OVERRIDES the shell env (see
 `src/libs/load-env.js`). Lite builds must point `MICROWEBSTACKS_WORKSPACE_ROOT`
-at an empty directory so the profile takes effect — `release-engine.js` does
+at an empty directory so the profile takes effect — `pnpm engine:release` does
 this automatically.
 
 ## Marketplace notes
