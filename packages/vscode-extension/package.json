@@ -44,7 +44,8 @@
     "commands": [
       {
         "command": "microwebstacks.previewDocs",
-        "title": "Markdown Site Preview: Open Preview"
+        "title": "Markdown Site Preview: Open Preview",
+        "icon": "$(globe)"
       },
       {
         "command": "microwebstacks.openDocsInBrowser",
@@ -59,6 +60,22 @@
         "title": "Markdown Site Preview: Stop Server"
       }
     ],
+    "keybindings": [
+      {
+        "command": "microwebstacks.previewDocs",
+        "key": "ctrl+k m",
+        "when": "editorLangId == markdown"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "microwebstacks.previewDocs",
+          "when": "editorLangId == markdown",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": {
       "title": "Markdown Site Preview",
       "properties": {
@@ -90,7 +107,7 @@
         "microwebstacks.preview.krokiServer": {
           "type": "string",
           "default": "http://localhost:18000",
-          "markdownDescription": "Base URL of the Kroki-compatible server that renders diagrams (mermaid, plantuml, blockdiag). The preview POSTs diagram source to this URL. Use a local Docker Kroki (`http://localhost:18000`), the public service (`https://kroki.io`), or your organization's internal endpoint. Leave blank to fall back to the workspace `.env` or environment."
+          "markdownDescription": "Base URL of the Kroki-compatible server that renders PlantUML and BlockDiag diagrams. Mermaid renders client-side in the preview. Use a local Docker Kroki (`http://localhost:18000`), the public service (`https://kroki.io`), or your organization's internal endpoint. Leave blank to fall back to the workspace `.env` or environment."
         }
       }
     }

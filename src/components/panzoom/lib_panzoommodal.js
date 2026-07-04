@@ -45,6 +45,12 @@ async function appendShadowSVG(center,svg){
   return new_svg
 }
 
+function findContainer(center){
+  return center.closest('[data-panzoom-root="true"]')
+    ?? center.closest('.container.panzoom')
+    ?? center.parentElement?.parentElement?.parentElement?.parentElement
+}
+
 function serializeAndDeserializeSVG(svg) {
   const serializer = new XMLSerializer();
   const svgStr = serializer.serializeToString(svg);
@@ -85,7 +91,30 @@ function waitForObjectSvg(obj, timeout = 5000){
 }
 
 async function cloneAsset(center){
-    const container = center.parentElement.parentElement.parentElement.parentElement
+    const container = findContainer(center)
+    if(!container){
+      return {is_svg: false, svg_img: null}
+    }
+    const sourceSelector = center.getAttribute("data-source-selector")
+    if(sourceSelector){
+      const source = container.querySelector(sourceSelector)
+      const tagName = source?.tagName?.toLowerCase()
+      if(tagName === "svg"){
+        return {is_svg: true, svg_img: await appendShadowSVG(center, source)}
+      }
+      if(tagName === "img"){
+        const svg_img = source.cloneNode(true)
+        center.appendChild(svg_img)
+        return {is_svg: false, svg_img}
+      }
+      if(tagName === "object"){
+        const svg = await waitForObjectSvg(source)
+        if(!svg){
+          return {is_svg: true, svg_img: null}
+        }
+        return {is_svg: true, svg_img: await appendShadowSVG(center, svg)}
+      }
+    }
     const obj = container.querySelector("object")
     let is_svg = false
     let svg
@@ -126,7 +155,10 @@ function window_url_add_zoom(zoom){
   window.history.pushState({}, "", currentUrl.toString());
 }
 function window_url_add_modal(center){
-      const container = center.parentElement.parentElement.parentElement.parentElement
+    const container = findContainer(center)
+    if(!container){
+      return
+    }
     let modal_name
     const data_name = container.getAttribute("data-name")
     if(data_name != "diagram.svg"){
@@ -145,7 +177,10 @@ function is_url_modal(center){
   const params = new URL(location.href).searchParams;
   const modal_name = params.get('modal');
   if(modal_name){
-    const container = center.parentElement.parentElement.parentElement.parentElement
+    const container = findContainer(center)
+    if(!container){
+      return false
+    }
     const pz_name = container.getAttribute("data-name")
     return (modal_name == pz_name)
   }
@@ -224,8 +259,8 @@ async function openModal(event){
       img.remove()
     }else{// SVG - remove the parent div and leave the shadowRoot for reuse
       const shadowRoot = center.shadowRoot
-      const svg = shadowRoot.querySelector("svg")
-      svg.parentElement.remove()
+      const svg = shadowRoot?.querySelector("svg")
+      svg?.parentElement?.remove()
     }
     window_url_remove_modal()
   }

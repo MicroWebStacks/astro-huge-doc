@@ -33,7 +33,7 @@ diagram:
   languages:
     plantuml: kroki
     blockdiag: kroki
-    mermaid: kroki
+    mermaid: client # browser-rendered; Kroki remains for PlantUML/BlockDiag
   aliases:
     puml: plantuml
     mmd: mermaid

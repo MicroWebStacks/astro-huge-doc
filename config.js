@@ -33,7 +33,7 @@ const DEFAULT_MANIFEST = {
         languages: {
             plantuml: 'kroki',
             blockdiag: 'kroki',
-            mermaid: 'kroki'
+            mermaid: 'client'
         },
         aliases: {
             puml: 'plantuml',

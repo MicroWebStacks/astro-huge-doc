@@ -49,6 +49,7 @@ const isImg = !isSvg
 
 ---
 <div class={`container panzoom ${center?"center":""} ${showOpenButton ? 'with-open-button' : 'without-open-button'}`}
+      data-panzoom-root="true"
       data-type={isSvg?"svg":"img"}
       data-name={data_name}
       data-sid={hash}

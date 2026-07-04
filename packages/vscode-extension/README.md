@@ -1,7 +1,7 @@
 <h1 align="center">Markdown Site Preview</h1>
 
 <p align="center">
-Browse your whole Markdown documentation like a website — rendered as a real
+Browse your whole Markdown documentation like a website - rendered as a real
 documentation site, not a single-file preview.
 </p>
 
@@ -11,20 +11,21 @@ documentation site, not a single-file preview.
 
 ## Features
 
-- **File tree** — navigate a whole multi-folder docs repo from a sidebar, not one file at a time.
-- **Outline / table of contents** — jump between headings of the current page, with per-section table and diagram markers.
-- **Diagrams** — mermaid, plantuml, and blockdiag blocks render to SVG.
-- **Tables** — Markdown tables become sortable, readable data tables.
-- **Syntax highlighting** — fenced code blocks highlighted with Shiki.
+- **File tree** - navigate a whole multi-folder docs repo from a sidebar, not one file at a time.
+- **Outline / table of contents** - jump between headings of the current page, with per-section table and diagram markers.
+- **Diagrams** - Mermaid renders client-side; PlantUML and BlockDiag render to SVG through Kroki.
+- **Tables** - Markdown tables become sortable, readable data tables.
+- **Syntax highlighting** - fenced code blocks highlighted with Shiki.
 
 ## Requirements
 
-- **Node.js 18+** (with npm) installed and on your PATH — the preview runs a local
+- **Node.js 18+** (with npm) installed and on your PATH - the preview runs a local
   rendering engine with it. On first use the engine (~a few MB download) is
   installed automatically from the npm registry; later runs are offline.
 - Optional: a reachable [Kroki](https://kroki.io) server if your docs contain
-  diagrams (see Configuration below). Pages render fine without one — diagrams
-  are simply skipped.
+  PlantUML or BlockDiag diagrams (see Configuration below). Mermaid does not
+  need a server. Pages still load without Kroki - only PlantUML/BlockDiag
+  diagrams are skipped.
 
 ## Getting started
 
@@ -39,12 +40,12 @@ The workspace folder is the documentation root by default. Other commands:
 
 | Setting | Default | What it does |
 |---|---|---|
-| `microwebstacks.preview.krokiServer` | `http://localhost:18000` | Diagram renderer URL. Point it at a local [Kroki](https://kroki.io) (Docker), the public `https://kroki.io`, or your own internal endpoint. |
+| `microwebstacks.preview.krokiServer` | `http://localhost:18000` | Kroki URL for PlantUML and BlockDiag. Point it at a local [Kroki](https://kroki.io) (Docker), the public `https://kroki.io`, or your own internal endpoint. |
 | `microwebstacks.preview.docsRoot` | _workspace folder_ | Documentation root, if your docs live in a subfolder. |
 
-Diagrams need a reachable Kroki server at the configured URL — the simplest is a
-local one via Docker. After changing a setting, run **Markdown Site Preview:
-Restart Server**.
+PlantUML and BlockDiag need a reachable Kroki server at the configured URL - the
+simplest is a local one via Docker. Mermaid renders client-side with no server
+setting. After changing a setting, run **Markdown Site Preview: Restart Server**.
 
 > Advanced: `microwebstacks.preview.engineSource` and
 > `microwebstacks.preview.enginePath` control where the rendering engine is

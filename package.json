@@ -45,6 +45,7 @@
     "hast-util-to-html": "^9.0.3",
     "js-yaml": "^4.1.0",
     "marked": "^15.0.3",
+    "mermaid": "^11.12.1",
     "mdast-util-to-hast": "^13.2.0",
     "panzoom": "^9.4.3",
     "passport": "^0.7.0",

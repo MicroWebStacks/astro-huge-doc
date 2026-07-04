@@ -82,6 +82,7 @@
 		const root = document.documentElement;
 		root.setAttribute('data-theme', resolved);
 		root.setAttribute('data-theme-pref', pref);
+		document.dispatchEvent(new CustomEvent('mws:theme-change', {detail: {theme: resolved, preference: pref}}));
 		try {
 			localStorage.setItem('theme-pref', pref);
 		} catch (e) {

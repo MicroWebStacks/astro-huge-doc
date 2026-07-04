@@ -13,7 +13,7 @@ const diagramTypeMap = {
     linked_file: 'file_diagram'
 };
 const diagramConfig = config.diagram ?? {};
-const diagramLanguages = diagramConfig.languages ?? {plantuml: 'kroki', blockdiag: 'kroki', mermaid: 'kroki'};
+const diagramLanguages = diagramConfig.languages ?? {plantuml: 'kroki', blockdiag: 'kroki', mermaid: 'client'};
 const diagramExts = new Set(Object.keys(diagramLanguages));
 const languageAliases = diagramConfig.aliases ?? {puml: 'plantuml', mmd: 'mermaid'};
 
@@ -28,6 +28,10 @@ function normalizeLanguage(value) {
     }
     const trimmed = normalized.startsWith('.') ? normalized.slice(1) : normalized;
     return languageAliases[trimmed] ?? trimmed;
+}
+
+function resolveRendererName(language) {
+    return diagramLanguages[language] ?? diagramConfig.default_renderer;
 }
 
 function parseBlobUid(blobUid) {
@@ -54,7 +58,7 @@ async function writeStaticBlob(blobsDir, hash, ext, buffer) {
 }
 
 async function renderDiagram(language, code) {
-    const rendererName = diagramLanguages[language] ?? diagramConfig.default_renderer;
+    const rendererName = resolveRendererName(language);
     const renderer = diagramConfig.renderers?.[rendererName];
     const server = renderer?.server ?? renderer?.base_url ?? config.kroki_server;
     if (!server) {
@@ -182,6 +186,10 @@ async function runSqlite() {
             const diagramType = diagramTypeMap[asset.type];
             const ext = normalizeLanguage(asset.ext);
             if (!diagramType || !diagramExts.has(ext)) {
+                continue;
+            }
+            if (resolveRendererName(ext) === 'client') {
+                console.log(`Skipping client-rendered diagram ${asset.uid} (${ext})`);
                 continue;
             }
 
@@ -318,6 +326,10 @@ async function runJson() {
         const diagramType = diagramTypeMap[asset.type];
         const ext = normalizeLanguage(asset.ext);
         if (!diagramType || !diagramExts.has(ext)) {
+            continue;
+        }
+        if (resolveRendererName(ext) === 'client') {
+            console.log(`Skipping client-rendered diagram ${asset.uid} (${ext})`);
             continue;
         }
 

@@ -1,6 +1,7 @@
 ---
 import Highlighter from './Highlighter.astro'
 import Panzoom from '@/components/panzoom/panzoom.astro'
+import PanZoomModal from '@/components/panzoom/panzoommodal.astro'
 import SvgIcons from '@/components/svgicons.astro';
 import { config } from '@/config.js';
 import { getAssetUrl } from '@/libs/structure-db';
@@ -15,18 +16,22 @@ export interface Props {
 }
 
 const {uid, code, language, params, meta, versionId = config.collect.version_id} = Astro.props as Props;
-console.log("Rendering DiagramCode for uid:", uid, "with verison:", versionId);
+const rendererName = config.diagram?.languages?.[language];
+const isClientDiagram = rendererName === 'client';
 const diagramAssetUid = `${uid}.svg`;
-const diagram_url = getAssetUrl(diagramAssetUid, versionId)
-    ?? getAssetUrl(diagramAssetUid, config.collect.version_id)
-    ?? getAssetUrl(diagramAssetUid);
-const hasDiagram = Boolean(diagram_url);
+const diagram_url = isClientDiagram
+    ? null
+    : getAssetUrl(diagramAssetUid, versionId)
+        ?? getAssetUrl(diagramAssetUid, config.collect.version_id)
+        ?? getAssetUrl(diagramAssetUid);
+const hasDiagram = isClientDiagram || Boolean(diagram_url);
 let alt = ""
 let title = ""
 if(params && (params.length > 0)){
     alt = params[0]
     title = params[0]
 }
+const modalName = title || uid;
 
 ---
 {hasDiagram &&
@@ -61,9 +66,19 @@ if(params && (params.length > 0)){
                 <SvgIcons filename="full-screen" />
             </button>
         </div>
-        {diagram_url &&
+        {!isClientDiagram && diagram_url &&
             <div class="diagram visible" data-role="diagram" data-uid={uid}>
                 <Panzoom src={diagram_url} alt={alt} title={title} meta={meta} hash={uid} showOpenButton={false}/>
+            </div>
+        }
+        {isClientDiagram &&
+            <div class="diagram visible" data-role="diagram" data-uid={uid}>
+                <div class="mermaid-diagram" data-panzoom-root="true" data-uid={uid} data-name={modalName} data-sid={uid}>
+                    <div class="mermaid-output" data-mermaid-output></div>
+                    <div class="mermaid-error hidden" data-mermaid-error role="status" aria-live="polite"></div>
+                    <template data-mermaid-source>{code}</template>
+                    <PanZoomModal sourceSelector='[data-mermaid-output] svg' />
+                </div>
             </div>
         }
         <div class="code hidden" data-role="code" data-uid={uid}>
@@ -87,6 +102,26 @@ if(params && (params.length > 0)){
 .diagram{
     background-color: var(--diagram-surface-bg);
     border-radius: 0 0 8px 8px;
+}
+.mermaid-diagram{
+    padding: 10px;
+}
+.mermaid-output{
+    min-width: min(100%, 20rem);
+}
+.mermaid-output :global(svg){
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+.mermaid-error{
+    margin: 10px;
+    padding: 12px;
+    color: var(--chart-error-text-color);
+    background: var(--chart-error-bg-color);
+    border-left: 3px solid var(--chart-error-accent-color);
+    border-radius: 6px;
+    white-space: pre-wrap;
 }
 .diagram-shell{
     display: flex;
@@ -240,3 +275,10 @@ if (document.readyState === 'loading') {
     initDiagramControls();
 }
 </script>
+
+{isClientDiagram &&
+    <script src="./mermaid-render.js" />
+}
+{isClientDiagram &&
+    <script src="../../panzoom/panzoom_common.js" />
+}

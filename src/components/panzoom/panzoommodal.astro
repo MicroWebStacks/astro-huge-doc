@@ -1,7 +1,8 @@
 ---
 
 export interface Props {
-    url: string;
+    url?: string;
+    sourceSelector?: string;
 }
 
 //TODO currently all pazoom items do create and ship html for svg
@@ -9,7 +10,7 @@ export interface Props {
 //A free Svg instead of object is important in panzoom to keep interactivity enbaled
 //object would require to pass mouse events to allow panzoom which disables interactivity
 
-const {url} = Astro.props as Props;
+const {url = '', sourceSelector} = Astro.props as Props;
 
 ---
 <div class="modal-background" data-state={"init"}>
@@ -18,7 +19,7 @@ const {url} = Astro.props as Props;
       <span class="close-x">&times;</span>
     </div>
     <div class="modal-content">
-      <div class="modal-center" data-url={url}>
+      <div class="modal-center" data-url={url} data-source-selector={sourceSelector}>
         <!-- injected svg or img on modal init -->
       </div>
     </div>
