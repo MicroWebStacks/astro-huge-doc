@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.11 - 2026-07-04
+
+- Mermaid now renders client-side in the browser and no longer depends on
+  Kroki, while PlantUML and BlockDiag continue using Kroki (engine 0.0.6).
+- Mermaid diagrams now follow light/dark theme changes and support the full
+  view modal in the preview.
+
 ## 0.0.10 - 2026-07-04
 
 - Skip unreadable workspace folders while building the source tree, so preview

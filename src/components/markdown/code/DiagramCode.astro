@@ -32,6 +32,7 @@ if(params && (params.length > 0)){
     title = params[0]
 }
 const modalName = title || uid;
+const mermaidSourceJson = JSON.stringify(code).replace(/</g, '\\u003c');
 
 ---
 {hasDiagram &&
@@ -76,7 +77,7 @@ const modalName = title || uid;
                 <div class="mermaid-diagram" data-panzoom-root="true" data-uid={uid} data-name={modalName} data-sid={uid}>
                     <div class="mermaid-output" data-mermaid-output></div>
                     <div class="mermaid-error hidden" data-mermaid-error role="status" aria-live="polite"></div>
-                    <template data-mermaid-source>{code}</template>
+                    <script type="application/json" data-mermaid-source set:html={mermaidSourceJson}></script>
                     <PanZoomModal sourceSelector='[data-mermaid-output] svg' />
                 </div>
             </div>

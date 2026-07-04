@@ -51,17 +51,30 @@ function clearError(container) {
   errorBox.classList.add('hidden');
 }
 
-async function renderContainer(container, epoch) {
+function readSource(container) {
+  const sourceScript = container.querySelector('script[data-mermaid-source][type="application/json"]');
+  if (sourceScript) {
+    try {
+      return JSON.parse(sourceScript.textContent ?? '""');
+    } catch (error) {
+      throw new Error(`Invalid Mermaid source payload: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   const sourceTemplate = container.querySelector('template[data-mermaid-source]');
+  return sourceTemplate?.textContent ?? '';
+}
+
+async function renderContainer(container, epoch) {
   const mount = container.querySelector('[data-mermaid-output]');
-  if (!sourceTemplate || !mount) {
+  if (!mount) {
     return;
   }
 
   clearError(container);
   mount.innerHTML = '';
 
-  const source = sourceTemplate.textContent ?? '';
+  const source = readSource(container);
   const mermaid = await loadMermaid();
   mermaid.initialize({
     startOnLoad: false,
