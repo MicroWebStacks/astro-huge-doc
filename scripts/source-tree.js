@@ -3,6 +3,14 @@ import path from 'node:path';
 
 const IGNORED_NAMES = new Set(['.git', 'node_modules']);
 
+function isSkippableFsError(error) {
+  return ['EACCES', 'EPERM', 'ENOENT'].includes(String(error?.code ?? ''));
+}
+
+function logSkippedPath(absPath, error) {
+  console.warn(`source-tree: skipped ${absPath} (${error.code ?? 'ERROR'}: ${error.message})`);
+}
+
 function normalizeRelPath(value) {
   return String(value ?? '').split(path.sep).join('/');
 }
@@ -72,7 +80,16 @@ async function scanContentTree(contentRoot, documentMap) {
   const entries = [];
 
   async function visit(absDir, relDir) {
-    const children = await fsp.readdir(absDir, {withFileTypes: true});
+    let children;
+    try {
+      children = await fsp.readdir(absDir, {withFileTypes: true});
+    } catch (error) {
+      if (isSkippableFsError(error)) {
+        logSkippedPath(absDir, error);
+        return;
+      }
+      throw error;
+    }
     children.sort((a, b) => {
       if (a.isDirectory() !== b.isDirectory()) {
         return a.isDirectory() ? -1 : 1;
@@ -86,7 +103,16 @@ async function scanContentTree(contentRoot, documentMap) {
       }
       const relPath = relDir ? `${relDir}/${child.name}` : child.name;
       const absPath = path.join(absDir, child.name);
-      const stat = await fsp.stat(absPath);
+      let stat;
+      try {
+        stat = await fsp.stat(absPath);
+      } catch (error) {
+        if (isSkippableFsError(error)) {
+          logSkippedPath(absPath, error);
+          continue;
+        }
+        throw error;
+      }
       const isDirectory = child.isDirectory();
       const doc = documentMap.get(relPath) ?? {};
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.10 - 2026-07-04
+
+- Skip unreadable workspace folders while building the source tree, so preview
+  startup no longer aborts on locked or permission-restricted cache
+  directories (engine 0.0.5).
+
 ## 0.0.9 — 2026-07-04
 
 First release under the new name **Markdown Site Preview**
