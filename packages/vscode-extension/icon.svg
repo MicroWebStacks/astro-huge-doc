@@ -1,25 +1,28 @@
 <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
-  <!-- "Graph M" — the letter M (markdown) drawn as a node graph (diagrams).
-       Vivid indigo→violet tile so it stands out on dark VS Code sidebars
-       while still holding on the white marketplace page. -->
+  <!-- Browser window with the "graph M" (markdown as a node graph) as page
+       content: docs rendered as a website. Gradient chrome, dark body,
+       traffic-light dots; transparent canvas works on any theme. -->
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="gu" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="128" y2="128">
       <stop offset="0" stop-color="#6366F1"/>
       <stop offset="1" stop-color="#7C3AED"/>
     </linearGradient>
   </defs>
-  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+  <rect x="12" y="18" width="104" height="92" rx="14" fill="#181818" stroke="url(#gu)" stroke-width="9"/>
+  <line x1="12" y1="42" x2="116" y2="42" stroke="url(#gu)" stroke-width="7"/>
+  <circle cx="30" cy="31" r="4.5" fill="#22D3EE"/>
+  <circle cx="45" cy="31" r="4.5" fill="#FFFFFF"/>
   <g stroke="#FFFFFF" stroke-width="9" stroke-linecap="round">
-    <line x1="33" y1="89" x2="33" y2="42"/>
-    <line x1="33" y1="42" x2="64" y2="76"/>
-    <line x1="64" y1="76" x2="95" y2="42"/>
-    <line x1="95" y1="42" x2="95" y2="89"/>
+    <line x1="36" y1="94" x2="36" y2="58"/>
+    <line x1="36" y1="58" x2="64" y2="82"/>
+    <line x1="64" y1="82" x2="92" y2="58"/>
+    <line x1="92" y1="58" x2="92" y2="94"/>
   </g>
   <g fill="#FFFFFF">
-    <circle cx="33" cy="89" r="10"/>
-    <circle cx="33" cy="42" r="10"/>
-    <circle cx="95" cy="42" r="10"/>
-    <circle cx="95" cy="89" r="10"/>
+    <circle cx="36" cy="94" r="8.5"/>
+    <circle cx="36" cy="58" r="8.5"/>
+    <circle cx="92" cy="58" r="8.5"/>
+    <circle cx="92" cy="94" r="8.5"/>
   </g>
-  <circle cx="64" cy="76" r="11" fill="#22D3EE"/>
+  <circle cx="64" cy="82" r="9.5" fill="#22D3EE"/>
 </svg>

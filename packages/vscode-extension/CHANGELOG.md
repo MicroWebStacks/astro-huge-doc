@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.8 — 2026-07-04
+## 0.0.9 — 2026-07-04
 
 First release under the new name **Markdown Site Preview**
 (marketplace ID `microwebstacks.markdown-site-preview`, previously published
@@ -9,7 +9,7 @@ as `microwebstacks.microwebstacks-docs-preview`).
 - Pages menu now mirrors the source folder structure in the lite preview
   (engine 0.0.4), matching the full website behavior.
 - Outline shows per-section table and diagram markers.
-- New icon, marketplace page with screenshot, and reworked README.
+- New browser-window icon, marketplace page with screenshot, and reworked README.
 - Command titles renamed to the **Markdown Site Preview:** prefix.
 
 ## Earlier versions (as MicroWebStacks Docs Preview)
