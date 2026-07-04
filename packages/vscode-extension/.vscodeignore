@@ -1,6 +1,6 @@
 .vscode/**
 .vscodeignore
-icon.svg
+icon*.svg
 **/*.vsix
 **/tsconfig.json
 **/.eslintrc.json

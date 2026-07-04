@@ -1,6 +1,5 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import Database from 'better-sqlite3';
 
 const IGNORED_NAMES = new Set(['.git', 'node_modules']);
 
@@ -46,10 +45,7 @@ function createSchema(db) {
   `);
 }
 
-function loadDocumentMap(db, versionId) {
-  const rows = db
-    .prepare('SELECT path, url, title, url_type, "order" AS sort_order FROM documents WHERE version_id = ?')
-    .all(versionId);
+function buildDocumentMap(rows) {
   const map = new Map();
   for (const row of rows) {
     if (!row.path) {
@@ -64,6 +60,12 @@ function loadDocumentMap(db, versionId) {
     });
   }
   return map;
+}
+
+function loadDocumentRows(db, versionId) {
+  return db
+    .prepare('SELECT path, url, title, url_type, "order" AS sort_order FROM documents WHERE version_id = ?')
+    .all(versionId);
 }
 
 async function scanContentTree(contentRoot, documentMap) {
@@ -133,15 +135,23 @@ function insertEntries(db, versionId, entries) {
   insertMany(entries);
 }
 
+async function buildSourceEntries({contentRoot, documents}) {
+  const documentMap = buildDocumentMap(documents ?? []);
+  return scanContentTree(contentRoot, documentMap);
+}
+
 async function indexSourceTree({dbPath, contentRoot, versionId}) {
   if (!versionId) {
     throw new Error('source-tree: versionId is required');
   }
+  const {default: Database} = await import('better-sqlite3');
   const db = new Database(dbPath, {readonly: false});
   try {
     createSchema(db);
-    const documentMap = loadDocumentMap(db, versionId);
-    const entries = await scanContentTree(contentRoot, documentMap);
+    const entries = await buildSourceEntries({
+      contentRoot,
+      documents: loadDocumentRows(db, versionId)
+    });
     insertEntries(db, versionId, entries);
     console.log(`source-tree: indexed ${entries.length} entries`);
     return entries.length;
@@ -150,4 +160,4 @@ async function indexSourceTree({dbPath, contentRoot, versionId}) {
   }
 }
 
-export {indexSourceTree};
+export {buildSourceEntries, indexSourceTree};

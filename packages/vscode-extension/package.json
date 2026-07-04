@@ -1,9 +1,24 @@
 {
-  "name": "microwebstacks-docs-preview",
-  "displayName": "MicroWebStacks Docs Preview",
-  "description": "Preview large Markdown documentation sets inside VS Code: file tree, outline, diagrams, and tables.",
+  "name": "markdown-site-preview",
+  "displayName": "Markdown Site Preview",
+  "description": "Browse your whole Markdown documentation like a website — Mermaid/PlantUML diagrams, tables, file tree and outline navigation.",
   "version": "0.0.7",
   "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#1E1B4B",
+    "theme": "dark"
+  },
+  "keywords": [
+    "markdown",
+    "preview",
+    "diagrams",
+    "mermaid",
+    "plantuml",
+    "documentation",
+    "tables",
+    "site",
+    "kroki"
+  ],
   "engineVersion": "0.0.3",
   "publisher": "microwebstacks",
   "private": false,
@@ -24,23 +39,23 @@
     "commands": [
       {
         "command": "microwebstacks.previewDocs",
-        "title": "MicroWebStacks: Preview Docs in VS Code"
+        "title": "Markdown Site Preview: Open Preview"
       },
       {
         "command": "microwebstacks.openDocsInBrowser",
-        "title": "MicroWebStacks: Open Docs in Browser"
+        "title": "Markdown Site Preview: Open in Browser"
       },
       {
         "command": "microwebstacks.restartDocsPreviewServer",
-        "title": "MicroWebStacks: Restart Docs Preview Server"
+        "title": "Markdown Site Preview: Restart Server"
       },
       {
         "command": "microwebstacks.stopDocsPreviewServer",
-        "title": "MicroWebStacks: Stop Docs Preview Server"
+        "title": "Markdown Site Preview: Stop Server"
       }
     ],
     "configuration": {
-      "title": "MicroWebStacks Docs Preview",
+      "title": "Markdown Site Preview",
       "properties": {
         "microwebstacks.preview.engineSource": {
           "type": "string",

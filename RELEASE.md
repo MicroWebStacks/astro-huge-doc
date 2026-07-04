@@ -6,7 +6,7 @@ exactly what to release:
 | Artifact | Source | Ships as | Ships to |
 |---|---|---|---|
 | **Engine** (the renderer) | `src/`, `server/`, `scripts/`, `config.js` | `@microwebstacks/md-render` (staged build artifact in `packages/md-render/`, gitignored) | npm registry |
-| **Extension** (the thin VS Code launcher) | `packages/vscode-extension/` (`extension.js`, `package.json`, `README.md`) | `microwebstacks-docs-preview.vsix` | VS Code Marketplace |
+| **Extension** (the thin VS Code launcher) | `packages/vscode-extension/` (`extension.js`, `package.json`, `README.md`) | `markdown-site-preview.vsix` | VS Code Marketplace |
 | **Repo** | everything | git commits | GitHub (branch `vscode_lite` → `main`) |
 
 The extension does not contain the renderer. At runtime it npm-installs the
@@ -59,14 +59,17 @@ Then do an extension release with `engineVersion` set to the new engine version.
 
 # 2. Package:
 cd packages/vscode-extension
-npm exec --yes @vscode/vsce -- package --no-dependencies -o microwebstacks-docs-preview.vsix
+npm exec --yes @vscode/vsce -- package --no-dependencies -o markdown-site-preview.vsix
 
 # 3. Test locally before uploading:
-code --install-extension microwebstacks-docs-preview.vsix --force
-#    → reload VS Code window, run "MicroWebStacks: Preview Docs" in a docs folder.
+code --install-extension markdown-site-preview.vsix --force
+#    → reload VS Code window, run "Markdown Site Preview: Open Preview" in a docs folder.
 
 # 4. Upload the .vsix at https://marketplace.visualstudio.com/manage/publishers/microwebstacks
 #    (… menu on the extension → Update). Web upload needs no PAT.
+#    NOTE: renaming "name" in package.json (e.g. microwebstacks-docs-preview →
+#    markdown-site-preview) changes the extension ID: the upload creates a NEW
+#    marketplace entry. Unpublish the old one manually from the publisher page.
 ```
 
 Existing users receive the new extension via VS Code auto-update; on next preview

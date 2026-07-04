@@ -19,7 +19,7 @@ const repoRoot = path.resolve(__dirname, '..');
 
 const PACKAGE_NAME = '@microwebstacks/md-render';
 // Runtime files the lite engine needs to collect, render, and serve docs.
-const RUNTIME_PATHS = ['config.js', 'server', 'scripts', 'src/libs', 'dist'];
+const RUNTIME_PATHS = ['config.js', 'server', 'scripts', 'src/libs', 'src/assets', 'dist'];
 // Dependencies that only matter to full-site, fetch/auth, native, or heavy
 // client paths. The VS Code engine runs DOCS_PROFILE=lite + DOCS_BACKEND=json.
 const EXCLUDED_DEPS = new Set([

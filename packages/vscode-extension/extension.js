@@ -608,7 +608,7 @@ function renderWebviewHtml(url, port, cspSource) {
   </style>
 </head>
 <body>
-  <iframe src="${escapedUrl}" title="MicroWebStacks Docs Preview"></iframe>
+  <iframe src="${escapedUrl}" title="Markdown Site Preview"></iframe>
 </body>
 </html>`;
 }

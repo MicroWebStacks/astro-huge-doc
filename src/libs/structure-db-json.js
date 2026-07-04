@@ -370,11 +370,21 @@ function getDocuments(versionId = null) {
         });
 }
 
-/* The source tree index is built into SQLite only (scripts/source-tree.js is
-   skipped in json mode); returning [] makes the layout fall back to the
-   docs-derived section menu. */
+/* Newer JSON datasets carry exported `source_entries` so the lite/runtime menu
+   can follow the same folder-aware file-tree contract as sqlite. Older exports
+   may not have it yet, so [] remains the compatibility fallback. */
 function getSourceEntries(versionId = null) {
-    return [];
+    load();
+    return [...(dataset.source_entries ?? [])].sort((a, b) => {
+        const parent = String(a.parent_path ?? '').localeCompare(String(b.parent_path ?? ''));
+        if (parent !== 0) {
+            return parent;
+        }
+        if (a.entry_type !== b.entry_type) {
+            return a.entry_type === 'dir' ? -1 : 1;
+        }
+        return String(a.name ?? '').localeCompare(String(b.name ?? ''));
+    });
 }
 
 function getFirstDocument(versionId = null) {

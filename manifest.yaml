@@ -1,5 +1,5 @@
 fetch:
-  select: VectorMind/evidence-engine
+  select: MicroWebStacks/astro-big-doc
   github:
     - repo: MicroWebStacks/astro-big-doc
       branch: main

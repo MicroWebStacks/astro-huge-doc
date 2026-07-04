@@ -22,6 +22,7 @@ import {gunzipSync} from 'node:zlib';
 import Database from 'better-sqlite3';
 import {config} from '../config.js';
 import {blobFileName} from '../src/libs/blob-files.js';
+import {buildSourceEntries} from './source-tree.js';
 
 const dbPath = config.collect.db_path;
 const outdir = config.collect.outdir; // store root; on-disk blobs live under <outdir>/blobs
@@ -59,7 +60,7 @@ function resolveBlobBuffer(row) {
     return buffer;
 }
 
-function main() {
+async function main() {
     const versionRow = db.prepare('SELECT version_id FROM versions ORDER BY version_id DESC LIMIT 1').get();
     const versionId = versionRow?.version_id ?? null;
 
@@ -73,6 +74,10 @@ function main() {
     const assets = scoped('assets');
     const asset_info = db.prepare('SELECT * FROM asset_info').all();
     const images = db.prepare('SELECT * FROM images').all();
+    const source_entries = await buildSourceEntries({
+        contentRoot: config.collect.contentdir,
+        documents
+    });
     const blobRows = db
         .prepare('SELECT blob_uid, hash, path, compression, size, payload FROM blob_store')
         .all();
@@ -121,6 +126,7 @@ function main() {
         asset_info,
         assets,
         images,
+        source_entries,
         blob_store: blobRows.map(({payload, ...row}) => row)
     };
     writeFileSync(join(jsonDir, 'content.json'), JSON.stringify(dataset));
@@ -128,13 +134,13 @@ function main() {
     console.log(
         `export-json: version ${versionId ?? '(all)'} → ${jsonDir}\n` +
             `  documents=${documents.length} items=${items.length} ` +
-            `asset_info=${asset_info.length} assets=${assets.length} images=${images.length}\n` +
+            `asset_info=${asset_info.length} assets=${assets.length} images=${images.length} source_entries=${source_entries.length}\n` +
             `  blobs written=${written}${missing ? ` (missing=${missing})` : ''}`
     );
 }
 
 try {
-    main();
+    await main();
 } finally {
     db.close();
 }

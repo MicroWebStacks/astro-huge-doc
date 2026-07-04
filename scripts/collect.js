@@ -1,3 +1,5 @@
+import fsp from 'node:fs/promises';
+import {join} from 'node:path';
 import { config } from '../config.js';
 import { collect } from 'content-structure';
 
@@ -17,6 +19,19 @@ async function clearHtmlCache(dbPath) {
   }
 }
 
+async function updateJsonSourceTree(jsonDir, contentRoot) {
+  const jsonFile = join(jsonDir, 'content.json');
+  const dataset = JSON.parse(await fsp.readFile(jsonFile, 'utf8'));
+  const {buildSourceEntries} = await import('./source-tree.js');
+  const sourceEntries = await buildSourceEntries({
+    contentRoot,
+    documents: dataset.documents ?? []
+  });
+  dataset.source_entries = sourceEntries;
+  await fsp.writeFile(jsonFile, `${JSON.stringify(dataset)}\n`, 'utf8');
+  console.log(`source-tree: indexed ${sourceEntries.length} entries in json dataset`);
+}
+
 async function main() {
   const collectConfig = config.collect;
 
@@ -25,9 +40,8 @@ async function main() {
   console.log(`content-structure: collect() finished (version: ${collectConfig.version_id})`);
 
   if ((collectConfig.format ?? 'sqlite') === 'json') {
-    // The JSON dataset is self-contained; the SQLite-only source-tree index and
-    // html-cache clear do not apply (and would require better-sqlite3).
-    console.log("content-structure: json output - skipping sqlite source-tree indexing and html-cache clear");
+    await updateJsonSourceTree(collectConfig.json_dir, collectConfig.contentdir);
+    console.log("content-structure: json output - source-tree refreshed; sqlite html-cache clear skipped");
     return;
   }
 

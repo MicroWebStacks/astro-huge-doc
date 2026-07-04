@@ -17,8 +17,8 @@
     "clean:diagrams": "node scripts/clean-diagrams.js",
     "export-json": "node scripts/export-json.js",
     "ext:stage-engine": "node scripts/stage-engine.js",
-    "ext:package": "pnpm build && cd packages/vscode-extension && vsce package --no-dependencies -o microwebstacks-docs-preview.vsix",
-    "ext:install": "code --install-extension packages/vscode-extension/microwebstacks-docs-preview.vsix --force",
+    "ext:package": "pnpm build && cd packages/vscode-extension && vsce package --no-dependencies -o markdown-site-preview.vsix",
+    "ext:install": "code --install-extension packages/vscode-extension/markdown-site-preview.vsix --force",
     "ext:reinstall": "pnpm ext:package && pnpm ext:install"
   },
   "dependencies": {
