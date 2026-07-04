@@ -343,6 +343,9 @@ function createRuntimeEnv(runtime, port) {
   return {
     ...process.env,
     ...(krokiServer ? {MICROWEBSTACKS_KROKI_SERVER: krokiServer} : {}),
+    // The previewed workspace's .env must not clobber this explicit runtime
+    // config (profile, port, paths); it only fills in keys not set here.
+    MICROWEBSTACKS_DOTENV_OVERRIDE: 'false',
     DOCS_PROFILE: 'lite',
     DOCS_BACKEND: 'json',
     MICROWEBSTACKS_ENGINE_ROOT: runtime.engineRoot,

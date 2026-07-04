@@ -21,4 +21,10 @@ import * as dotenv from 'dotenv';
 
 const workspaceRoot = resolve(process.env.MICROWEBSTACKS_WORKSPACE_ROOT ?? process.cwd());
 
-dotenv.config({path: join(workspaceRoot, '.env'), override: true});
+// The VS Code extension launches the engine with explicit runtime config
+// (profile, backend, port, paths) that a previewed workspace's `.env` must not
+// clobber. It sets MICROWEBSTACKS_DOTENV_OVERRIDE=false so the `.env` only
+// fills in keys the launcher did not set. CLI use keeps override semantics.
+const override = process.env.MICROWEBSTACKS_DOTENV_OVERRIDE !== 'false';
+
+dotenv.config({path: join(workspaceRoot, '.env'), override});

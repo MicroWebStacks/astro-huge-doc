@@ -156,21 +156,24 @@ const docsBackend = (process.env.DOCS_BACKEND ?? (docsProfile === 'lite' ? 'json
 const krokiServer = process.env.MICROWEBSTACKS_KROKI_SERVER
     ?? manifest.diagram.renderers.kroki?.server
     ?? manifest.kroki.server;
+// Relative env-provided paths anchor to the workspace root (the engine may run
+// with a cwd far away from the docs, e.g. the VS Code extension's globalStorage);
+// absolute values pass through unchanged. The SSR outDir belongs to the engine.
 const docsRoot = process.env.MICROWEBSTACKS_DOCS_ROOT
-    ? resolve(process.env.MICROWEBSTACKS_DOCS_ROOT)
+    ? resolvePath(workspaceRoot, process.env.MICROWEBSTACKS_DOCS_ROOT)
     : resolvePath(workspaceRoot, manifest.output.content);
 const outDir = process.env.MICROWEBSTACKS_OUTDIR
-    ? resolve(process.env.MICROWEBSTACKS_OUTDIR)
+    ? resolvePath(engineRoot, process.env.MICROWEBSTACKS_OUTDIR)
     : resolvePath(engineRoot, manifest.output.ssr);
 const storePath = process.env.MICROWEBSTACKS_STORE_PATH
-    ? resolve(process.env.MICROWEBSTACKS_STORE_PATH)
+    ? resolvePath(workspaceRoot, process.env.MICROWEBSTACKS_STORE_PATH)
     : resolvePath(workspaceRoot, manifest.output.store);
 const abs_db_path = process.env.MICROWEBSTACKS_DB_PATH
-    ? resolve(process.env.MICROWEBSTACKS_DB_PATH)
+    ? resolvePath(workspaceRoot, process.env.MICROWEBSTACKS_DB_PATH)
     : resolvePath(workspaceRoot, manifest.output.db_path);
 // Pre-exported JSON dataset (json backend). Sits beside the sqlite store.
 const jsonDir = process.env.MICROWEBSTACKS_JSON_DIR
-    ? resolve(process.env.MICROWEBSTACKS_JSON_DIR)
+    ? resolvePath(workspaceRoot, process.env.MICROWEBSTACKS_JSON_DIR)
     : join(storePath, 'json');
 // Version resolution requires sqlite; the json backend carries its own version
 // in the exported dataset, so skip the native lookup entirely in json mode.

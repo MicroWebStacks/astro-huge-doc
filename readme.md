@@ -79,25 +79,96 @@ cache libraries considerations :
 - interactive islands will be hydrated on the client with the shipped page js assets
 
 # Usage
-## environment and diagram rendering
+## configuration
 
-The engine reads environment overrides from a root `.env` file before it reads
-ambient shell variables, `manifest.yaml`, or built-in defaults. Start by copying
-the example file:
+The engine can be configured from four places:
+
+| Source | Applies to | What it controls |
+|---|---|---|
+| `manifest.yaml` | standalone repo flow and VS Code preview | durable project config such as content paths, collect settings, server defaults, and diagram defaults |
+| root `.env` | standalone repo flow and VS Code preview | machine- or workspace-local overrides without editing `manifest.yaml` |
+| shell / process env | standalone repo flow and VS Code preview | one-off overrides for the current process |
+| VS Code extension settings | VS Code preview only | how the extension finds the engine and what runtime values it injects into the preview |
+
+Start by copying the example file:
 
 ```powershell
 copy .env.example .env
 ```
 
-The diagram renderer is configured with:
+### override order
 
-```dotenv
-MICROWEBSTACKS_KROKI_SERVER=http://localhost:18000
-```
+`config.js` imports `src/libs/load-env.js` first, so environment resolution
+happens before the manifest/default config is finalized.
 
-This URL is where the engine POSTs Mermaid, PlantUML, and BlockDiag source when
-`scripts/diagrams.js` runs. No Java renderer runs inside VS Code; the preview
-always calls a Kroki-compatible HTTP endpoint.
+| Context | Highest precedence | Then | Then | Then | Lowest precedence |
+|---|---|---|---|---|---|
+| standalone repo commands (`pnpm dev`, `pnpm collect`, `pnpm diagrams`, `pnpm server`) | root `.env` | shell / global env | `manifest.yaml` | built-in defaults | - |
+| VS Code extension preview | explicit extension runtime env | inherited launcher env | workspace root `.env` | workspace `manifest.yaml` | built-in defaults |
+
+Notes:
+
+- In standalone use, `.env` wins because `dotenv.config({override: true})` is
+  the default behavior in `src/libs/load-env.js`.
+- In VS Code preview, the extension sets
+  `MICROWEBSTACKS_DOTENV_OVERRIDE=false`, so the workspace `.env` fills gaps but
+  cannot replace runtime-critical values that the extension already injected.
+- `DOCS_BACKEND` defaults from `DOCS_PROFILE` when unset: `lite -> json`,
+  otherwise `sqlite`.
+- Relative env paths resolve from the workspace root, except
+  `MICROWEBSTACKS_OUTDIR`, which resolves from the engine root.
+
+### VS Code extension settings
+
+These settings live under the `microwebstacks.preview.*` namespace in VS Code.
+
+| Setting | Used by | Effect |
+|---|---|---|
+| `microwebstacks.preview.engineSource` | extension only | chooses where the rendering engine comes from: local checkout, installed package, or npm registry |
+| `microwebstacks.preview.enginePath` | extension only | explicit path to an `astro-huge-doc` checkout; highest-priority engine source |
+| `microwebstacks.preview.docsRoot` | extension, then engine | overrides the documentation root inside the opened workspace; when set, the extension passes it to the engine as `MICROWEBSTACKS_DOCS_ROOT`; when unset, the extension uses `manifest.yaml` behavior if present, otherwise the workspace root |
+| `microwebstacks.preview.krokiServer` | extension, then engine | if non-empty, the extension passes it as `MICROWEBSTACKS_KROKI_SERVER`; this wins over the workspace `.env` during preview |
+
+`engineSource` and `enginePath` are extension-only settings; they do not map to
+engine env vars. `docsRoot` and `krokiServer` affect the engine by being
+translated into runtime env vars by the extension.
+
+### environment variables
+
+User-facing env vars:
+
+| Variable | Purpose | Typical values | Notes |
+|---|---|---|---|
+| `DOCS_PROFILE` | selects runtime profile | `full`, `lite` | `full` = standalone website/warehouse, `lite` = VS Code extension engine |
+| `DOCS_BACKEND` | selects data backend | `sqlite`, `json` | if unset, derived from `DOCS_PROFILE` |
+| `MICROWEBSTACKS_KROKI_SERVER` | diagram rendering endpoint | `http://localhost:18000`, `https://kroki.io`, internal URL | the engine POSTs Mermaid, PlantUML, and BlockDiag source here |
+| `MICROWEBSTACKS_HOST` | server bind host | `127.0.0.1`, `0.0.0.0` | env wins over `manifest.yaml` |
+| `MICROWEBSTACKS_PORT` | server bind port | `4321` | env wins over `manifest.yaml` |
+| `MICROWEBSTACKS_PROTOCOL` | advertised protocol | `http`, `https` | env wins over `manifest.yaml` |
+| `MICROWEBSTACKS_DOCS_ROOT` | Markdown content root | `content`, `docs`, `.` | relative to workspace root |
+| `MICROWEBSTACKS_DB_PATH` | SQLite database path | `dataset/content.db` | mainly for the full/sqlite flow; relative to workspace root |
+| `MICROWEBSTACKS_STORE_PATH` | dataset/blob store path | `dataset` | relative to workspace root |
+| `MICROWEBSTACKS_JSON_DIR` | JSON export directory | `dataset/json` | relative to workspace root; used by the json backend |
+| `MICROWEBSTACKS_OUTDIR` | Astro SSR output directory | `dist` | relative to engine root, not workspace root |
+| `GITHUB_TOKEN` | authenticated GitHub fetch access | personal access token | used by `scripts/fetch.js`; keep this in `.env` only |
+
+Advanced or runtime-injected env vars:
+
+| Variable | Usually set by | Purpose |
+|---|---|---|
+| `MICROWEBSTACKS_WORKSPACE_ROOT` | extension or advanced shell usage | anchors `.env`, content paths, and manifest discovery |
+| `MICROWEBSTACKS_ENGINE_ROOT` | extension or advanced shell usage | points at the engine checkout/install root |
+| `MICROWEBSTACKS_MANIFEST_PATH` | extension or advanced shell usage | explicit manifest location instead of `<workspace>/manifest.yaml` |
+| `MICROWEBSTACKS_DOTENV_OVERRIDE` | extension or advanced shell usage | `false` means `.env` fills missing keys only; any other value keeps `.env` override behavior |
+| `MICROWEBSTACKS_DEBUG_CONFIG` | ad hoc debugging | prints resolved config for inspection |
+| `MICROWEBSTACKS_NODE_PATH` | extension launch environment | optional override for the Node executable the extension uses |
+
+## diagram rendering
+
+Set `MICROWEBSTACKS_KROKI_SERVER` using `.env`, shell env, or the VS Code
+setting `microwebstacks.preview.krokiServer`, depending on the flow above.
+No Java renderer runs inside VS Code; the preview always calls a
+Kroki-compatible HTTP endpoint.
 
 ### local Docker Kroki
 
@@ -195,11 +266,6 @@ pnpm diagrams
 pnpm dev
 ```
 
-For the VS Code extension, put the `.env` file in the opened documentation
-workspace or set the variable in the environment that launches VS Code. Restart
-the preview after changing the URL; the extension runs collect and diagram
-generation before starting the local preview server.
-
 ## fetching
 - Configure `fetch.github` in `manifest.yaml` (single object or list). Use
   `fetch.select` to run one repo from a list of examples, or omit it/use `all`
@@ -245,6 +311,9 @@ The repository includes a first-pass desktop VS Code extension in
 `packages/vscode-extension`. It previews Markdown documentation from the opened
 workspace through the existing `astro-huge-doc` SSR renderer and opens the same
 localhost preview in an external browser on demand.
+
+Configuration for extension mode is documented in `Usage -> configuration`.
+This section covers install and run only.
 
 The extension follows VS Code storage conventions:
 
@@ -313,11 +382,6 @@ For this V1 local package, set the VS Code setting
 
 Open another Markdown workspace and run
 `MicroWebStacks: Preview Docs in VS Code`.
-
-If the workspace has a `manifest.yaml`, the extension lets the engine use its
-configured `output.content` path. For a plain Markdown folder without a
-manifest, the workspace folder itself is treated as the docs root. You can
-override that with `microwebstacks.preview.docsRoot`.
 
 # Notes
 * XLSX files support dropped but could potentially generate two assets, original file for download and asset table for direct asset vieweing
