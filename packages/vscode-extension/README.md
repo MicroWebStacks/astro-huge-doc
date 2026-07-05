@@ -14,6 +14,7 @@ documentation site, not a single-file preview.
 - **File tree** - navigate a whole multi-folder docs repo from a sidebar, not one file at a time.
 - **Outline / table of contents** - jump between headings of the current page, with per-section table and diagram markers.
 - **Diagrams** - Mermaid renders client-side; PlantUML and BlockDiag render to SVG through Kroki.
+- **Math** - inline and block formulas render with KaTeX.
 - **Tables** - Markdown tables become sortable, readable data tables.
 - **Syntax highlighting** - fenced code blocks highlighted with Shiki.
 
@@ -41,7 +42,7 @@ The workspace folder is the documentation root by default. Other commands:
 | Setting | Default | What it does |
 |---|---|---|
 | `microwebstacks.preview.krokiServer` | `http://localhost:18000` | Kroki URL for PlantUML and BlockDiag. Point it at a local [Kroki](https://kroki.io) (Docker), the public `https://kroki.io`, or your own internal endpoint. |
-| `microwebstacks.preview.docsRoot` | _workspace folder_ | Documentation root, if your docs live in a subfolder. |
+| `microwebstacks.preview.docsRoot` | _manifest `render.folder` or `output.content`_ | Documentation root, if your docs live in a subfolder. |
 
 PlantUML and BlockDiag need a reachable Kroki server at the configured URL - the
 simplest is a local one via Docker. Mermaid renders client-side with no server

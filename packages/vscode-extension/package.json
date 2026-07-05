@@ -102,7 +102,7 @@
         "microwebstacks.preview.docsRoot": {
           "type": "string",
           "default": "",
-          "description": "Optional path to the documentation root inside the workspace. Defaults to manifest output.content when manifest.yaml exists, otherwise the workspace folder."
+          "description": "Optional path to the documentation root inside the workspace. Defaults to manifest render.folder when set, otherwise output.content, otherwise the workspace folder."
         },
         "microwebstacks.preview.krokiServer": {
           "type": "string",

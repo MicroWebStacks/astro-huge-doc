@@ -48,6 +48,7 @@ const DEFAULT_MANIFEST = {
         inline_compression_kb: 32
     },
     render: {
+        folder: null,
         highlighter: {
             theme: 'dark-plus',
             themes: {light: 'light-plus', dark: 'dark-plus'},
@@ -159,9 +160,10 @@ const krokiServer = process.env.MICROWEBSTACKS_KROKI_SERVER
 // Relative env-provided paths anchor to the workspace root (the engine may run
 // with a cwd far away from the docs, e.g. the VS Code extension's globalStorage);
 // absolute values pass through unchanged. The SSR outDir belongs to the engine.
+const manifestDocsRoot = manifest.render?.folder ?? manifest.output.render ?? manifest.output.content;
 const docsRoot = process.env.MICROWEBSTACKS_DOCS_ROOT
     ? resolvePath(workspaceRoot, process.env.MICROWEBSTACKS_DOCS_ROOT)
-    : resolvePath(workspaceRoot, manifest.output.content);
+    : resolvePath(workspaceRoot, manifestDocsRoot);
 const outDir = process.env.MICROWEBSTACKS_OUTDIR
     ? resolvePath(engineRoot, process.env.MICROWEBSTACKS_OUTDIR)
     : resolvePath(engineRoot, manifest.output.ssr);

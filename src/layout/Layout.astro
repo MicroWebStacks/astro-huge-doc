@@ -1,6 +1,7 @@
 ---
 import './colors.css';
 import './tokens.css';
+import 'katex/dist/katex.min.css';
 import AppBar from './AppBar.astro';
 import SideMenu from './SideMenu.astro';
 import { process_toc_list, buildNavigationMenus } from "./layout_utils";
@@ -251,6 +252,14 @@ main{
 	padding: 0 var(--space-4);
 	color: var(--content-color-muted);
 	border-left: 0.25em solid var(--soft-border-color);
+}
+
+.article-slot :global(.katex-display){
+	max-width: 100%;
+	overflow-x: auto;
+	overflow-y: hidden;
+	margin-block: var(--space-4);
+	padding-bottom: 0.15rem;
 }
 
 </style>

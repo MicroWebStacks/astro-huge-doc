@@ -11,6 +11,7 @@ import {toHast} from 'mdast-util-to-hast'
 import {toHtml} from 'hast-util-to-html'
 import {dirname} from 'path'
 import {text_only_children,has_image} from './node_check.js'
+import {renderMathInHtml} from '@/libs/render-math.js'
 export interface Props {
     items: {
         ast?: string;
@@ -25,7 +26,7 @@ const {items = [], data, headings = []} = Astro.props as Props;
 
 function renderAstToHtml(astNode){
     try{
-        return toHtml(toHast(astNode));
+        return renderMathInHtml(toHtml(toHast(astNode)));
     }catch{
         return '';
     }

@@ -126,7 +126,7 @@ These settings live under the `microwebstacks.preview.*` namespace in VS Code.
 |---|---|---|
 | `microwebstacks.preview.engineSource` | extension only | chooses where the rendering engine comes from: local checkout, installed package, or npm registry |
 | `microwebstacks.preview.enginePath` | extension only | explicit path to an `astro-huge-doc` checkout; highest-priority engine source |
-| `microwebstacks.preview.docsRoot` | extension, then engine | overrides the documentation root inside the opened workspace; when set, the extension passes it to the engine as `MICROWEBSTACKS_DOCS_ROOT`; when unset, the extension uses `manifest.yaml` behavior if present, otherwise the workspace root |
+| `microwebstacks.preview.docsRoot` | extension, then engine | overrides the documentation root inside the opened workspace; when set, the extension passes it to the engine as `MICROWEBSTACKS_DOCS_ROOT`; when unset, the engine uses `manifest.render.folder` when present, otherwise `manifest.output.content`, otherwise the workspace root |
 | `microwebstacks.preview.krokiServer` | extension, then engine | if non-empty, the extension passes it as `MICROWEBSTACKS_KROKI_SERVER`; this wins over the workspace `.env` during preview |
 
 `engineSource` and `enginePath` are extension-only settings; they do not map to
@@ -145,7 +145,7 @@ User-facing env vars:
 | `MICROWEBSTACKS_HOST` | server bind host | `127.0.0.1`, `0.0.0.0` | env wins over `manifest.yaml` |
 | `MICROWEBSTACKS_PORT` | server bind port | `4321` | env wins over `manifest.yaml` |
 | `MICROWEBSTACKS_PROTOCOL` | advertised protocol | `http`, `https` | env wins over `manifest.yaml` |
-| `MICROWEBSTACKS_DOCS_ROOT` | Markdown content root | `content`, `docs`, `.` | relative to workspace root |
+| `MICROWEBSTACKS_DOCS_ROOT` | Markdown content root | `content`, `demo`, `docs`, `.` | relative to workspace root; overrides `manifest.render.folder` / `output.content` |
 | `MICROWEBSTACKS_DB_PATH` | SQLite database path | `dataset/content.db` | mainly for the full/sqlite flow; relative to workspace root |
 | `MICROWEBSTACKS_STORE_PATH` | dataset/blob store path | `dataset` | relative to workspace root |
 | `MICROWEBSTACKS_JSON_DIR` | JSON export directory | `dataset/json` | relative to workspace root; used by the json backend |
@@ -281,8 +281,13 @@ pnpm dev
       - repo: VectorMind/alm-ontology
         branch: main
         dest: content
+  output:
+    content: content
+  render:
+    folder: demo
   ```
 - `folders` pulls those subfolders and flattens their contents into `dest`; omit `folders` to copy the whole repo. `dest` defaults to the repo name and is cleared before copying.
+- `output.content` remains the fetch destination / legacy default docs root. Set `render.folder` when you want to render a different folder such as a bundled local `demo/` tree while still fetching remote content into `content/`.
 - Switch examples by changing `fetch.select` to another `repo` value.
 - Set `GITHUB_TOKEN` to avoid GitHub rate limits.
 - Run `pnpm fetch` (or `node scripts/fetch.js`) after installing dependencies.

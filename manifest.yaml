@@ -44,6 +44,7 @@ collect:
   external_storage_kb: 512
   inline_compression_kb: 32
 render:
+  folder: demo
   highlighter:
     theme: dark-plus
     langs: ['javascript','js','python','yaml', 'markdown', 'mermaid', 'text']
