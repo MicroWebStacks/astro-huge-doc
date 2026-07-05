@@ -80,7 +80,8 @@ const isImg = !isSvg
   flex-direction: column;
   align-items: center;
   padding:10px;
-  width:fit-content;
+  width:100%;
+  box-sizing: border-box;
   border-top: 4px solid transparent;
   position: relative;
 }
@@ -118,12 +119,18 @@ const isImg = !isSvg
 
 .figure{
   display: flex;
+  justify-content: center;
+  width: 100%;
 }
 object{
+  width: 100%;
   max-width: 100%;
+  height: auto;
 }
 img{
+  width: 100%;
   max-width: 100%;
+  height: auto;
 }
 .header :global(svg){
   height: 16px;

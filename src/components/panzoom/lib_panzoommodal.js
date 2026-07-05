@@ -7,6 +7,11 @@ const zoomOptions = {
   //autocenter:true
 }
 
+function mergeStyle(baseStyle, extraStyle){
+  const prefix = baseStyle && !baseStyle.trim().endsWith(';') ? `${baseStyle};` : (baseStyle ?? '')
+  return `${prefix}${extraStyle}`
+}
+
 function addFocusStyles(shadowRoot) {
   if (!shadowRoot.getElementById('glowStyles')) {
       const style = document.createElement('style');
@@ -20,6 +25,45 @@ function addFocusStyles(shadowRoot) {
   }
 }
 
+function styleModalViewport(node){
+  if(!node){
+    return
+  }
+  node.style.width = "100%"
+  node.style.height = "100%"
+  node.style.display = "flex"
+  node.style.alignItems = "center"
+  node.style.justifyContent = "center"
+  node.style.overflow = "hidden"
+}
+
+function styleFullscreenAsset(asset, isSvg){
+  if(!asset){
+    return
+  }
+  if(isSvg){
+    asset.setAttribute(
+      "style",
+      mergeStyle(
+        asset.getAttribute("style"),
+        "user-select:none;cursor:grab;display:block;width:100%;height:100%;max-width:none;max-height:none;"
+      )
+    )
+    if(!asset.getAttribute("preserveAspectRatio")){
+      asset.setAttribute("preserveAspectRatio", "xMidYMid meet")
+    }
+    return
+  }
+  asset.style.userSelect = "none"
+  asset.style.cursor = "grab"
+  asset.style.display = "block"
+  asset.style.width = "100%"
+  asset.style.height = "100%"
+  asset.style.maxWidth = "none"
+  asset.style.maxHeight = "none"
+  asset.style.objectFit = "contain"
+}
+
 async function appendShadowSVG(center,svg){
   //cannot detatch a shadow root, so check existing before creation
   let shadowRoot = center.shadowRoot
@@ -27,6 +71,7 @@ async function appendShadowSVG(center,svg){
     shadowRoot = center.attachShadow({mode: 'open'});
   }
   const div = document.createElement("div")//needed for the panzoom as it takes the parent
+  styleModalViewport(div)
   shadowRoot.appendChild(div)
   addFocusStyles(shadowRoot)
   let new_svg
@@ -37,8 +82,7 @@ async function appendShadowSVG(center,svg){
     new_svg = svg.cloneNode(true)
   }
   div.appendChild(new_svg)
-  const oldstyle = new_svg.getAttribute("style")
-  new_svg.setAttribute("style",`${oldstyle};user-select: none; cursor:grab;`)
+  styleFullscreenAsset(new_svg, true)
   //new_svg.querySelectorAll('tspan,text').forEach((el)=>{
   //    el.style.cursor = "pointer";
   //});
@@ -104,6 +148,7 @@ async function cloneAsset(center){
       }
       if(tagName === "img"){
         const svg_img = source.cloneNode(true)
+        styleFullscreenAsset(svg_img, false)
         center.appendChild(svg_img)
         return {is_svg: false, svg_img}
       }
@@ -129,6 +174,7 @@ async function cloneAsset(center){
     }else{
       const img = container.querySelector("img")
       svg_img = img.cloneNode(true)
+      styleFullscreenAsset(svg_img, false)
       center.appendChild(svg_img)
     }
     return {is_svg,svg_img}
@@ -231,6 +277,7 @@ async function openModal(event){
   const modal = event.target
   const close = modal.querySelector(".close")
   const center = modal.querySelector(".modal-center")
+  styleModalViewport(center)
 
   const {is_svg,svg_img} = await cloneAsset(center)
   if(!svg_img){

@@ -46,7 +46,7 @@ collect:
 render:
   highlighter:
     theme: dark-plus
-    langs: ['javascript','js','python','yaml', 'markdown', 'text']
+    langs: ['javascript','js','python','yaml', 'markdown', 'mermaid', 'text']
 html_cache:
   exclude_paths:
     - /blobs/

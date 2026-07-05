@@ -9,9 +9,9 @@
   matching the site's historical look.
 
   Naming is semantic so components never hardcode a hex value:
-  surfaces, text, accents and the small set of "always light" surfaces
-  (diagrams, 3d viewer, image lightbox) that need a bright backdrop but
-  are toned down in dark mode to avoid glare.
+  surfaces, text, accents, theme-aware diagram surfaces, and the small set
+  of "always light" surfaces (static diagrams, 3d viewer, image lightbox)
+  that need a bright backdrop but are toned down in dark mode to avoid glare.
 */
 
 :root,
@@ -87,10 +87,12 @@
   --chart-error-accent-color: #F66;
 
   /* "Always light" content surfaces.
-     Diagrams (kroki) and 3d posters are authored with dark ink on a
+     Static diagrams (kroki) and 3d posters are authored with dark ink on a
      light backdrop, so they must stay light. In dark mode we dim them
-     to a soft grey instead of pure white to avoid a blinding flash. */
+     to a soft grey instead of pure white to avoid a blinding flash.
+     Mermaid is client-rendered, so it can follow the active site theme. */
   --diagram-surface-bg: #EDEDED;
+  --mermaid-surface-bg: #252526;
   --model-viewer-bg: #2A2A30;
   --lightbox-overlay-color: rgba(0, 0, 0, 0.6);
   --lightbox-surface-bg: #F4F4F4;
@@ -180,6 +182,7 @@
 
   /* "Always light" content surfaces stay genuinely white in light mode. */
   --diagram-surface-bg: #FFFFFF;
+  --mermaid-surface-bg: #FFFFFF;
   --model-viewer-bg: #EEF0FA;
   --lightbox-overlay-color: rgba(0, 0, 0, 0.45);
   --lightbox-surface-bg: #FEFEFE;

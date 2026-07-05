@@ -36,7 +36,7 @@ const mermaidSourceJson = JSON.stringify(code).replace(/</g, '\\u003c');
 
 ---
 {hasDiagram &&
-    <div class="diagram-shell" data-uid={uid} data-view="diagram">
+    <div class:list={['diagram-shell', {'mermaid-shell': isClientDiagram}]} data-uid={uid} data-view="diagram">
         <div class="diagram-toolbar" role="toolbar" aria-label="Diagram controls">
             <div class="view-toggle" aria-label="Diagram view mode">
                 <button
@@ -73,7 +73,7 @@ const mermaidSourceJson = JSON.stringify(code).replace(/</g, '\\u003c');
             </div>
         }
         {isClientDiagram &&
-            <div class="diagram visible" data-role="diagram" data-uid={uid}>
+            <div class="diagram mermaid-panel visible" data-role="diagram" data-uid={uid}>
                 <div class="mermaid-diagram" data-panzoom-root="true" data-uid={uid} data-name={modalName} data-sid={uid}>
                     <div class="mermaid-output" data-mermaid-output></div>
                     <div class="mermaid-error hidden" data-mermaid-error role="status" aria-live="polite"></div>
@@ -101,18 +101,27 @@ const mermaidSourceJson = JSON.stringify(code).replace(/</g, '\\u003c');
     display:none;
 }
 .diagram{
+    width: 100%;
+    box-sizing: border-box;
     background-color: var(--diagram-surface-bg);
     border-radius: 0 0 8px 8px;
 }
+.mermaid-panel{
+    background-color: var(--mermaid-surface-bg);
+}
 .mermaid-diagram{
     padding: 10px;
+    --lightbox-surface-bg: var(--mermaid-surface-bg);
 }
 .mermaid-output{
+    display: flex;
+    justify-content: center;
+    width: 100%;
     min-width: min(100%, 20rem);
 }
 .mermaid-output :global(svg){
     display: block;
-    max-width: 100%;
+    width: 100%;
     height: auto;
 }
 .mermaid-error{
@@ -127,14 +136,18 @@ const mermaidSourceJson = JSON.stringify(code).replace(/</g, '\\u003c');
 .diagram-shell{
     display: flex;
     flex-direction: column;
-    width: fit-content;
+    width: min(100%, 80ch);
     max-width: 100%;
     margin-top: 12px;
     margin-bottom: 20px;
+    box-sizing: border-box;
     background-color: var(--diagram-surface-bg);
     border: 1px solid var(--soft-border-color);
     border-radius: 8px;
     overflow: hidden;
+}
+.mermaid-shell{
+    background-color: var(--mermaid-surface-bg);
 }
 .diagram-toolbar{
     display: flex;
