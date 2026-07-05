@@ -5,11 +5,20 @@
 // directory, without moving any source files. Native modules and dist/ are
 // produced by `pnpm build`; this script validates the build then copies it.
 //
+// Also vendors the package's production dependency tree into the staged
+// output (see vendorDependencies below), so the VS Code extension can install
+// the published tarball with a plain HTTPS fetch instead of running npm
+// (plans/2026-07/05-vscode-node-free-bootstrap OP-002). Pass --no-vendor to
+// skip this and stage a source-only package instead (npm's packer runs a real
+// dependency install; this needs npm on PATH here on the maintainer's
+// machine, same as `pnpm build` already does).
+//
 // Usage:
-//   node scripts/stage-engine.js [--out <dir>] [--version <semver>]
+//   node scripts/stage-engine.js [--out <dir>] [--version <semver>] [--no-vendor]
 // Defaults: --out packages/md-render, --version from root package.json version.
 
 import {fileURLToPath} from 'node:url';
+import {spawnSync} from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -18,6 +27,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
 
 const PACKAGE_NAME = '@microwebstacks/md-render';
+// npm's packer (npm-packlist) always excludes any directory literally named
+// "node_modules" from a published tarball, even when listed in "files". To
+// ship a self-contained install, the vendored tree is materialized as
+// node_modules and then renamed to this name before packing; the extension's
+// installer renames it back after extracting (see extension.js installEngine).
+const VENDOR_DIR_NAME = '_modules';
 // Runtime files the lite engine needs to collect, render, and serve docs.
 const RUNTIME_PATHS = ['config.js', 'server', 'scripts', 'src/libs', 'src/assets', 'dist'];
 // Dependencies that only matter to full-site, fetch/auth, native, or heavy
@@ -36,15 +51,45 @@ const EXCLUDED_DEPS = new Set([
 ]);
 
 function parseArgs(argv) {
-  const args = {out: path.join('packages', 'md-render'), version: null};
+  const args = {out: path.join('packages', 'md-render'), version: null, vendor: true};
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--out') {
       args.out = argv[++i];
     } else if (argv[i] === '--version') {
       args.version = argv[++i];
+    } else if (argv[i] === '--no-vendor') {
+      args.vendor = false;
     }
   }
   return args;
+}
+
+// Installs the package's own `dependencies` with a real npm (available on the
+// maintainer's machine, same requirement `pnpm build` already has) and hides
+// the result from npm's packer under VENDOR_DIR_NAME. Uses npm rather than
+// pnpm/the workspace install so the result is a flat, non-symlinked tree -
+// pnpm's node_modules are symlinks into a local content-addressable store,
+// which would not survive being packed into a tarball and unpacked elsewhere.
+function vendorDependencies(outDir) {
+  console.log(`\nVendoring production dependencies into ${outDir} (npm install)...`);
+  const result = spawnSync('npm', ['install', '--omit=dev', '--omit=optional', '--no-audit', '--no-fund', '--no-package-lock'], {
+    cwd: outDir,
+    stdio: 'inherit',
+    shell: process.platform === 'win32'
+  });
+  if (result.status !== 0) {
+    throw new Error('npm install failed while vendoring dependencies for the published engine package.');
+  }
+}
+
+async function hideVendoredModules(outDir) {
+  const nodeModules = path.join(outDir, 'node_modules');
+  if (!fs.existsSync(nodeModules)) {
+    throw new Error(`Expected ${nodeModules} after npm install; nothing to vendor.`);
+  }
+  const vendored = path.join(outDir, VENDOR_DIR_NAME);
+  await fsp.rm(vendored, {recursive: true, force: true});
+  await fsp.rename(nodeModules, vendored);
 }
 
 async function readJson(file) {
@@ -89,9 +134,13 @@ async function main() {
     type: 'module',
     private: false,
     license: rootPkg.license ?? 'UNLICENSED',
-    files: RUNTIME_PATHS,
+    files: args.vendor ? [...RUNTIME_PATHS, VENDOR_DIR_NAME] : RUNTIME_PATHS,
     dependencies,
-    engines: {node: '>=18'}
+    engines: {node: '>=18'},
+    // Tells the VS Code extension's installer (extension.js installEngine)
+    // this tarball has its production dependencies vendored under this name
+    // and can be installed with a plain HTTPS fetch, no npm required.
+    ...(args.vendor ? {vendoredModulesDir: VENDOR_DIR_NAME} : {})
   };
   await fsp.writeFile(path.join(outDir, 'package.json'), `${JSON.stringify(enginePkg, null, 2)}\n`, 'utf8');
 
@@ -103,6 +152,12 @@ async function main() {
     for (const [name, range] of localDeps) {
       console.warn(`  - ${name}: ${range}  (publish or vendor before "npm publish")`);
     }
+  }
+
+  if (args.vendor) {
+    vendorDependencies(outDir);
+    await hideVendoredModules(outDir);
+    console.log(`Vendored dependencies into ${path.join(outDir, VENDOR_DIR_NAME)}.`);
   }
 }
 

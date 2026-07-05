@@ -35,6 +35,9 @@ When a plan changes during implementation, update the dated plan folder and the
 top-level plan indexes so the packet, implementation notes, test proof, and
 repo-level status stay consistent.
 
+Plan review and the plan-to-implementation trigger are exclusively maintainer-
+initiated actions — never solicit approval via `ExitPlanMode` or chat questions.
+
 ## Temporary Files
 
 - Never create temporary files, scratch scripts, or captured logs in the

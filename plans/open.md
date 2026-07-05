@@ -9,3 +9,9 @@ Plan packets with work still outstanding. See each folder for details.
   trust review, platform validation, and publishing flow remain.
 - [Features alignment](./2026-07/04-features-alignment/plan.md) - research and
   quick wins are done; Phase 3 math support is next.
+- [VS Code node-free bootstrap](./2026-07/05-vscode-node-free-bootstrap/plan.md) -
+  reconsiders the "system Node on PATH" requirement now that the lite/json
+  engine is confirmed native-module-free; no implementation started yet.
+- [PlantUML theme-aware rendering](./2026-07/05-plantuml-theme-lazy-light/plan.md) -
+  dark renders at build time as today; light renders lazily on first request
+  via a new endpoint and is cached; no implementation started yet.

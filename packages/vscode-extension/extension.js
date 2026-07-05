@@ -4,8 +4,10 @@ const crypto = require('crypto');
 const fs = require('fs');
 const fsp = require('fs/promises');
 const http = require('http');
+const https = require('https');
 const net = require('net');
 const path = require('path');
+const zlib = require('zlib');
 const extensionPackage = require('./package.json');
 
 const COMMANDS = {
@@ -82,21 +84,100 @@ function exists(filePath) {
   return fs.existsSync(filePath);
 }
 
-function findNodeExecutable(runtime) {
-  const candidates = [
-    process.env.MICROWEBSTACKS_NODE_PATH,
-    path.join(runtime.engineRoot, 'node_modules', '.bin', process.platform === 'win32' ? 'node.exe' : 'node'),
-    process.platform === 'win32' ? 'node.exe' : 'node'
-  ].filter(Boolean);
-  for (const candidate of candidates) {
-    if (candidate.endsWith('node.exe') || candidate.endsWith('/node') || candidate.endsWith('\\node')) {
-      if (path.isAbsolute(candidate) && !exists(candidate)) {
-        continue;
+// Probes whether `execPath` (run with `extraEnv` merged into its environment)
+// behaves as a JS engine that understands `node -e <script>`. Used to detect
+// both a real system Node and VS Code's own runtime under
+// ELECTRON_RUN_AS_NODE=1, without assuming either exists or works.
+function probeNodeRunner(execPath, extraEnv) {
+  return new Promise((resolve) => {
+    let settled = false;
+    let child;
+    const finish = (ok) => {
+      if (settled) {
+        return;
       }
-      return candidate;
+      settled = true;
+      resolve(ok);
+    };
+    try {
+      child = cp.spawn(execPath, ['-e', 'process.stdout.write("mws-node-ok")'], {
+        env: {...process.env, ...extraEnv},
+        windowsHide: true
+      });
+    } catch {
+      finish(false);
+      return;
     }
+    const timer = setTimeout(() => {
+      child.kill();
+      finish(false);
+    }, 2000);
+    let out = '';
+    child.stdout?.on('data', (chunk) => {
+      out += chunk.toString();
+    });
+    child.on('error', () => {
+      clearTimeout(timer);
+      finish(false);
+    });
+    child.on('exit', (code) => {
+      clearTimeout(timer);
+      finish(code === 0 && out.includes('mws-node-ok'));
+    });
+  });
+}
+
+// Resolves how to spawn scripts as Node, without requiring a system Node
+// install (BLK-002 hidden constraint; see
+// plans/2026-07/05-vscode-node-free-bootstrap/plan.md OP-001/OP-003):
+// 1. MICROWEBSTACKS_NODE_PATH, if the maintainer/user set it explicitly.
+// 2. VS Code's own bundled runtime (process.execPath), run as plain Node via
+//    ELECTRON_RUN_AS_NODE=1 - this is what makes no-system-Node possible.
+// 3. A Node binary vendored alongside the installed engine, if present.
+// 4. A system Node on PATH, as a last-resort fallback for the rare case
+//    where a VS Code/Electron build has the runAsNode fuse disabled.
+let nodeRunnerPromise = null;
+
+async function resolveNodeRunner(runtime) {
+  if (nodeRunnerPromise) {
+    return nodeRunnerPromise;
   }
-  return process.platform === 'win32' ? 'node.exe' : 'node';
+  nodeRunnerPromise = (async () => {
+    const override = process.env.MICROWEBSTACKS_NODE_PATH;
+    if (override) {
+      if (!exists(override)) {
+        throw new Error(`MICROWEBSTACKS_NODE_PATH is set to "${override}" but that file does not exist.`);
+      }
+      log(`Using MICROWEBSTACKS_NODE_PATH override: ${override}`);
+      return {execPath: override, extraEnv: {}};
+    }
+
+    if (await probeNodeRunner(process.execPath, {ELECTRON_RUN_AS_NODE: '1'})) {
+      log(`Using VS Code's own runtime as the Node engine (${process.execPath}, ELECTRON_RUN_AS_NODE=1); no system Node required.`);
+      return {execPath: process.execPath, extraEnv: {ELECTRON_RUN_AS_NODE: '1'}};
+    }
+    log("VS Code's runtime does not support ELECTRON_RUN_AS_NODE (the runAsNode fuse may be disabled on this build); falling back.");
+
+    const vendoredNode = path.join(runtime.engineRoot, 'node_modules', '.bin', process.platform === 'win32' ? 'node.exe' : 'node');
+    if (exists(vendoredNode)) {
+      log(`Using Node binary vendored with the engine: ${vendoredNode}`);
+      return {execPath: vendoredNode, extraEnv: {}};
+    }
+
+    const systemNode = process.platform === 'win32' ? 'node.exe' : 'node';
+    if (await probeNodeRunner(systemNode, {})) {
+      log(`Using system Node on PATH: ${systemNode}`);
+      return {execPath: systemNode, extraEnv: {}};
+    }
+
+    throw new Error(
+      "Could not find a way to run scripts as Node: VS Code's bundled runtime does not support ELECTRON_RUN_AS_NODE, and no system Node.js was found on PATH. Install Node.js 18+, or set the MICROWEBSTACKS_NODE_PATH environment variable to a Node executable."
+    );
+  })();
+  return nodeRunnerPromise.catch((error) => {
+    nodeRunnerPromise = null;
+    throw error;
+  });
 }
 
 const ENGINE_PACKAGE = '@microwebstacks/md-render';
@@ -183,30 +264,184 @@ function isUsableInstalledEngine(engineRoot) {
   return true;
 }
 
-function installEngine(context) {
-  const enginePrefix = getEnginePrefix(context);
-  fs.mkdirSync(enginePrefix, {recursive: true});
-  log(`Installing ${ENGINE_PACKAGE}@${ENGINE_VERSION} into ${enginePrefix} (this runs once and needs network access).`);
+// Scoped package tarball convention: the scope stays in the path but is
+// dropped from the filename, e.g. @foo/bar@1.0.0 ->
+// https://registry.npmjs.org/@foo/bar/-/bar-1.0.0.tgz
+function engineTarballUrl(name, version) {
+  const shortName = name.includes('/') ? name.split('/')[1] : name;
+  return `https://registry.npmjs.org/${name}/-/${shortName}-${version}.tgz`;
+}
+
+function fetchBuffer(url, redirectsLeft = 5) {
   return new Promise((resolve, reject) => {
-    const npmExecutable = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    // --omit=optional skips content-structure's optional native deps
-    // (better-sqlite3, sharp), which the lite/JSON engine never loads.
-    const child = spawnLogged(
-      npmExecutable,
-      ['install', `${ENGINE_PACKAGE}@${ENGINE_VERSION}`, '--prefix', enginePrefix, '--no-audit', '--no-fund', '--omit=optional'],
-      {cwd: enginePrefix, env: process.env}
-    );
-    child.on('error', (error) => {
-      reject(new Error(`Could not run npm (${error.message}). The docs preview needs Node.js and npm installed and on PATH.`));
-    });
-    child.on('exit', (code) => {
-      if (code === 0) {
-        resolve();
+    const request = https.get(url, {headers: {'user-agent': `microwebstacks-docs-preview/${extensionPackage.version}`}}, (response) => {
+      if ([301, 302, 307, 308].includes(response.statusCode) && response.headers.location && redirectsLeft > 0) {
+        response.resume();
+        resolve(fetchBuffer(new URL(response.headers.location, url).toString(), redirectsLeft - 1));
         return;
       }
-      reject(new Error(`Installing ${ENGINE_PACKAGE} failed (npm exited with code ${code}). See the MicroWebStacks Docs output channel.`));
+      if (response.statusCode !== 200) {
+        response.resume();
+        reject(new Error(`request to ${url} failed with status ${response.statusCode}`));
+        return;
+      }
+      const chunks = [];
+      response.on('data', (chunk) => chunks.push(chunk));
+      response.on('end', () => resolve(Buffer.concat(chunks)));
+      response.on('error', reject);
     });
+    request.on('error', reject);
   });
+}
+
+function readTarString(block, start, length) {
+  const slice = block.subarray(start, start + length);
+  const nul = slice.indexOf(0);
+  return (nul === -1 ? slice : slice.subarray(0, nul)).toString('utf8');
+}
+
+function tarBlockPadding(size) {
+  const remainder = size % 512;
+  return remainder === 0 ? size : size + (512 - remainder);
+}
+
+// PAX extended header records look like "<record-length> <key>=<value>\n",
+// back-to-back for as many keys as were overridden for the next entry.
+function parsePaxRecords(text) {
+  const result = {};
+  let i = 0;
+  while (i < text.length) {
+    const spaceIndex = text.indexOf(' ', i);
+    if (spaceIndex === -1) {
+      break;
+    }
+    const recordLength = parseInt(text.slice(i, spaceIndex), 10);
+    if (!Number.isFinite(recordLength) || recordLength <= 0) {
+      break;
+    }
+    const record = text.slice(i, i + recordLength);
+    const equalsIndex = record.indexOf('=');
+    const key = record.slice(spaceIndex - i + 1, equalsIndex);
+    const value = record.slice(equalsIndex + 1).replace(/\n$/, '');
+    result[key] = value;
+    i += recordLength;
+  }
+  return result;
+}
+
+// Minimal reader for the USTAR/PAX tar format npm registry tarballs use.
+// Supports what a real `npm install` output actually contains - regular
+// files, directories, and PAX/GNU long-name headers for the deeply nested
+// paths vendored node_modules trees have. Deliberately does not handle
+// symlinks or hard links: the vendored tree is produced by `npm install`
+// (scripts/stage-engine.js), which does not create either.
+function parseTarEntries(tarBuffer) {
+  const entries = [];
+  let offset = 0;
+  let pendingLongName = null;
+  let pendingPax = null;
+
+  while (offset + 512 <= tarBuffer.length) {
+    const header = tarBuffer.subarray(offset, offset + 512);
+    if (header.every((byte) => byte === 0)) {
+      break;
+    }
+
+    const size = parseInt(readTarString(header, 124, 12).trim() || '0', 8);
+    const typeflag = String.fromCharCode(header[156] || 0);
+    const dataStart = offset + 512;
+
+    if (typeflag === 'x' || typeflag === 'g') {
+      const pax = parsePaxRecords(tarBuffer.subarray(dataStart, dataStart + size).toString('utf8'));
+      if (typeflag === 'x') {
+        pendingPax = pax;
+      }
+      offset = dataStart + tarBlockPadding(size);
+      continue;
+    }
+
+    if (typeflag === 'L') {
+      pendingLongName = tarBuffer.subarray(dataStart, dataStart + size).toString('utf8').replace(/\0+$/, '');
+      offset = dataStart + tarBlockPadding(size);
+      continue;
+    }
+
+    const name = readTarString(header, 0, 100);
+    const entryName = pendingPax?.path ?? pendingLongName ?? name;
+    const entrySize = pendingPax?.size ? parseInt(pendingPax.size, 10) : size;
+    pendingLongName = null;
+    pendingPax = null;
+
+    if (typeflag === '5') {
+      entries.push({name: entryName, type: 'directory'});
+    } else if (typeflag === '0' || typeflag === '\0') {
+      entries.push({name: entryName, type: 'file', data: tarBuffer.subarray(dataStart, dataStart + entrySize)});
+    }
+    // Other typeflags (symlinks, hard links, device files) are ignored.
+
+    offset = dataStart + tarBlockPadding(entrySize);
+  }
+  return entries;
+}
+
+async function extractTarGz(buffer, destDir) {
+  const tarBuffer = zlib.gunzipSync(buffer);
+  const resolvedDestDir = path.resolve(destDir);
+  for (const entry of parseTarEntries(tarBuffer)) {
+    // npm tarballs wrap every entry under a top-level "package/" directory.
+    const relPath = entry.name.replace(/^package\//, '');
+    if (!relPath || relPath === '.') {
+      continue;
+    }
+    const target = path.resolve(resolvedDestDir, relPath);
+    const relativeToRoot = path.relative(resolvedDestDir, target);
+    if (relativeToRoot.startsWith('..') || path.isAbsolute(relativeToRoot)) {
+      throw new Error(`Refusing to extract entry outside the install directory: ${entry.name}`);
+    }
+    if (entry.type === 'directory') {
+      await fsp.mkdir(target, {recursive: true});
+    } else {
+      await fsp.mkdir(path.dirname(target), {recursive: true});
+      await fsp.writeFile(target, entry.data);
+    }
+  }
+}
+
+// Installs the engine with a plain HTTPS download of its published npm
+// tarball, extracted in-process - no npm (or system Node) involved (plans/
+// 2026-07/05-vscode-node-free-bootstrap OP-002). The tarball's production
+// dependencies are pre-vendored under a disguised directory name by
+// scripts/stage-engine.js (npm's packer always strips a real "node_modules"
+// out of a published tarball); this renames it back after extracting.
+async function installEngine(context) {
+  const enginePrefix = getEnginePrefix(context);
+  await fsp.mkdir(enginePrefix, {recursive: true});
+  const url = engineTarballUrl(ENGINE_PACKAGE, ENGINE_VERSION);
+  log(`Installing ${ENGINE_PACKAGE}@${ENGINE_VERSION} from ${url} (this runs once and needs network access).`);
+
+  let buffer;
+  try {
+    buffer = await fetchBuffer(url);
+  } catch (error) {
+    throw new Error(`Could not download ${ENGINE_PACKAGE}@${ENGINE_VERSION} (${error.message}).`);
+  }
+
+  const installRoot = getInstalledEngineRoot(context);
+  await fsp.rm(installRoot, {recursive: true, force: true});
+  await fsp.mkdir(installRoot, {recursive: true});
+  try {
+    await extractTarGz(buffer, installRoot);
+  } catch (error) {
+    throw new Error(`Could not extract ${ENGINE_PACKAGE}@${ENGINE_VERSION} (${error.message}).`);
+  }
+
+  const installedPkg = JSON.parse(await fsp.readFile(path.join(installRoot, 'package.json'), 'utf8'));
+  const vendoredDir = installedPkg.vendoredModulesDir;
+  if (!vendoredDir || !exists(path.join(installRoot, vendoredDir))) {
+    throw new Error(`${ENGINE_PACKAGE}@${ENGINE_VERSION} was not published with vendored dependencies; this extension version can only install a vendored engine build. Republish it with scripts/stage-engine.js (vendoring is on by default).`);
+  }
+  await fsp.rename(path.join(installRoot, vendoredDir), path.join(installRoot, 'node_modules'));
+  log(`Installed ${ENGINE_PACKAGE}@${ENGINE_VERSION} into ${enginePrefix}.`);
 }
 
 // Resolves the engine root. The local workspace checkout is always a valid
@@ -361,17 +596,17 @@ function createRuntimeEnv(runtime, port) {
   };
 }
 
-function runNodeScript(runtime, scriptPath, env) {
+async function runNodeScript(runtime, scriptPath, env) {
+  const runner = await resolveNodeRunner(runtime);
   return new Promise((resolve, reject) => {
-    const nodeExecutable = findNodeExecutable(runtime);
     log(`Running ${scriptPath}`);
-    log(`Node executable: ${nodeExecutable}`);
-    const child = spawnLogged(nodeExecutable, [scriptPath], {
+    log(`Node runtime: ${runner.execPath}`);
+    const child = spawnLogged(runner.execPath, [scriptPath], {
       cwd: runtime.engineRoot,
-      env
+      env: {...env, ...runner.extraEnv}
     });
     child.on('error', (error) => {
-      reject(new Error(`Could not run Node.js (${error.message}). The docs preview needs Node.js 18+ installed and on PATH.`));
+      reject(new Error(`Could not run ${scriptPath} (${error.message}).`));
     });
     child.on('exit', (code) => {
       if (code === 0) {
@@ -388,13 +623,13 @@ async function collect(runtime, env) {
   await runNodeScript(runtime, path.join('scripts', 'diagrams.js'), env);
 }
 
-function startServer(runtime, port, env) {
-  const nodeExecutable = findNodeExecutable(runtime);
+async function startServer(runtime, port, env) {
+  const runner = await resolveNodeRunner(runtime);
   log(`Starting preview server on http://127.0.0.1:${port}/`);
-  log(`Node executable: ${nodeExecutable}`);
-  const child = spawnLogged(nodeExecutable, [path.join('server', 'server.js')], {
+  log(`Node runtime: ${runner.execPath}`);
+  const child = spawnLogged(runner.execPath, [path.join('server', 'server.js')], {
     cwd: runtime.engineRoot,
-    env
+    env: {...env, ...runner.extraEnv}
   });
   child.on('exit', (code, signal) => {
     if (serverProcess === child) {
@@ -451,7 +686,7 @@ async function ensureServer(context) {
       progress.report({message: 'indexing documentation…'});
       await collect(runtime, env);
       progress.report({message: 'starting preview server…'});
-      startServer(runtime, port, env);
+      await startServer(runtime, port, env);
       const browserUrl = `http://127.0.0.1:${port}/`;
       await waitForServer(browserUrl);
       serverState = {
