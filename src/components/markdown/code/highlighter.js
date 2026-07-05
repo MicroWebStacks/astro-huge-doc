@@ -1,7 +1,7 @@
-import {readFile} from 'node:fs/promises';
 import {config} from '@/config.js'
 import { log_debug } from '@/libs/utils';
 import {bundledLanguages, createHighlighter} from 'shiki';
+import mermaidGrammarJson from './mermaid.tmLanguage.json?raw';
 
 // Dual-theme highlighting: Shiki emits both light and dark token colors as
 // CSS variables (--shiki-light / --shiki-dark). The active palette is picked
@@ -12,9 +12,7 @@ const themes = config.highlighter.themes ?? {
     light: config.highlighter.light_theme ?? 'light-plus'
 }
 const themeList = [...new Set(Object.values(themes))]
-const mermaidGrammar = JSON.parse(
-    await readFile(new URL('./mermaid.tmLanguage.json', import.meta.url), 'utf8')
-)
+const mermaidGrammar = JSON.parse(mermaidGrammarJson)
 const mermaidLanguage = {
     name: 'mermaid',
     ...mermaidGrammar

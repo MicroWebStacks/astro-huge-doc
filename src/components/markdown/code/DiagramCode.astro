@@ -33,11 +33,17 @@ if(params && (params.length > 0)){
 }
 const modalName = title || uid;
 const mermaidSourceJson = JSON.stringify(code).replace(/</g, '\\u003c');
+const languageLabel = language
+    .split(/[-_]+/g)
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 
 ---
 {hasDiagram &&
     <div class:list={['diagram-shell', {'mermaid-shell': isClientDiagram}]} data-uid={uid} data-view="diagram">
         <div class="diagram-toolbar" role="toolbar" aria-label="Diagram controls">
+            <span class="toolbar-language" aria-hidden="true">{languageLabel}</span>
             <div class="view-toggle" aria-label="Diagram view mode">
                 <button
                     type="button"
@@ -151,7 +157,6 @@ const mermaidSourceJson = JSON.stringify(code).replace(/</g, '\\u003c');
 }
 .diagram-toolbar{
     display: flex;
-    justify-content: flex-end;
     align-items: center;
     gap: 4px;
     min-height: 28px;
@@ -164,6 +169,21 @@ const mermaidSourceJson = JSON.stringify(code).replace(/</g, '\\u003c');
 .diagram-shell:hover .diagram-toolbar,
 .diagram-shell:focus-within .diagram-toolbar{
     opacity: 1;
+}
+.toolbar-language{
+    margin-right: auto;
+    padding: 0 8px;
+    color: var(--content-color-soft, var(--content-color));
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.16s ease;
+}
+.diagram-shell[data-view="code"] .toolbar-language{
+    opacity: 0.9;
 }
 .view-toggle{
     display: inline-flex;
