@@ -39,19 +39,26 @@ Use `plans/` for dated planning packets tied to active work.
 Each new plan folder should use:
 
 ```text
-plans/YYYY-MM-DD-<slug>/
-  survey.md            # only when explicitly requested
-  plan.md
-  implementation.md    # created only after implementation work has happened
-  test.md              # validation proof before review
+plans/YYYY-MM/
+  DD-<slug>/
+    survey.md            # only when explicitly requested
+    plan.md
+    implementation.md    # created only after implementation work has happened
+    test.md              # validation proof before review
 ```
 
 Create `survey.md` only when the maintainer explicitly requests a survey. For
 ordinary discovery, fold concise notes into `plan.md`.
 
-Top-level `plans/open.md` and `plans/closed.md` may be used to track packet
-status when there are multiple active or completed packets. Keep them concise:
-packet path, status, owner or agent, and proof link.
+Keep three top-level packet surfaces current:
+
+- `plans/README.md` - concise layout guidance for the directory itself;
+- `plans/open.md` - packets with work still outstanding;
+- `plans/closed.md` - completed packets and planning-only packets whose
+  decisions are settled.
+
+Update these index files whenever a packet starts, closes, or materially
+changes status.
 
 ## Plan Shape
 

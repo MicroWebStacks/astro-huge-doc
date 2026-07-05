@@ -14,13 +14,16 @@ This repository reserves `specification/` for stable requirements and uses
   it or a durable implementation contract has clearly emerged.
 - Store durable specifications under `specification/<slug>/spec.md` when a
   requirement must outlive one implementation pass.
-- Store planning work under `plans/YYYY-MM-DD-<slug>/`. Use the ISO date for
-  the day the plan packet starts, followed by a short lowercase slug.
+- Store planning work under `plans/YYYY-MM/DD-<slug>/`. Use the ISO month as
+  the bucket, then the day the plan packet starts plus a short lowercase slug.
 - New dated plan folders should contain `plan.md` and a validation record in
   `test.md` before the work is considered ready for review.
 - Create `implementation.md` only after implementation work has actually
   happened. Do not create it upfront as a planning stub.
 - Add `survey.md` only when the maintainer explicitly asks for a survey.
+- Keep `plans/README.md` as the concise layout note, `plans/open.md` for work
+  still outstanding, and `plans/closed.md` for completed or planning-only
+  settled packets.
 - Keep `plan.md` focused on scope, milestones, dependencies, risks, and exit
   criteria. Do not turn unreviewed discovery notes into committed scope.
 - Keep `implementation.md` as a running log of changes made, decisions,
@@ -28,8 +31,9 @@ This repository reserves `specification/` for stable requirements and uses
 - Keep `test.md` as proof of working behavior: commands run, fixtures used,
   expected and actual results, and any gaps that remain untested.
 
-When a plan changes during implementation, update the dated plan folder so the
-plan, implementation notes, and test proof stay consistent.
+When a plan changes during implementation, update the dated plan folder and the
+top-level plan indexes so the packet, implementation notes, test proof, and
+repo-level status stay consistent.
 
 ## Temporary Files
 

@@ -10,6 +10,7 @@ function cloneHeading(heading) {
         uid: heading.uid ?? null,
         nodeKey: heading.nodeKey ?? heading.uid ?? heading.slug ?? heading.link ?? label,
         hasTable: Boolean(heading.hasTable),
+        hasCode: Boolean(heading.hasCode),
         hasDiagram: Boolean(heading.hasDiagram)
     };
 }

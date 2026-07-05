@@ -56,7 +56,7 @@ our zero-config, folder-based documentation-site identity.
   Node.js installed at all" — vendoring only removes the download step; the
   engine still runs as a spawned Node process either way. The no-Node-
   runtime gap stays tracked in
-  `plans/2026-06-28-vscode-marketplace-readiness`, unaffected by this
+  `plans/2026-06/28-vscode-marketplace-readiness`, unaffected by this
   decision.
 - `OP-002` — **Local/bundled Mermaid rendering.** Out of scope here — already
   in progress under a separate, existing plan. No duplicate tracking needed

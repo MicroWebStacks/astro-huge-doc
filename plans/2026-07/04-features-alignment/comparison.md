@@ -4,12 +4,12 @@
 
 - Ours: `packages/vscode-extension/{package.json,extension.js,README.md,CHANGELOG.md}`,
   `packages/md-render/{config.js,package.json}`, root `readme.md`, and prior
-  planning packets (`plans/2026-06-27-vscode-ext/`,
-  `plans/2026-06-28-vscode-marketplace-readiness/`,
-  `plans/2026-06-28-mermaid-diagrams/`, `plans/2026-06-28-diagram-toolbar/`,
-  `plans/2026-06-27-toc-menu-controls/`, `plans/2026-06-28-file-tree-menu/`,
-  `plans/2026-06-28-menu-state-auto/`, `plans/2026-06-27-ui-redesign/`,
-  `plans/2026-06-29-vscode-lite/`, `plans/2026-07-04-vscode-lite-parity/`).
+  planning packets (`plans/2026-06/27-vscode-ext/`,
+  `plans/2026-06/28-vscode-marketplace-readiness/`,
+  `plans/2026-06/28-mermaid-diagrams/`, `plans/2026-06/28-diagram-toolbar/`,
+  `plans/2026-06/27-toc-menu-controls/`, `plans/2026-06/28-file-tree-menu/`,
+  `plans/2026-06/28-menu-state-auto/`, `plans/2026-06/27-ui-redesign/`,
+  `plans/2026-06/29-vscode-lite/`, `plans/2026-07/04-vscode-lite-parity/`).
 - Theirs: `C:\dev\github\shd101wyy\vscode-markdown-preview-enhanced` (v0.8.30),
   `package.json`, `CHANGELOG.md`, `gulpfile.js`, `yarn.lock`, `README.md`.
   Note: the `crossnote` npm dependency that implements MPE's actual rendering
@@ -33,7 +33,7 @@ a maintainer call are cross-referenced to `OP-xxx` in `plan.md`.
 | Area | Feature | MPE | Ours | Relevant to us? | Recommendation |
 |---|---|---|---|---|---|
 | Install | Rendering engine bundled in the VSIX (no first-run install) | Yes — `crossnote` assets vendored at build time via `gulpfile.js` | No — engine npm-installs into `globalStorage` on first run (network, minutes) | Accepted tradeoff | Declined for now: a download-on-first-install vs. a much larger bundled VSIX is an acceptable tradeoff. Note this is a **separate concern** from the Node.js runtime requirement below — vendoring assets doesn't remove the need to execute them under Node either way |
-| Install | Requires a system Node.js/npm | No | Yes (README.md:22) | Yes | Already tracked in `plans/2026-06-28-vscode-marketplace-readiness`; no new action here |
+| Install | Requires a system Node.js/npm | No | Yes (README.md:22) | Yes | Already tracked in `plans/2026-06/28-vscode-marketplace-readiness`; no new action here |
 | Install | Cross-platform (macOS/Linux) | Yes | No — Windows x64 only in preview | Yes | Already tracked in marketplace-readiness plan; out of scope for this packet |
 | Install | Web extension / vscode.dev support | Yes (dual native+browser build) | No (explicit non-goal) | Low | Keep as non-goal |
 | Install | Telemetry-free / offline after install | Yes | Yes (implied — no telemetry code found) | — | No action |

@@ -299,8 +299,8 @@ function getAssetUrl(assetUid, versionId = null) {
     return blobFileUrl(blob?.hash, assetInfo?.ext);
 }
 
-/* Mark each heading whose section directly contains a table or a diagram, so
-   the TOC can show an indicator. Mirrors structure-db-sqlite.js but resolves
+/* Mark each heading whose section directly contains a table, code block, or
+   diagram, so the TOC can show an indicator. Mirrors structure-db-sqlite.js but resolves
    code-block extensions from the in-memory asset_info index. */
 function annotateHeadingSections(items) {
     const headings = items.filter((i) => i.type === 'heading');
@@ -342,6 +342,8 @@ function annotateHeadingSections(items) {
             const lang = normalizeLang(extByUid.get(item.asset_uid));
             if (diagramLanguages[lang]) {
                 current.hasDiagram = true;
+            } else {
+                current.hasCode = true;
             }
         }
     }

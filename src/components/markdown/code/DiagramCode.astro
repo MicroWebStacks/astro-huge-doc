@@ -41,10 +41,10 @@ const languageLabel = language
 
 ---
 {hasDiagram &&
-    <div class:list={['diagram-shell', {'mermaid-shell': isClientDiagram}]} data-uid={uid} data-view="diagram">
+    <div class:list={['diagram-shell', {'mermaid-shell': isClientDiagram}]} data-code-shell data-uid={uid} data-view="diagram">
         <div class="diagram-toolbar" role="toolbar" aria-label="Diagram controls">
-            <span class="toolbar-language" aria-hidden="true">{languageLabel}</span>
-            <div class="view-toggle" aria-label="Diagram view mode">
+            <span class="toolbar-language">{languageLabel}</span>
+            <div class="toolbar-group" aria-label="Diagram view mode">
                 <button
                     type="button"
                     class="toolbar-btn"
@@ -64,9 +64,37 @@ const languageLabel = language
                     <SvgIcons filename="diagram" />
                 </button>
             </div>
+            <div class="toolbar-group" aria-label="Code display controls">
+                <button
+                    type="button"
+                    class="toolbar-btn"
+                    data-code-action="line-numbers"
+                    title="Toggle line numbers"
+                    aria-label="Toggle line numbers"
+                    aria-pressed="false">
+                    <SvgIcons filename="line-numbers" />
+                </button>
+                <button
+                    type="button"
+                    class="toolbar-btn"
+                    data-code-action="wrap"
+                    title="Toggle wrapped lines"
+                    aria-label="Toggle wrapped lines"
+                    aria-pressed="false">
+                    <SvgIcons filename="wrap" />
+                </button>
+            </div>
             <button
                 type="button"
-                class="toolbar-btn"
+                class="toolbar-btn standalone-btn"
+                data-code-action="copy"
+                title="Copy code"
+                aria-label="Copy code">
+                <SvgIcons filename="copy" />
+            </button>
+            <button
+                type="button"
+                class="toolbar-btn standalone-btn"
                 data-action="expand"
                 title="Open full view"
                 aria-label="Open full view">
@@ -89,7 +117,7 @@ const languageLabel = language
             </div>
         }
         <div class="code hidden" data-role="code" data-uid={uid}>
-            <Highlighter uid={uid} code={code} language={language} params={params} />
+            <Highlighter uid={uid} code={code} language={language} params={params} showToolbar={false} />
         </div>
     </div>
 }
@@ -158,17 +186,11 @@ const languageLabel = language
 .diagram-toolbar{
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     min-height: 28px;
     padding: 2px 5px;
     background: var(--surface-2-bg);
     border-bottom: 1px solid var(--soft-border-color);
-    opacity: 0;
-    transition: opacity 0.16s ease;
-}
-.diagram-shell:hover .diagram-toolbar,
-.diagram-shell:focus-within .diagram-toolbar{
-    opacity: 1;
 }
 .toolbar-language{
     margin-right: auto;
@@ -178,14 +200,8 @@ const languageLabel = language
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.16s ease;
 }
-.diagram-shell[data-view="code"] .toolbar-language{
-    opacity: 0.9;
-}
-.view-toggle{
+.toolbar-group{
     display: inline-flex;
     overflow: hidden;
     border: 1px solid var(--soft-border-color);
@@ -205,19 +221,32 @@ const languageLabel = language
     cursor: pointer;
     transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
 }
-.toolbar-btn[data-action="expand"]{
+.toolbar-btn:active:not(:disabled){
+    transform: translateY(1px);
+}
+.standalone-btn{
     border: 1px solid var(--soft-border-color);
     border-radius: 6px;
 }
-.view-toggle .toolbar-btn + .toolbar-btn{
+.toolbar-btn[data-code-action="copy"]{
+    width: auto;
+    min-width: 28px;
+    padding: 0 8px;
+}
+.toolbar-group .toolbar-btn + .toolbar-btn{
     border-left: 1px solid var(--soft-border-color);
 }
-.toolbar-btn:hover{
+.toolbar-btn:hover:not(:disabled){
     background: var(--menu-span-hover-color);
 }
-.toolbar-btn[aria-pressed="true"]{
+.toolbar-btn[aria-pressed="true"],
+.toolbar-btn[data-copied="true"]{
     background: var(--content-bg-color);
     color: var(--front-blue);
+}
+.toolbar-btn:disabled{
+    opacity: 0.4;
+    cursor: default;
 }
 .diagram-shell[data-view="code"] .toolbar-btn[data-action="expand"]{
     opacity: 0.45;
@@ -238,11 +267,28 @@ const languageLabel = language
     fill: currentColor;
 }
 .toolbar-btn[data-action="diagram"] :global(svg path),
-.toolbar-btn[data-action="code"] :global(svg path){
+.toolbar-btn[data-action="code"] :global(svg path),
+.toolbar-btn[data-code-action="copy"] :global(svg path),
+.toolbar-btn[data-code-action="line-numbers"] :global(svg path),
+.toolbar-btn[data-code-action="wrap"] :global(svg path){
     fill: none;
 }
-.standalone-code{
-    margin-top: 12px;
+.toolbar-btn[data-code-action="copy"]::after{
+    content: "";
+    max-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: max-width 0.16s ease, margin-left 0.16s ease, opacity 0.16s ease;
+    opacity: 0;
+}
+.toolbar-btn[data-code-action="copy"][data-copied="true"]::after{
+    content: "Copied";
+    max-width: 4.5rem;
+    margin-left: 6px;
+    opacity: 1;
 }
 </style>
 
@@ -284,6 +330,7 @@ const initDiagramControls = () => {
                 codeButton.setAttribute('aria-pressed', String(!showDiagram));
             }
 
+            shell.dispatchEvent(new CustomEvent('microwebstacks:code-view-change', {bubbles: true}));
         };
 
         diagramButton?.addEventListener('click', () => setView('diagram'));

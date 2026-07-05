@@ -12,7 +12,7 @@ Expected:
 
 Actual:
 
-- Created `plans/2026-06-28-vscode-marketplace-readiness/plan.md`.
+- Created `plans/2026-06/28-vscode-marketplace-readiness/plan.md`.
 - Created this planning validation record.
 - Did not create `implementation.md` because no implementation work happened.
 - Confirmed the current VSIX contains only:
@@ -31,8 +31,8 @@ Commands run:
 ```txt
 Get-Content WORKFLOW.md
 Get-ChildItem -Force plans
-Get-Content plans\2026-06-27-vscode-ext\plan.md
-Get-Content plans\2026-06-27-vscode-ext\test.md
+Get-Content plans\2026-06\27-vscode-ext\plan.md
+Get-Content plans\2026-06\27-vscode-ext\test.md
 rg -n "vscode|extension|marketplace|publish|vsce|enginePath|VSIX" C:\Users\wassi\.codex\memories\MEMORY.md
 ```
 
@@ -86,8 +86,8 @@ Actual:
 Commands run:
 
 ```txt
-Get-Content plans\2026-06-28-vscode-marketplace-readiness\plan.md
-Get-Content plans\2026-06-28-vscode-marketplace-readiness\test.md
+Get-Content plans\2026-06\28-vscode-marketplace-readiness\plan.md
+Get-Content plans\2026-06\28-vscode-marketplace-readiness\test.md
 ```
 
 Known gaps:
@@ -157,7 +157,7 @@ Expected:
 
 Actual:
 
-- Created `plans/2026-06-28-vscode-marketplace-readiness/implementation.md`.
+- Created `plans/2026-06/28-vscode-marketplace-readiness/implementation.md`.
 - Refactored `packages/vscode-extension/extension.js`: replaced
   `resolveEngineRoot()` with async `resolveEngine(context)` implementing the
   tiered order enginePath -> local repo -> installed storage -> registry

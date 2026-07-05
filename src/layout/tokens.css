@@ -6,7 +6,7 @@
   components compose on one rhythm instead of ad-hoc px values.
 
   See `specification/ui_design.md` (Foundations) for the intent and
-  `plans/2026-06-27-ui-redesign/plan.md` for the rollout. These do not
+  `plans/2026-06/27-ui-redesign/plan.md` for the rollout. These do not
   vary by theme, so they sit on :root unconditionally.
 */
 

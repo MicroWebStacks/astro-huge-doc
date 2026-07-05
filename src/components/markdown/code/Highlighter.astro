@@ -7,65 +7,215 @@ export interface Props {
     code: string;
     language: string;
     params: object;
+    showToolbar?: boolean;
 }
 
-const { uid, code, language, params } = Astro.props as Props;
+const { uid, code, language, params, showToolbar = true } = Astro.props as Props;
 
 const html = await codeToHtml(code, { lang: language, theme:'dark-plus' })
+const languageLabel = language
+    .split(/[-_]+/g)
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 
 ---
-<div class="highlighter container" data-uid={uid}>
-    <Fragment set:html={html}></Fragment>
-    <button class="copy-btn" data-uid={uid}><Svgicons filename="copy" /></button>
-    <span class="copy-message" data-uid={uid}>Copied!</span>
+<div class:list={['code-shell', {embedded: !showToolbar}]} data-code-shell data-uid={uid}>
+    {showToolbar &&
+        <div class="code-toolbar" role="toolbar" aria-label="Code block controls">
+            <span class="toolbar-language">{languageLabel}</span>
+            <div class="toolbar-group" aria-label="Code display controls">
+                <button
+                    type="button"
+                    class="toolbar-btn"
+                    data-code-action="line-numbers"
+                    title="Toggle line numbers"
+                    aria-label="Toggle line numbers"
+                    aria-pressed="false">
+                    <Svgicons filename="line-numbers" />
+                </button>
+                <button
+                    type="button"
+                    class="toolbar-btn"
+                    data-code-action="wrap"
+                    title="Toggle wrapped lines"
+                    aria-label="Toggle wrapped lines"
+                    aria-pressed="false">
+                    <Svgicons filename="wrap" />
+                </button>
+            </div>
+            <button
+                type="button"
+                class="toolbar-btn standalone-btn"
+                data-code-action="copy"
+                title="Copy code"
+                aria-label="Copy code">
+                <Svgicons filename="copy" />
+            </button>
+        </div>
+    }
+    <div
+        class:list={['highlighter', 'container', {embedded: !showToolbar}]}
+        data-uid={uid}
+        data-code-surface
+        data-line-numbers="false"
+        data-wrap-lines="false">
+        <Fragment set:html={html}></Fragment>
+    </div>
 </div>
 
 <style>
+.code-shell {
+    display: flex;
+    flex-direction: column;
+    width: min(100%, 80ch);
+    max-width: 100%;
+    margin-top: 12px;
+    margin-bottom: 20px;
+    box-sizing: border-box;
+    background: var(--content-bg-color);
+    border: 1px solid var(--soft-border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.code-shell.embedded {
+    width: 100%;
+    margin: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+}
+.code-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 28px;
+    padding: 2px 5px;
+    background: var(--surface-2-bg);
+    border-bottom: 1px solid var(--soft-border-color);
+}
+.toolbar-language {
+    margin-right: auto;
+    padding: 0 8px;
+    color: var(--content-color-soft, var(--content-color));
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.toolbar-group {
+    display: inline-flex;
+    overflow: hidden;
+    border: 1px solid var(--soft-border-color);
+    border-radius: 6px;
+}
+.toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 24px;
+    padding: 0;
+    color: var(--content-color);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+.toolbar-btn:active:not(:disabled) {
+    transform: translateY(1px);
+}
+.toolbar-group .toolbar-btn + .toolbar-btn {
+    border-left: 1px solid var(--soft-border-color);
+}
+.standalone-btn {
+    border: 1px solid var(--soft-border-color);
+    border-radius: 6px;
+}
+.toolbar-btn[data-code-action="copy"] {
+    width: auto;
+    min-width: 28px;
+    padding: 0 8px;
+}
+.toolbar-btn:hover:not(:disabled) {
+    background: var(--menu-span-hover-color);
+}
+.toolbar-btn[aria-pressed="true"],
+.toolbar-btn[data-copied="true"] {
+    background: var(--content-bg-color);
+    color: var(--front-blue);
+}
+.toolbar-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
 .highlighter.container {
     position: relative;
-    margin-top: 10px;
-    margin-bottom: 20px;
-    width: fit-content;
-    min-width: 98%;
-    border-width: 1px;
-    border-style: solid;
-    border-color: var(--code-border-color);
-}
-.copy-btn {
-    position: absolute;
-    top: 15px;
-    right: 5px;
-    cursor: pointer;
-    display: none;
-    background: transparent;
-    border-width: 1px;
-    border-style: solid;
-    border-color: var(--code-btn-border-color);
-    border-radius: 3px;
-    padding: 5px;
-    outline: none;
-}
-.container:hover .copy-btn {
-    display: block;
-}
-
-.copy-message {
-    display: none;
-    position: absolute;
-    top: 15px;
-    right: 40px;
-    background-color: var(--tooltip-bg-color);
-    color: var(--tooltip-text-color);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 12px;
-    transition: opacity 0.3s;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
 }
 </style>
 
 <style is:global>
-pre{
-    padding:10px;
+.highlighter.container .shiki {
+    margin: 0;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+.highlighter.container pre.shiki,
+.highlighter.container .shiki {
+    margin: 0;
+    padding: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    box-sizing: border-box;
+    scrollbar-gutter: stable both-edges;
+}
+.highlighter.container pre.shiki code,
+.highlighter.container .shiki code {
+    display: block;
+}
+.highlighter.container pre.shiki code .line,
+.highlighter.container .shiki code .line {
+    display: inline-block;
+    width: 100%;
+    vertical-align: top;
+}
+.highlighter.container[data-line-numbers="true"] pre.shiki code,
+.highlighter.container[data-line-numbers="true"] .shiki code {
+    counter-reset: line;
+}
+.highlighter.container[data-line-numbers="true"] pre.shiki code .line,
+.highlighter.container[data-line-numbers="true"] .shiki code .line {
+    position: relative;
+    padding-left: calc(1ch + 0.9rem);
+}
+.highlighter.container[data-line-numbers="true"] pre.shiki code .line::before,
+.highlighter.container[data-line-numbers="true"] .shiki code .line::before {
+    position: absolute;
+    left: 0;
+    width: 1ch;
+    padding-right: 0.45rem;
+    border-right: 1px solid var(--soft-border-color);
+    color: var(--content-color-soft, var(--content-color));
+    opacity: 0.55;
+    text-align: right;
+    user-select: none;
+    counter-increment: line;
+    content: counter(line);
+}
+.highlighter.container[data-wrap-lines="true"] pre.shiki,
+.highlighter.container[data-wrap-lines="true"] .shiki {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.highlighter.container[data-wrap-lines="true"] pre.shiki code,
+.highlighter.container[data-wrap-lines="true"] .shiki code {
+    white-space: inherit;
 }
 /* Shiki dual-theme: select the active palette from the CSS variables it
    emitted (--shiki-light / --shiki-dark) based on the resolved theme. */
@@ -83,40 +233,44 @@ pre{
 :root[data-theme="dark"] .shiki{
     background-color: var(--shiki-dark-bg);
 }
-.copy-btn > svg{
-  height: 16px;
-  width: 16px;
-  margin:0px;
-  padding-top: 2px;
-  padding-left: 2px;
-  fill:var(--code-btn-fill-color);
+.toolbar-btn > svg{
+  height: 15px;
+  width: 15px;
+  margin: 0;
+}
+.toolbar-btn svg path,
+.toolbar-btn svg circle,
+.toolbar-btn svg rect,
+.toolbar-btn svg polyline,
+.toolbar-btn svg line{
+    stroke: currentColor;
+}
+.toolbar-btn svg path,
+.toolbar-btn svg rect{
+    fill: currentColor;
+}
+.toolbar-btn[data-code-action="copy"] svg path,
+.toolbar-btn[data-code-action="line-numbers"] svg path,
+.toolbar-btn[data-code-action="wrap"] svg path{
+    fill: none;
+}
+.toolbar-btn[data-code-action="copy"]::after {
+    content: "";
+    max-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: max-width 0.16s ease, margin-left 0.16s ease, opacity 0.16s ease;
+    opacity: 0;
+}
+.toolbar-btn[data-code-action="copy"][data-copied="true"]::after {
+    content: "Copied";
+    max-width: 4.5rem;
+    margin-left: 6px;
+    opacity: 1;
 }
 </style>
 
-<script>
-const buttons = document.querySelectorAll('button.copy-btn');
-buttons.forEach(button => {
-    button.addEventListener('click', async () => {
-        const uid = button.getAttribute('data-uid');
-        const message = document.querySelector(`.copy-message[data-uid="${uid}"]`);
-        
-        try {
-            const container = button.closest('.highlighter.container');
-            const codeText = container?.querySelector('pre')?.textContent ?? '';
-            if (codeText) {
-                await navigator.clipboard.writeText(codeText);
-                
-                message.style.display = 'block';
-                setTimeout(() => {
-                    message.style.display = 'none';
-                }, 1000);
-                
-            } else {
-                console.error('Failed to read code content');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-        }
-    });
-});
-</script>
+<script src="./code_controls.js" />

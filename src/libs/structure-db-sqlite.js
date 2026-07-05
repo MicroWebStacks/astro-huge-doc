@@ -475,7 +475,7 @@ function buildItems(items, assets, docUid, documentPath) {
     return {items: renderItems, headings};
 }
 
-/* Mark each heading whose section directly contains a table or a diagram so
+/* Mark each heading whose section directly contains a table, code block, or diagram so
    the TOC can show an indicator icon next to the label. The "section" of a
    heading is the run of items between it and the next heading; the nearest
    preceding heading is the one annotated. Diagrams are code blocks whose
@@ -524,6 +524,8 @@ function annotateHeadingSections(items) {
             const lang = normalizeLang(extByUid.get(item.asset_uid));
             if (diagramLanguages[lang]) {
                 current.hasDiagram = true;
+            } else {
+                current.hasCode = true;
             }
         }
     }
