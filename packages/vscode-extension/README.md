@@ -20,9 +20,13 @@ documentation site, not a single-file preview.
 
 ## Requirements
 
-- **Node.js 18+** (with npm) installed and on your PATH - the preview runs a local
-  rendering engine with it. On first use the engine (~a few MB download) is
-  installed automatically from the npm registry; later runs are offline.
+- No system Node.js or npm is required on the normal install path. On first
+  use the extension downloads the pinned rendering engine from the npm registry
+  and runs its scripts with VS Code's own bundled runtime. Later runs are
+  offline unless the pinned engine version changes.
+- Rare fallback case: if a VS Code/Electron build disables
+  `ELECTRON_RUN_AS_NODE`, set `MICROWEBSTACKS_NODE_PATH` to a Node.js 18+
+  executable or make `node` available on PATH.
 - Optional: a reachable [Kroki](https://kroki.io) server if your docs contain
   PlantUML or BlockDiag diagrams (see Configuration below). Mermaid does not
   need a server. Pages still load without Kroki - only PlantUML/BlockDiag

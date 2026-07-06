@@ -190,3 +190,40 @@ Known gaps:
 - Tier 4 (registry install) is unexercised end to end because
   `@microwebstacks/md-render` is unpublished (blocked on `content-structure`).
 - Full bootstrap not yet run inside a real VS Code host / clean profile.
+
+## 2026-07-06 - Node-Free Bootstrap Reconciliation
+
+Expected:
+
+- Recheck the Marketplace packet after the follow-up node-free bootstrap work.
+- Confirm whether the earlier "system Node + npm required" notes are still
+  true.
+
+Actual:
+
+- Confirmed the earlier requirement notes are now stale for the installed
+  lite/json preview path.
+- `packages/vscode-extension/extension.js` now:
+  - probes `process.execPath` with `ELECTRON_RUN_AS_NODE=1`
+  - falls back to `MICROWEBSTACKS_NODE_PATH` / system `node` only if needed
+  - downloads the engine tarball over HTTPS and extracts it locally instead of
+    shelling out to `npm install`
+- `scripts/stage-engine.js` now vendors production dependencies under
+  `_modules`, matching the installer's restore path.
+- Updated this packet's plan/implementation wording so BLK-002 and Phase 2 no
+  longer claim that system Node/npm are part of the normal first-run contract.
+
+Commands reviewed:
+
+```txt
+Get-Content packages\vscode-extension\extension.js
+Get-Content scripts\stage-engine.js
+Get-Content scripts\release-engine.js
+Get-Content RELEASE.md
+Get-Content plans\2026-07\05-vscode-node-free-bootstrap\plan.md
+```
+
+Known gaps:
+
+- The clean-profile, no-Node/no-npm machine validation is still not captured in
+  this packet and remains required before closure.

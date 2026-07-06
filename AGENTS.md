@@ -16,24 +16,27 @@ This repository reserves `specification/` for stable requirements and uses
   requirement must outlive one implementation pass.
 - Store planning work under `plans/YYYY-MM/DD-<slug>/`. Use the ISO month as
   the bucket, then the day the plan packet starts plus a short lowercase slug.
-- New dated plan folders should contain `plan.md` and a validation record in
-  `test.md` before the work is considered ready for review.
+- New dated plan folders should always contain `plan.md`.
 - Create `implementation.md` only after implementation work has actually
   happened. Do not create it upfront as a planning stub.
+- Add `test.md` only when validation notes are useful to preserve; it is never
+  required to close the plan.
 - Add `survey.md` only when the maintainer explicitly asks for a survey.
 - Keep `plans/README.md` as the concise layout note, `plans/open.md` for work
-  still outstanding, and `plans/closed.md` for completed or planning-only
-  settled packets.
+  still outstanding, and `plans/closed.md` for implementation-finished or
+  planning-only settled packets.
 - Keep `plan.md` focused on scope, milestones, dependencies, risks, and exit
   criteria. Do not turn unreviewed discovery notes into committed scope.
 - Keep `implementation.md` as a running log of changes made, decisions,
   deviations from the plan, and follow-up risks.
-- Keep `test.md` as proof of working behavior: commands run, fixtures used,
+- Keep `test.md` as optional validation evidence: commands run, fixtures used,
   expected and actual results, and any gaps that remain untested.
+- Close the plan as soon as implementation is finished. Testing can happen
+  before or after closure and does not change the plan's definition of done.
 
 When a plan changes during implementation, update the dated plan folder and the
-top-level plan indexes so the packet, implementation notes, test proof, and
-repo-level status stay consistent.
+top-level plan indexes so the packet, implementation notes, optional test
+notes, and repo-level status stay consistent.
 
 Plan review and the plan-to-implementation trigger are exclusively maintainer-
 initiated actions — never solicit approval via `ExitPlanMode` or chat questions.

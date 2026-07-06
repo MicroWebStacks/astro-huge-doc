@@ -37,18 +37,25 @@ local `astro-huge-doc` checkout.
   native stack inside one VSIX.
 - First release ships to the Marketplace flagged as a preview/pre-release.
 - First release targets Windows x64 only, explicitly labeled in the listing.
-- The first ship documents that a system Node runtime is required; true
-  no-Node zero-config is deferred.
+- The installed extension should use VS Code's own bundled runtime plus an
+  npm-free HTTPS tarball installer for the lite/json engine; system Node stays
+  only as a documented fallback when a VS Code/Electron build does not allow
+  `ELECTRON_RUN_AS_NODE=1`.
 
 ## Current Evidence
 
-- `packages/vscode-extension/package.json` is marked `"private": true`.
-- The extension manifest includes a publisher and commands, but not the full
-  Marketplace-facing metadata surface.
-- The currently generated VSIX contains only `extension/package.json` and
-  `extension/extension.js`.
-- `extension.js` still resolves a rendering engine through `enginePath` or
-  repo-relative candidates.
+- `packages/vscode-extension/package.json` is public (`"private": false`) and
+  now includes Marketplace-facing metadata plus a pinned `engineVersion`.
+- The extension manifest includes a publisher, commands, categories, keywords,
+  repository/bugs links, and an extension-local README.
+- `extension.js` now resolves a rendering engine through `enginePath`,
+  repo-relative candidates, or a versioned installed engine in extension
+  storage.
+- `extension.js` now installs the engine with an in-process HTTPS tarball
+  download/extract path instead of shelling out to `npm`.
+- `extension.js` now prefers VS Code's own runtime
+  (`process.execPath` + `ELECTRON_RUN_AS_NODE=1`) for collect/diagrams/server
+  script execution, with explicit override / fallback paths if unavailable.
 - `README.md` still documents local `C:\dev\...` development paths for the
   extension flow.
 - The renderer defaults to a Kroki-hosted diagram rendering service unless
@@ -96,24 +103,24 @@ Candidate approaches:
 
 Selected direction: Option B. Publish the renderer as a versioned Node engine
 package (built/staged from this repo) that the extension installs or spawns.
-This keeps the VSIX small, lets the platform's package manager resolve native
-modules (`better-sqlite3`, `duckdb`, `sharp`) per platform/ABI, and leaves the
-source repository's standalone `pnpm build`/`collect`/preview flows untouched.
+This keeps the VSIX small, leaves the source repository's standalone
+`pnpm build`/`collect`/preview flows untouched, and still allows the published
+lite/json engine package to remain self-contained for installed users.
 Keep `enginePath` only as an advanced development override. First-run install
-mechanism is registry install of `@microwebstacks/md-render` from npm; a
-bundled-tarball offline install is a deferred optimization. Trade-offs accepted
-for the preview: first-run latency, and a first-use requirement for network
-access plus npm/build tooling on the user's machine. This network requirement is
-fetching engine *code* from npm only — it does not send the user's documentation
-anywhere, and is independent of the opt-in hosted diagram rendering in BLK-005.
+mechanism is now an in-process HTTPS download of the published
+`@microwebstacks/md-render` tarball plus local extraction into extension
+storage; no npm invocation is required on the user machine. Trade-offs accepted
+for the preview: first-run latency and a first-use requirement for network
+access. This network requirement is fetching engine *code* only - it does not
+send the user's documentation anywhere, and is independent of the opt-in
+hosted diagram rendering in BLK-005.
 
-Note (hidden constraint): the extension spawns a child `node` process, so even
-with the engine packaged the user must have a compatible system Node runtime on
-PATH whose ABI matches the engine's prebuilt native modules. True no-Node
-zero-config (bundling a Node runtime or running the server in-process in the
-extension host) is explicitly deferred past the first preview release. The first
-release documents the Node requirement and surfaces a clear error when it is
-missing or mismatched.
+Updated hidden constraint: the installed lite/json engine no longer requires a
+system Node runtime on the common path. The extension prefers VS Code's own
+bundled runtime (`process.execPath` + `ELECTRON_RUN_AS_NODE=1`) to run
+collect/diagrams/server. Some Electron builds may disable the `runAsNode`
+fuse, so `MICROWEBSTACKS_NODE_PATH` and system `node` remain documented
+fallbacks with a clear error if neither route works.
 
 ### BLK-003 - Native dependency compatibility is unproven
 
@@ -277,24 +284,23 @@ Exit criteria:
   dependencies (including native modules).
 - Add a build/stage script that produces this package from the repo without
   moving source files out of their current locations.
-- Add an extension bootstrap that, on first run, installs the engine package
-  from the npm registry (`npm install @microwebstacks/md-render@<pinned>`) into
-  VS Code extension storage and spawns it from there instead of from a repo
-  checkout. Registry install lets the package manager fetch prebuilt native
-  modules for the user's platform/ABI automatically.
-- First-run mechanism is registry install. A bundled-tarball (offline) install
-  is deferred as a later optimization once cross-platform support and size
-  optimization are in scope.
+- Add an extension bootstrap that, on first run, downloads the published
+  `@microwebstacks/md-render` tarball over HTTPS into VS Code extension
+  storage, extracts it locally, and spawns it from there instead of from a
+  repo checkout.
+- First-run mechanism is an in-process HTTPS download/extract install. Offline
+  use is supported after that first download until the pinned engine version
+  changes.
 - Keep `enginePath` only as a development override.
-- Surface a clear error when system Node is missing or its ABI does not match
-  the engine's prebuilt native modules.
+- Surface a clear error when neither VS Code's bundled runtime nor a fallback
+  Node path can run the engine scripts.
 - Add `.vscodeignore` / explicit allowlist so the thin VSIX ships no repo source.
 - Ensure no generated DB/cache writes happen under the installed extension path.
 
 Exit criteria:
 
 - A clean-profile VSIX install bootstraps the engine package and starts the
-  preview without `enginePath` (system Node present).
+  preview without `enginePath` and without system Node/npm on PATH.
 - The installed extension writes generated preview state and the engine install
   only under VS Code extension/workspace-scoped storage.
 - `pnpm build`, `pnpm collect`, and local repository preview flows continue to

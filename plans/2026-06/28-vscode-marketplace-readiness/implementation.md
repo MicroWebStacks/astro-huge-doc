@@ -24,9 +24,10 @@ New setting `microwebstacks.preview.engineSource`: `auto` (default) | `local` |
    `engineSource = registry`.
 3. Installed engine in `globalStorage/engine/node_modules/@microwebstacks/md-render`
    - used if already present. Skipped when `engineSource = local`.
-4. Install then use - `npm install @microwebstacks/md-render@<pinned>` into
-   `globalStorage/engine`, then resolve tier 3. Skipped when
-   `engineSource = local` (local mode never touches the registry).
+4. Install then use - install the pinned `@microwebstacks/md-render` engine
+   into `globalStorage/engine`, then resolve tier 3. The current installer path
+   is HTTPS download plus local extract; `engineSource = local` still skips this
+   tier entirely.
 
 Mode semantics:
 
@@ -66,3 +67,21 @@ step; the script validates the build exists before staging.
 - [x] `scripts/stage-engine.js`
 - [ ] Publish `@microwebstacks/md-render` (blocked on content-structure)
 - [ ] End-to-end clean-profile registry install validation
+
+## Follow-up: node-free bootstrap landing
+
+The original Phase 2 implementation described a registry install through
+`npm install` plus a system-Node runtime requirement. That is now stale.
+
+Current code path:
+
+- `packages/vscode-extension/extension.js` installs the published engine via
+  HTTPS tarball download and local extraction, with no npm invocation.
+- The same file resolves a script runner via `process.execPath` +
+  `ELECTRON_RUN_AS_NODE=1` first, keeping `MICROWEBSTACKS_NODE_PATH` and
+  system `node` only as explicit fallbacks.
+- `scripts/stage-engine.js` vendors the published engine dependency tree under
+  `_modules` so the installer can restore it after extraction.
+
+This removes the common-case requirement for system Node/npm on the user's
+machine while keeping local repo fallback behavior intact.

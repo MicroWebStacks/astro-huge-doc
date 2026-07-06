@@ -44,18 +44,23 @@ plans/YYYY-MM/
     survey.md            # only when explicitly requested
     plan.md
     implementation.md    # created only after implementation work has happened
-    test.md              # validation proof before review
+    test.md              # optional validation notes when useful
 ```
 
 Create `survey.md` only when the maintainer explicitly requests a survey. For
 ordinary discovery, fold concise notes into `plan.md`.
 
+The definition of done for a plan packet is implementation complete. Move the
+packet from `plans/open.md` to `plans/closed.md` as soon as implementation is
+finished. Testing may happen before or after closure and should not block,
+delay, or reopen the plan by itself.
+
 Keep three top-level packet surfaces current:
 
 - `plans/README.md` - concise layout guidance for the directory itself;
 - `plans/open.md` - packets with work still outstanding;
-- `plans/closed.md` - completed packets and planning-only packets whose
-  decisions are settled.
+- `plans/closed.md` - packets whose implementation is finished and planning-only
+  packets whose decisions are settled.
 
 Update these index files whenever a packet starts, closes, or materially
 changes status.
@@ -91,10 +96,10 @@ that is easy to update, for example:
 [#-----] Phase 1/6 - discovery complete; implementation next.
 ```
 
-When the packet is fully implemented and proven, mark it done:
+When the packet is fully implemented, mark it done:
 
 ```text
-[######] Done - implemented and validated; follow-ups noted below.
+[######] Done - implementation finished; follow-ups noted below.
 ```
 
 Use the rest of the file as the running trace of work:
@@ -106,9 +111,9 @@ Use the rest of the file as the running trace of work:
 - follow-up risks;
 - important commands or migrations.
 
-## Test Proof
+## Test Notes
 
-Use `test.md` as proof of behavior:
+Use `test.md` when validation notes are worth preserving:
 
 - commands run;
 - fixtures or data used;
@@ -117,8 +122,11 @@ Use `test.md` as proof of behavior:
 - known gaps;
 - environment or dependency notes that affect reproducibility.
 
+`test.md` is optional. It documents testing work when that work happens, but it
+does not gate implementation completion or packet closure.
+
 For planning-only changes, `test.md` may record document review and consistency
-checks instead of runtime proof.
+checks instead of runtime proof when that record is useful.
 
 ## Repository Work Areas
 
@@ -155,8 +163,8 @@ Use the smallest meaningful verification for the change:
 - focused script or server checks for targeted behavior;
 - document consistency review for workflow-only changes.
 
-Record what was run and what was not run in `test.md` for planned work or in
-the final response for small direct changes.
+Record what was run and what was not run in `test.md` when you create one, or
+in the final response for small direct changes.
 
 ## Git Ownership
 

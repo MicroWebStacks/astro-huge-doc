@@ -1,9 +1,10 @@
 # Closed Plans
 
-Completed plan packets. Work is implemented and proven or, for planning-only
-packets, the decisions are settled. See each folder for details.
+Completed plan packets. Work is implemented or, for planning-only packets, the
+decisions are settled. Validation notes may exist, but they are not part of the
+closure gate. See each folder for details.
 
-| Plan | Date | Summary | Proof / Notes |
+| Plan | Date | Summary | Implementation / Notes |
 | --- | --- | --- | --- |
 | [2026-06-27-toc-menu-controls](2026-06/27-toc-menu-controls/) | 2026-06-27 | Replaced the TOC depth slider with button controls and added TOC/page cross-highlight behavior. | Implementation and build proof recorded in [implementation.md](2026-06/27-toc-menu-controls/implementation.md) and [test.md](2026-06/27-toc-menu-controls/test.md). |
 | [2026-06-27-vscode-ext](2026-06/27-vscode-ext/) | 2026-06-27 | Added the desktop VS Code preview extension baseline for the docs site. | Extension/config validation recorded in [implementation.md](2026-06/27-vscode-ext/implementation.md) and [test.md](2026-06/27-vscode-ext/test.md). |

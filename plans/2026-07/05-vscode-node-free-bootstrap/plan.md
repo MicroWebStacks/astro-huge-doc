@@ -54,7 +54,7 @@ Non-goals (unchanged from the marketplace-readiness plan):
 
 ### OP-001 - Does `process.execPath` + `ELECTRON_RUN_AS_NODE=1` reliably replace system Node for spawning scripts?
 
-Status: needs validation.
+Status: implemented; clean-machine validation still needed.
 
 Replace the `node`/`node.exe` PATH lookup in `findNodeExecutable` /
 `runNodeScript` / `startServer` with VS Code's own binary
@@ -65,42 +65,46 @@ disable the `runAsNode` fuse.
 
 ### OP-002 - How should engine install avoid shelling out to npm?
 
-Status: needs decision.
+Status: resolved and implemented.
 
 `installEngine()` currently runs `npm.cmd install ...`, and npm's CLI is
 itself a Node script - a second, currently undocumented Node dependency.
-Candidates:
-
-- Fetch the published tarball via HTTPS in-process (Node's built-in
-  `https`/`zlib`) and extract it with a small bundled pure-JS tar reader.
-- Publish the engine as a self-contained artifact with its production
-  dependency tree already vendored, so there is no dependency resolution to
-  replicate client-side - just download and unzip.
+Decision: fetch the published tarball via HTTPS in-process and extract it with
+a small bundled tar reader in the extension. The published engine package is
+prepared with its production dependency tree vendored under a disguised folder
+name so npm's packer keeps it; the installer renames that folder back to
+`node_modules` after extraction.
 
 ### OP-003 - What is the fallback when `runAsNode` is unavailable?
 
-Status: needs decision.
+Status: resolved and implemented.
 
-Define the degraded path (clear error message, or fallback to system Node)
-for the rare case where a VS Code/Electron build has the `runAsNode` fuse
-disabled.
+Decision: keep `MICROWEBSTACKS_NODE_PATH` as the highest-priority explicit
+override, then fall back from `process.execPath` + `ELECTRON_RUN_AS_NODE=1` to
+system `node` if the VS Code/Electron build has the `runAsNode` fuse disabled.
+If neither route works, raise a clear error.
 
 ## Implementation Phases
 
 ### Phase 1 - Script execution without system Node
 
-- Swap the spawn target in `findNodeExecutable`, `runNodeScript`,
-  `startServer` to `process.execPath` + `ELECTRON_RUN_AS_NODE=1`.
-- Add the OP-003 fallback/error path.
-- Validate collect/diagrams/server start in a clean VS Code profile with no
-  Node/npm on PATH.
+- Implemented in `packages/vscode-extension/extension.js`:
+  `resolveNodeRunner()` probes `process.execPath` with
+  `ELECTRON_RUN_AS_NODE=1`, keeps `MICROWEBSTACKS_NODE_PATH` as an explicit
+  override, and falls back to system `node` with a clear error path.
+- Remaining work: validate collect/diagrams/server start in a clean VS Code
+  profile with no Node/npm on PATH.
 
 ### Phase 2 - Engine install without npm
 
-- Implement the OP-002 fetch/extract path in `installEngine()`.
-- Update `scripts/stage-engine.js` / publish flow if a vendored artifact is
-  chosen.
-- Validate the first-run install in the same Node-free environment as Phase 1.
+- Implemented in `packages/vscode-extension/extension.js`:
+  `installEngine()` downloads the published tarball over HTTPS, extracts it
+  in-process, and restores the vendored dependency tree.
+- Implemented in `scripts/stage-engine.js` / release flow: staged engine
+  packages now vendor their production dependency tree under `_modules`, and
+  the extension installer restores it after extraction.
+- Remaining work: validate the first-run install in the same Node-free
+  environment as Phase 1.
 
 ### Phase 3 - Trim unnecessary transitive weight (optional, size only)
 
@@ -111,9 +115,9 @@ disabled.
 ### Phase 4 - Fold back into marketplace-readiness plan
 
 - Update `plans/2026-06/28-vscode-marketplace-readiness/plan.md`: BLK-002's
-  hidden-constraint note, the "documents Node requirement, true no-Node
-  deferred" maintainer decision, and OP-001/Phase 2/3 exit criteria, once
-  Phases 1-2 here are proven.
+  hidden-constraint note, the old "documents Node requirement, true no-Node
+  deferred" maintainer decision, and OP-001/Phase 2/3 exit criteria so they
+  match the landed bootstrap and the remaining validation gap.
 
 ## Dependencies And Risks
 

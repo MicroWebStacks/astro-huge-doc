@@ -366,27 +366,19 @@ MicroWebStacks: Stop Docs Preview Server
 
 ### Install from a local VSIX
 
-For local installation without marketplace publishing, package the extension
-from `packages/vscode-extension` with VS Code's `vsce` tool, then install the
-generated `.vsix`:
+For local installation without Marketplace publishing, build/package the
+extension and install the generated `.vsix`:
 
 ```powershell
-cd C:\dev\MicroWebStacks\astro-huge-doc\packages\vscode-extension
-vsce package
-code --install-extension .\microwebstacks-docs-preview-0.0.1.vsix
+pnpm ext:release
+code --install-extension .\packages\vscode-extension\markdown-site-preview.vsix
 ```
 
-For this V1 local package, set the VS Code setting
-`microwebstacks.preview.enginePath` to the root of this repository checkout:
-
-```json
-{
-  "microwebstacks.preview.enginePath": "C:\\dev\\MicroWebStacks\\astro-huge-doc"
-}
-```
-
-Open another Markdown workspace and run
-`MicroWebStacks: Preview Docs in VS Code`.
+The installed extension normally does not require system Node/npm: on first
+preview run it downloads the pinned `@microwebstacks/md-render` engine and
+uses VS Code's bundled runtime to run it. `microwebstacks.preview.enginePath`
+is now only an advanced development override when you want the extension to run
+against a local checkout instead of the published engine.
 
 # Notes
 * XLSX files support dropped but could potentially generate two assets, original file for download and asset table for direct asset vieweing
