@@ -102,7 +102,7 @@ for the normal installed-extension path. That is now stale.
 Current code path:
 
 - `scripts/package-extension.js` stages a vendored `bundled-engine/` payload
-  into the VSIX by reusing `scripts/stage-engine.js`.
+  for the VSIX by reusing `scripts/stage-engine.js`.
 - `packages/vscode-extension/extension.js` hydrates that payload into
   workspace-global storage under `bundled-engine-<version>/` and prefers it in
   `engineSource = auto` before any previously installed or downloaded engine.
@@ -111,3 +111,23 @@ Current code path:
 
 This keeps the source checkout behavior unchanged while making the public VSIX
 usable on firewalled machines that cannot reach the npm registry.
+
+## 2026-07-07 - VSIX packaging follow-up
+
+Stage-only proof turned out to be insufficient. The staged extension directory
+contained `bundled-engine/`, but the actual `markdown-site-preview.vsix`
+generated from `.tmp/extension-package` did not contain any
+`extension/bundled-engine/*` entries.
+
+To close that gap:
+
+- `scripts/package-extension.js` now packages from an auto-created system temp
+  directory by default instead of the repo's ignored `.tmp/` tree.
+- The same script now opens the finished VSIX and fails packaging unless it
+  finds both `extension/bundled-engine/package.json` and vendored
+  `_modules/` entries.
+- The repo's direct `glob` dependency was moved off deprecated `11.1.0` so the
+  vendoring install no longer pulls that known-old version by default.
+
+This changes the proof standard from "the staging folder looked right" to "the
+final VSIX archive demonstrably contains the bundled engine payload."

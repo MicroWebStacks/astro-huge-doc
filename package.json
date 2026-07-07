@@ -40,7 +40,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-session": "^1.18.1",
-    "glob": "^11.0.0",
+    "glob": "^13.0.0",
     "gray-matter": "^4.0.3",
     "hast-util-to-html": "^9.0.3",
     "js-yaml": "^4.1.0",
@@ -63,11 +63,6 @@
   },
   "engines": {
     "pnpm": ">=8.0.0"
-  },
-  "pnpm": {
-    "overrides": {
-      "glob": "11.1.0"
-    }
   },
   "devDependencies": {
     "@rollup/plugin-yaml": "^4.1.2",

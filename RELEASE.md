@@ -30,7 +30,7 @@ If the OTP expires while the build runs, rerun with a fresh code:
 
 1. Bump `version` in `packages/vscode-extension/package.json` (strictly increasing, never reuse).
 2. Commit the release changes locally if you did not already do so for the engine release.
-3. Package (checks the pinned engine is on npm, stages the bundled lite/json engine fallback into the VSIX, then builds the vsix with the current git commit stamped into it):
+3. Package (checks the pinned engine is on npm, stages the bundled lite/json engine fallback into the VSIX, builds the vsix with the current git commit stamped into it, and fails if the final archive does not actually contain `bundled-engine/`):
 
 ```powershell
 pnpm ext:release

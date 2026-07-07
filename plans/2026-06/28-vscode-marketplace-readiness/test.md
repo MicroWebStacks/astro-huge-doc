@@ -278,3 +278,50 @@ Known gaps:
   install the rebuilt VSIX into a clean VS Code profile.
 - `engineSource=registry` remains dependent on the pinned npm package existing
   and reachable, as intended.
+
+## 2026-07-07 - VSIX payload verification gap
+
+Expected:
+
+- Confirm that the packaged VSIX, not just the staging directory, actually
+  contains the bundled engine fallback.
+- Explain the large `vsce` file-count warning against the real package output.
+
+Actual:
+
+- Inspected `packages/vscode-extension/markdown-site-preview.vsix` directly and
+  confirmed it contained only 10 entries and zero
+  `extension/bundled-engine/*` paths.
+- Confirmed the staged directory under `.tmp/extension-package` contained
+  `bundled-engine/` with `package.json`, `build-meta.json`, runtime folders,
+  and vendored `_modules/`.
+- Identified the packaging gap: stage-only success was not enough proof that
+  the final VSIX carried the fallback payload.
+- Updated `scripts/package-extension.js` so default packaging stages in a
+  system temp directory and then verifies the finished VSIX contains
+  `extension/bundled-engine/package.json` plus vendored `_modules/` entries.
+- Updated the repo's direct `glob` dependency off deprecated `11.1.0`; the
+  remaining `tsconfck@3.1.6` warning is still transitive and was not removed by
+  this repo-local dependency change.
+
+Commands run:
+
+```txt
+Get-Content scripts\package-extension.js
+Get-Content scripts\stage-engine.js
+Get-Content packages\vscode-extension\.vscodeignore
+Get-Item packages\vscode-extension\markdown-site-preview.vsix
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[IO.Compression.ZipFile]::OpenRead((Resolve-Path 'packages\vscode-extension\markdown-site-preview.vsix')).Entries
+Get-ChildItem .tmp\extension-package -Recurse -File
+Get-ChildItem .tmp\extension-package\bundled-engine
+Get-Content package.json
+```
+
+Known gaps:
+
+- I have not yet rerun `vsce package` from the updated script in this sandbox;
+  the previous direct `npm.cmd exec @vscode/vsce` attempt hit restricted
+  registry/cache access here.
+- Clean-profile VS Code install validation is still required before closing the
+  packet.
