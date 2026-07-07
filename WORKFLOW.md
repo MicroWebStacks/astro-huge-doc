@@ -52,15 +52,17 @@ ordinary discovery, fold concise notes into `plan.md`.
 
 The definition of done for a plan packet is implementation complete. Move the
 packet from `plans/open.md` to `plans/closed.md` as soon as implementation is
-finished. Testing may happen before or after closure and should not block,
-delay, or reopen the plan by itself.
+finished. If `implementation.md` is present and its Progress marker says
+`[######] Done ...`, the packet must be listed in `plans/closed.md`, not
+`plans/open.md`. Testing may happen before or after closure and should not
+block, delay, or reopen the plan by itself.
 
 Keep three top-level packet surfaces current:
 
 - `plans/README.md` - concise layout guidance for the directory itself;
-- `plans/open.md` - packets with work still outstanding;
-- `plans/closed.md` - packets whose implementation is finished and planning-only
-  packets whose decisions are settled.
+- `plans/open.md` - a table of packets with work still outstanding;
+- `plans/closed.md` - a table of packets whose implementation is finished and
+  planning-only packets whose decisions are settled.
 
 Update these index files whenever a packet starts, closes, or materially
 changes status.

@@ -227,3 +227,54 @@ Known gaps:
 
 - The clean-profile, no-Node/no-npm machine validation is still not captured in
   this packet and remains required before closure.
+
+## 2026-07-07 - Bundled VSIX Engine Fallback
+
+Expected:
+
+- Make the release VSIX self-carry a lite/json engine fallback so installed
+  preview does not require npm registry access on first run.
+- Keep local checkout behavior intact and leave `engineSource=registry`
+  available for explicit production-path testing.
+- Prove the extension staging output now includes a vendored bundled engine.
+
+Actual:
+
+- `scripts/package-extension.js` now stages `bundled-engine/` into the
+  extension package by reusing `scripts/stage-engine.js` with vendored deps.
+- `packages/vscode-extension/extension.js` now hydrates that bundled payload
+  into VS Code storage under `bundled-engine-<version>/` and prefers it in
+  `engineSource=auto` before any registry-installed engine.
+- `packages/vscode-extension/package.json`, `packages/vscode-extension/README.md`,
+  `readme.md`, and `RELEASE.md` now describe bundled-first behavior honestly.
+- Stage-only packaging proved the staged extension contains:
+  - top-level `bundled-engine/`
+  - `bundled-engine/package.json`
+  - vendored dependency tree at `bundled-engine/_modules`
+  - bundled engine build metadata at `bundled-engine/build-meta.json`
+
+Commands run:
+
+```txt
+node --check packages/vscode-extension/extension.js
+node --check scripts/package-extension.js
+node --check scripts/stage-engine.js
+node scripts/package-extension.js --stage-only --out .tmp/extension-package-smoke
+Get-ChildItem .tmp\extension-package-smoke
+Get-ChildItem .tmp\extension-package-smoke\bundled-engine
+Get-Content .tmp\extension-package-smoke\bundled-engine\package.json
+```
+
+Notes:
+
+- The first `package-extension.js --stage-only` attempt timed out inside the
+  sandbox during the vendoring `npm install`.
+- Re-running the same command with escalated network access completed in about
+  52 seconds and wrote the expected `bundled-engine/_modules` payload.
+
+Known gaps:
+
+- This validation stops at the staged extension directory; it does not yet
+  install the rebuilt VSIX into a clean VS Code profile.
+- `engineSource=registry` remains dependent on the pinned npm package existing
+  and reachable, as intended.

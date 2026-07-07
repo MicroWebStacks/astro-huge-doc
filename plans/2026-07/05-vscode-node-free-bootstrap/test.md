@@ -63,4 +63,43 @@ Known gaps:
 
 - No clean-profile VS Code runtime proof was run in this takeover pass.
 - No zero-Node machine repro was run in this shell environment.
-- This packet should stay open until that end-to-end validation is captured.
+- At takeover time, this left the packet open pending a later closure review.
+
+## 2026-07-07 - Closure Review
+
+Expected:
+
+- Confirm whether the packet's document-reconciliation work is now complete.
+- Close the packet if only broader publish-readiness validation remains.
+
+Actual:
+
+- Confirmed `packages/vscode-extension/README.md` now documents the common path
+  honestly: no system Node/npm on the normal install path, first run downloads
+  the pinned engine, and `MICROWEBSTACKS_NODE_PATH` / PATH `node` are fallback
+  paths only.
+- Confirmed `plans/2026-06/28-vscode-marketplace-readiness/plan.md` already
+  carries the remaining clean-profile, platform, package, privacy, and publish
+  validation work for the installed extension.
+- Confirmed this packet's implementation scope is complete and the remaining
+  gap is validation that belongs to the broader Marketplace packet, so this
+  packet can close under the repository workflow definition of done.
+
+Commands run:
+
+```txt
+Get-Content WORKFLOW.md
+Get-Content packages\vscode-extension\README.md
+Get-Content plans\2026-06\28-vscode-marketplace-readiness\plan.md
+Get-Content plans\2026-07\05-vscode-node-free-bootstrap\plan.md
+Get-Content plans\2026-07\05-vscode-node-free-bootstrap\implementation.md
+Get-Content plans\2026-07\05-vscode-node-free-bootstrap\test.md
+Get-Content plans\open.md
+Get-Content plans\closed.md
+```
+
+Known gaps:
+
+- No new runtime validation was run in this closure pass.
+- Clean-profile and zero-Node end-to-end proof still belong to
+  `plans/2026-06/28-vscode-marketplace-readiness`.

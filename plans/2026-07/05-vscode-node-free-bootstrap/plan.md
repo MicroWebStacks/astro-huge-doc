@@ -54,7 +54,8 @@ Non-goals (unchanged from the marketplace-readiness plan):
 
 ### OP-001 - Does `process.execPath` + `ELECTRON_RUN_AS_NODE=1` reliably replace system Node for spawning scripts?
 
-Status: implemented; clean-machine validation still needed.
+Status: resolved and implemented; clean-profile validation is tracked by
+`plans/2026-06/28-vscode-marketplace-readiness`.
 
 Replace the `node`/`node.exe` PATH lookup in `findNodeExecutable` /
 `runNodeScript` / `startServer` with VS Code's own binary
@@ -92,8 +93,9 @@ If neither route works, raise a clear error.
   `resolveNodeRunner()` probes `process.execPath` with
   `ELECTRON_RUN_AS_NODE=1`, keeps `MICROWEBSTACKS_NODE_PATH` as an explicit
   override, and falls back to system `node` with a clear error path.
-- Remaining work: validate collect/diagrams/server start in a clean VS Code
-  profile with no Node/npm on PATH.
+- Validation hand-off: end-to-end collect/diagrams/server proof in a clean VS
+  Code profile with no Node/npm on PATH remains part of
+  `plans/2026-06/28-vscode-marketplace-readiness`.
 
 ### Phase 2 - Engine install without npm
 
@@ -103,8 +105,9 @@ If neither route works, raise a clear error.
 - Implemented in `scripts/stage-engine.js` / release flow: staged engine
   packages now vendor their production dependency tree under `_modules`, and
   the extension installer restores it after extraction.
-- Remaining work: validate the first-run install in the same Node-free
-  environment as Phase 1.
+- Validation hand-off: first-run install proof in the same Node-free
+  environment as Phase 1 remains part of
+  `plans/2026-06/28-vscode-marketplace-readiness`.
 
 ### Phase 3 - Trim unnecessary transitive weight (optional, size only)
 
@@ -114,10 +117,9 @@ If neither route works, raise a clear error.
 
 ### Phase 4 - Fold back into marketplace-readiness plan
 
-- Update `plans/2026-06/28-vscode-marketplace-readiness/plan.md`: BLK-002's
-  hidden-constraint note, the old "documents Node requirement, true no-Node
-  deferred" maintainer decision, and OP-001/Phase 2/3 exit criteria so they
-  match the landed bootstrap and the remaining validation gap.
+- Completed: `plans/2026-06/28-vscode-marketplace-readiness/plan.md` and the
+  extension README now match the landed bootstrap and keep the remaining
+  validation gap under the broader publish-readiness packet.
 
 ## Dependencies And Risks
 

@@ -2,7 +2,8 @@
 
 Tracks the Option B work: the extension resolves a `@microwebstacks/md-render`
 engine instead of assuming a repo checkout, while the local workspace checkout
-stays a guaranteed fallback.
+stays a guaranteed fallback and the release VSIX now carries its own bundled
+lite/json engine payload for offline first run.
 
 ## Hard requirement (maintainer)
 
@@ -22,19 +23,25 @@ New setting `microwebstacks.preview.engineSource`: `auto` (default) | `local` |
 2. Local repo-relative discovery (the current behavior, `../..` then `.`) - used
    directly. This is the guaranteed local fallback. Skipped only when
    `engineSource = registry`.
-3. Installed engine in `globalStorage/engine/node_modules/@microwebstacks/md-render`
+3. Bundled VSIX engine - if the installed extension ships `bundled-engine/`,
+   copy that payload into
+   `globalStorage/bundled-engine-<version>/node_modules/@microwebstacks/md-render`
+   and run it from there. Skipped when `engineSource = local|registry`.
+4. Installed published engine in
+   `globalStorage/engine-<version>/node_modules/@microwebstacks/md-render`
    - used if already present. Skipped when `engineSource = local`.
-4. Install then use - install the pinned `@microwebstacks/md-render` engine
-   into `globalStorage/engine`, then resolve tier 3. The current installer path
-   is HTTPS download plus local extract; `engineSource = local` still skips this
-   tier entirely.
+5. Install then use - install the pinned `@microwebstacks/md-render` engine
+   into `globalStorage/engine-<version>`, then resolve tier 4. The current
+   installer path is HTTPS download plus local extract; `engineSource = local`
+   still skips this tier entirely.
 
 Mode semantics:
 
-- `auto`: 1 -> 2 -> 3 -> 4. Never breaks local; registry is the last resort.
+- `auto`: 1 -> 2 -> 3 -> 4 -> 5. Never breaks local; bundled VSIX payload is
+  the default installed-extension path; registry stays the last resort.
 - `local`: 1 -> 2 only. Fully offline / repo-dev guarantee. Errors clearly if no
-  local engine is found instead of reaching the network.
-- `registry`: 1 -> 3 -> 4. Forces the published-install path even inside the
+  local engine is found instead of reaching the network or bundled fallback.
+- `registry`: 1 -> 4 -> 5. Forces the published-install path even inside the
   repo, so the production bootstrap can be exercised during development.
 
 An engine root is valid when it contains `server/server.js`,
@@ -65,6 +72,7 @@ step; the script validates the build exists before staging.
 - [x] Engine resolution refactor with guaranteed local fallback
 - [x] `engineSource` setting + extension version bump
 - [x] `scripts/stage-engine.js`
+- [x] Bundled VSIX engine fallback staged and hydrated before registry install
 - [ ] Publish `@microwebstacks/md-render` (blocked on content-structure)
 - [ ] End-to-end clean-profile registry install validation
 
@@ -85,3 +93,21 @@ Current code path:
 
 This removes the common-case requirement for system Node/npm on the user's
 machine while keeping local repo fallback behavior intact.
+
+## Follow-up: bundled VSIX engine fallback landing
+
+The original Phase 2 implementation still depended on npm registry reachability
+for the normal installed-extension path. That is now stale.
+
+Current code path:
+
+- `scripts/package-extension.js` stages a vendored `bundled-engine/` payload
+  into the VSIX by reusing `scripts/stage-engine.js`.
+- `packages/vscode-extension/extension.js` hydrates that payload into
+  workspace-global storage under `bundled-engine-<version>/` and prefers it in
+  `engineSource = auto` before any previously installed or downloaded engine.
+- Explicit `engineSource = registry` remains available to test or force the
+  published-install path.
+
+This keeps the source checkout behavior unchanged while making the public VSIX
+usable on firewalled machines that cannot reach the npm registry.

@@ -3,7 +3,7 @@
 ## Progress
 
 ```text
-[####--] Phase 2/4 - node-free bootstrap landed in code; clean-machine validation remains.
+[######] Done - implementation finished; follow-up validation moved to the Marketplace packet.
 ```
 
 ## Changes landed
@@ -25,6 +25,10 @@
 - `scripts/release-engine.js` / `RELEASE.md` already align with that release
   shape: the engine is staged from this repo, published first, then the
   extension release pins the new `engineVersion`.
+- `plans/2026-06/28-vscode-marketplace-readiness/plan.md` and
+  `packages/vscode-extension/README.md` now describe the bundled-runtime,
+  npm-free bootstrap as the normal install path, so this packet's document
+  reconciliation is complete.
 
 ## Decisions recorded
 
@@ -35,9 +39,10 @@
   `runAsNode` fuse, so explicit `MICROWEBSTACKS_NODE_PATH` and system `node`
   remain valid fallbacks rather than being removed.
 
-## Remaining work
+## Follow-up hand-off
 
-- Prove the full clean-machine path in a VS Code profile with no Node/npm on
-  PATH.
-- Reconcile the older Marketplace packet and public docs so they stop claiming
-  the extension requires Node/npm on the common install path.
+- Clean-profile and zero-Node end-to-end validation remain under
+  `plans/2026-06/28-vscode-marketplace-readiness`, where package, platform,
+  privacy, and publish-readiness checks already belong.
+- Phase 3 size trimming remains optional future work; it is not required to
+  close this implementation packet.

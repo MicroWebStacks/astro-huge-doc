@@ -124,7 +124,7 @@ These settings live under the `microwebstacks.preview.*` namespace in VS Code.
 
 | Setting | Used by | Effect |
 |---|---|---|
-| `microwebstacks.preview.engineSource` | extension only | chooses where the rendering engine comes from: local checkout, installed package, or npm registry |
+| `microwebstacks.preview.engineSource` | extension only | chooses where the rendering engine comes from: local checkout, bundled VSIX engine, installed package, or npm registry |
 | `microwebstacks.preview.enginePath` | extension only | explicit path to an `astro-huge-doc` checkout; highest-priority engine source |
 | `microwebstacks.preview.docsRoot` | extension, then engine | overrides the documentation root inside the opened workspace; when set, the extension passes it to the engine as `MICROWEBSTACKS_DOCS_ROOT`; when unset, the engine uses `manifest.render.folder` when present, otherwise `manifest.output.content`, otherwise the workspace root |
 | `microwebstacks.preview.krokiServer` | extension, then engine | if non-empty, the extension passes it as `MICROWEBSTACKS_KROKI_SERVER`; this wins over the workspace `.env` during preview |
@@ -159,6 +159,7 @@ Advanced or runtime-injected env vars:
 | `MICROWEBSTACKS_WORKSPACE_ROOT` | extension or advanced shell usage | anchors `.env`, content paths, and manifest discovery |
 | `MICROWEBSTACKS_ENGINE_ROOT` | extension or advanced shell usage | points at the engine checkout/install root |
 | `MICROWEBSTACKS_MANIFEST_PATH` | extension or advanced shell usage | explicit manifest location instead of `<workspace>/manifest.yaml` |
+| `MICROWEBSTACKS_EXTENSION_MODE` | extension or standalone lite/native usage | `true` suppresses the standalone "Authentication is disabled" banner; the real VS Code extension sets this automatically |
 | `MICROWEBSTACKS_DOTENV_OVERRIDE` | extension or advanced shell usage | `false` means `.env` fills missing keys only; any other value keeps `.env` override behavior |
 | `MICROWEBSTACKS_DEBUG_CONFIG` | ad hoc debugging | prints resolved config for inspection |
 | `MICROWEBSTACKS_NODE_PATH` | extension launch environment | optional override for the Node executable the extension uses |
@@ -374,11 +375,14 @@ pnpm ext:release
 code --install-extension .\packages\vscode-extension\markdown-site-preview.vsix
 ```
 
-The installed extension normally does not require system Node/npm: on first
-preview run it downloads the pinned `@microwebstacks/md-render` engine and
-uses VS Code's bundled runtime to run it. `microwebstacks.preview.enginePath`
-is now only an advanced development override when you want the extension to run
-against a local checkout instead of the published engine.
+The installed extension normally does not require system Node/npm: in `auto`
+mode it uses the bundled lite/json engine shipped inside the VSIX and uses VS
+Code's bundled runtime to run it. The pinned published
+`@microwebstacks/md-render` package remains available as a fallback or when you
+explicitly force `microwebstacks.preview.engineSource=registry`.
+`microwebstacks.preview.enginePath` is now only an advanced development
+override when you want the extension to run against a local checkout instead of
+the bundled or published engine.
 
 # Notes
 * XLSX files support dropped but could potentially generate two assets, original file for download and asset table for direct asset vieweing

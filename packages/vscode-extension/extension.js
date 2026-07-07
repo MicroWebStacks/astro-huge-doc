@@ -40,11 +40,201 @@ let previewPanel = null;
 let fileWatcher = null;
 let refreshTimer = null;
 let operation = Promise.resolve();
+const BUILD_META_FILE = 'build-meta.json';
+const BOX_WIDTH = 98;
+const BUNDLED_ENGINE_DIR = 'bundled-engine';
+
+function runCapture(command, cliArgs, options = {}) {
+  try {
+    const result = cp.spawnSync(command, cliArgs, {
+      encoding: 'utf8',
+      shell: process.platform === 'win32',
+      windowsHide: true,
+      ...options
+    });
+    return result.status === 0 ? result.stdout.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+function readJson(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function buildWorkspaceMetadata({repoRoot, packageRoot, engineVersion = null}) {
+  const pkg = readJson(path.join(packageRoot, 'package.json'));
+  if (!pkg) {
+    return null;
+  }
+  const gitCommit = runCapture('git', ['rev-parse', 'HEAD'], {cwd: repoRoot});
+  const gitCommitShort = runCapture('git', ['rev-parse', '--short', 'HEAD'], {cwd: repoRoot});
+  const gitBranch = runCapture('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {cwd: repoRoot});
+  const gitStatus = runCapture('git', ['status', '--short'], {cwd: repoRoot});
+  return {
+    version: pkg.version ?? null,
+    ...(engineVersion ? {engineVersion} : {}),
+    gitCommit,
+    gitCommitShort,
+    gitBranch,
+    gitDirty: Boolean(gitStatus)
+  };
+}
+
+function loadPackageBuildMetadata(packageRoot, {repoRoot = packageRoot, engineVersion = null} = {}) {
+  const pkg = readJson(path.join(packageRoot, 'package.json'));
+  if (!pkg) {
+    return null;
+  }
+  return (
+    pkg.buildMetadata ??
+    readJson(path.join(packageRoot, BUILD_META_FILE)) ??
+    buildWorkspaceMetadata({repoRoot, packageRoot, engineVersion})
+  );
+}
+
+function loadExtensionBuildMetadata() {
+  return loadPackageBuildMetadata(__dirname, {repoRoot: path.resolve(__dirname, '..', '..')});
+}
+
+function loadEngineBuildMetadata(engineRoot) {
+  const directRoot = loadPackageBuildMetadata(engineRoot, {engineVersion: ENGINE_VERSION});
+  if (readJson(path.join(engineRoot, 'package.json'))?.name === ENGINE_PACKAGE) {
+    return directRoot;
+  }
+  const workspacePackageRoot = path.join(engineRoot, 'packages', 'md-render');
+  const workspacePkg = readJson(path.join(workspacePackageRoot, 'package.json'));
+  if (workspacePkg?.name === ENGINE_PACKAGE) {
+    return loadPackageBuildMetadata(workspacePackageRoot, {
+      repoRoot: engineRoot,
+      engineVersion: workspacePkg.version ?? ENGINE_VERSION
+    });
+  }
+  return null;
+}
+
+function formatBuildMetadata(metadata) {
+  if (!metadata) {
+    return 'unavailable';
+  }
+  const parts = [];
+  if (metadata.version) {
+    parts.push(`version ${metadata.version}`);
+  }
+  if (metadata.engineVersion) {
+    parts.push(`engine ${metadata.engineVersion}`);
+  }
+  if (metadata.gitCommitShort) {
+    parts.push(`commit ${metadata.gitCommitShort}${metadata.gitDirty ? ' (dirty)' : ''}`);
+  } else if (metadata.gitDirty) {
+    parts.push('dirty worktree');
+  }
+  if (metadata.builtAt) {
+    parts.push(`built ${metadata.builtAt}`);
+  }
+  return parts.join(', ') || 'unavailable';
+}
+
+function formatCommit(metadata) {
+  if (metadata?.gitCommitShort) {
+    return `${metadata.gitCommitShort}${metadata.gitDirty ? ' (dirty)' : ''}`;
+  }
+  if (metadata?.gitDirty) {
+    return 'dirty worktree';
+  }
+  return 'unavailable';
+}
+
+function formatMetadataSummary(metadata) {
+  if (!metadata) {
+    return 'unavailable';
+  }
+  const parts = [];
+  if (metadata.gitBranch) {
+    parts.push(`branch ${metadata.gitBranch}`);
+  }
+  if (metadata.gitCommit) {
+    parts.push(`full ${metadata.gitCommit}`);
+  }
+  if (metadata.builtAt) {
+    parts.push(`built ${metadata.builtAt}`);
+  } else if (metadata.gitCommit || metadata.gitBranch) {
+    parts.push('workspace checkout');
+  }
+  if (metadata.gitDirty) {
+    parts.push('dirty');
+  }
+  return parts.join(', ') || formatBuildMetadata(metadata);
+}
+
+function wrapText(text, width) {
+  const value = String(text ?? '');
+  if (!value) {
+    return [''];
+  }
+  const lines = [];
+  for (const rawLine of value.split(/\r?\n/)) {
+    let remaining = rawLine;
+    while (remaining.length > width) {
+      let splitAt = remaining.lastIndexOf(' ', width);
+      if (splitAt <= 0 || splitAt < Math.floor(width * 0.6)) {
+        splitAt = width;
+      }
+      lines.push(remaining.slice(0, splitAt));
+      remaining = remaining.slice(splitAt).trimStart();
+    }
+    lines.push(remaining);
+  }
+  return lines;
+}
+
+function logRaw(message) {
+  output.appendLine(message);
+}
+
+function logBox(title, rows) {
+  const border = `+${'-'.repeat(BOX_WIDTH + 2)}+`;
+  const labelWidth = Math.max(...rows.map((row) => row.label.length), 0);
+  logRaw(border);
+  for (const line of wrapText(title, BOX_WIDTH)) {
+    logRaw(`| ${line.padEnd(BOX_WIDTH)} |`);
+  }
+  logRaw(border);
+  for (const row of rows) {
+    const prefix = `${row.label.padEnd(labelWidth)} : `;
+    const wrapped = wrapText(row.value, BOX_WIDTH - prefix.length);
+    wrapped.forEach((line, index) => {
+      const content = `${index === 0 ? prefix : ' '.repeat(prefix.length)}${line}`;
+      logRaw(`| ${content.padEnd(BOX_WIDTH)} |`);
+    });
+  }
+  logRaw(border);
+}
+
+function logPreviewSummary(runtime) {
+  const extensionMetadata = loadExtensionBuildMetadata();
+  const engineMetadata = loadEngineBuildMetadata(runtime.engineRoot);
+  log(`[preview] ${runtime.engineSourceLabel}`);
+  logBox('Preview Runtime', [
+    {label: 'Extension version', value: extensionPackage.version},
+    {label: 'Extension commit', value: formatCommit(extensionMetadata)},
+    {label: 'Extension meta', value: formatMetadataSummary(extensionMetadata)},
+    {label: 'Engine version', value: engineMetadata?.version ?? ENGINE_VERSION},
+    {label: 'Engine commit', value: formatCommit(engineMetadata)},
+    {label: 'Engine meta', value: formatMetadataSummary(engineMetadata)},
+    {label: 'Engine source', value: runtime.engineSourceLabel},
+    {label: 'Engine root', value: runtime.engineRoot},
+    {label: 'Docs root', value: runtime.docsRoot},
+    {label: 'Manifest path', value: runtime.manifestPath ?? '(none; using defaults)'}
+  ]);
+}
 
 function activate(context) {
   output = vscode.window.createOutputChannel('MicroWebStacks Docs');
-  log(`Extension version: ${extensionPackage.version}`);
-  log(`Extension path: ${context.extensionPath}`);
   context.subscriptions.push(output);
   context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.preview, () => enqueue(() => previewDocs(context))));
   context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.browser, () => enqueue(() => openDocsInBrowser(context))));
@@ -189,13 +379,75 @@ function quoteForShell(value) {
   return /\s/.test(value) ? `"${value}"` : value;
 }
 
-function spawnLogged(executable, args, options) {
+function filterChildLogLine(line, mode, summary) {
+  const text = String(line ?? '');
+  if (mode !== 'diagrams') {
+    return text;
+  }
+  if (/^Skipping client-rendered diagram /.test(text)) {
+    summary.clientRendered += 1;
+    return null;
+  }
+  if (/\[[^\]]+\]: generated blob /.test(text)) {
+    summary.generated += 1;
+    return null;
+  }
+  if (/\[[^\]]+\]: reused blob /.test(text)) {
+    summary.reused += 1;
+    return null;
+  }
+  if (/\[[^\]]+\]: linked existing blob /.test(text)) {
+    summary.linked += 1;
+    return null;
+  }
+  return text;
+}
+
+function attachLoggedStream(stream, mode, summary) {
+  let buffer = '';
+  const flush = (force = false) => {
+    const normalized = buffer.replace(/\r\n/g, '\n');
+    const parts = normalized.split('\n');
+    buffer = force ? '' : parts.pop();
+    for (const line of force ? parts.filter((_, index) => true) : parts) {
+      const filtered = filterChildLogLine(line, mode, summary);
+      if (filtered !== null) {
+        logRaw(filtered);
+      }
+    }
+    if (force && normalized && !normalized.endsWith('\n')) {
+      const filtered = filterChildLogLine(parts.at(-1) ?? normalized, mode, summary);
+      if (filtered !== null && parts.length === 0) {
+        logRaw(filtered);
+      }
+    }
+  };
+  stream.on('data', (chunk) => {
+    buffer += chunk.toString();
+    flush(false);
+  });
+  stream.on('end', () => {
+    if (buffer) {
+      const filtered = filterChildLogLine(buffer.replace(/\r?\n$/, ''), mode, summary);
+      if (filtered !== null) {
+        logRaw(filtered);
+      }
+      buffer = '';
+    }
+  });
+}
+
+function spawnLogged(executable, args, options = {}) {
+  const {logMode = 'passthrough', ...spawnOptions} = options;
   const useShell = process.platform === 'win32';
   const command = useShell ? quoteForShell(executable) : executable;
   const finalArgs = useShell ? args.map(quoteForShell) : args;
-  const child = cp.spawn(command, finalArgs, {...options, shell: useShell, windowsHide: true});
-  child.stdout.on('data', (chunk) => output.append(chunk.toString()));
-  child.stderr.on('data', (chunk) => output.append(chunk.toString()));
+  const child = cp.spawn(command, finalArgs, {...spawnOptions, shell: useShell, windowsHide: true});
+  const summary = {generated: 0, reused: 0, linked: 0, clientRendered: 0};
+  attachLoggedStream(child.stdout, logMode, summary);
+  attachLoggedStream(child.stderr, logMode, summary);
+  child.mwsLogMode = logMode;
+  child.mwsSummary = summary;
   return child;
 }
 
@@ -205,6 +457,19 @@ function isEngineRoot(candidate) {
     exists(path.join(candidate, 'scripts', 'collect.js')) &&
     exists(path.join(candidate, 'config.js'))
   );
+}
+
+function getBundledEnginePackageRoot() {
+  return path.join(__dirname, BUNDLED_ENGINE_DIR);
+}
+
+function hasBundledEnginePackage() {
+  const bundledRoot = getBundledEnginePackageRoot();
+  if (!isEngineRoot(bundledRoot)) {
+    return false;
+  }
+  const pkg = readJson(path.join(bundledRoot, 'package.json'));
+  return pkg?.name === ENGINE_PACKAGE;
 }
 
 // Each engine version gets its own prefix. In-place npm upgrades of a shared
@@ -218,12 +483,20 @@ function getInstalledEngineRoot(context) {
   return path.join(getEnginePrefix(context), 'node_modules', '@microwebstacks', 'md-render');
 }
 
+function getBundledEnginePrefix(context) {
+  return path.join(context.globalStorageUri.fsPath, `bundled-engine-${ENGINE_VERSION}`);
+}
+
+function getBundledInstalledEngineRoot(context) {
+  return path.join(getBundledEnginePrefix(context), 'node_modules', '@microwebstacks', 'md-render');
+}
+
 // Best-effort removal of previous engine installs (including the legacy
 // unversioned 'engine' dir). A locked folder is left behind and retried on a
 // later run; it never blocks the active engine.
 async function cleanupOldEngines(context) {
   const storageRoot = context.globalStorageUri.fsPath;
-  const keep = `engine-${ENGINE_VERSION}`;
+  const keep = new Set([`engine-${ENGINE_VERSION}`, `bundled-engine-${ENGINE_VERSION}`]);
   let entries = [];
   try {
     entries = await fsp.readdir(storageRoot);
@@ -231,7 +504,7 @@ async function cleanupOldEngines(context) {
     return;
   }
   for (const entry of entries) {
-    if ((entry === 'engine' || entry.startsWith('engine-')) && entry !== keep) {
+    if ((entry === 'engine' || entry.startsWith('engine-') || entry.startsWith('bundled-engine-')) && !keep.has(entry)) {
       try {
         await fsp.rm(path.join(storageRoot, entry), {recursive: true, force: true});
         log(`Removed old engine install ${entry}.`);
@@ -256,9 +529,14 @@ function isUsableInstalledEngine(engineRoot) {
   if (!isEngineRoot(engineRoot)) {
     return false;
   }
-  const version = installedEngineVersion(engineRoot);
+  const pkg = readJson(path.join(engineRoot, 'package.json'));
+  const version = pkg?.version ?? null;
   if (version !== ENGINE_VERSION) {
     log(`Installed engine version ${version ?? 'unknown'} does not match expected ${ENGINE_VERSION}; reinstalling.`);
+    return false;
+  }
+  if (Object.keys(pkg?.dependencies ?? {}).length > 0 && !exists(path.join(engineRoot, 'node_modules'))) {
+    log(`Installed engine at ${engineRoot} is missing node_modules; reinstalling.`);
     return false;
   }
   return true;
@@ -444,8 +722,35 @@ async function installEngine(context) {
   log(`Installed ${ENGINE_PACKAGE}@${ENGINE_VERSION} into ${enginePrefix}.`);
 }
 
-// Resolves the engine root. The local workspace checkout is always a valid
-// fallback (see engineSource: local|auto); the registry install is additive.
+async function hydrateBundledEngine(context) {
+  const bundledRoot = getBundledEnginePackageRoot();
+  if (!hasBundledEnginePackage()) {
+    throw new Error(`Bundled engine payload is missing at ${bundledRoot}. Repackage the extension.`);
+  }
+
+  const bundledPrefix = getBundledEnginePrefix(context);
+  const installRoot = getBundledInstalledEngineRoot(context);
+  await fsp.rm(bundledPrefix, {recursive: true, force: true});
+  await fsp.mkdir(path.dirname(installRoot), {recursive: true});
+  await fsp.cp(bundledRoot, installRoot, {recursive: true});
+
+  const installedPkg = JSON.parse(await fsp.readFile(path.join(installRoot, 'package.json'), 'utf8'));
+  const vendoredDir = installedPkg.vendoredModulesDir;
+  const vendoredPath = vendoredDir ? path.join(installRoot, vendoredDir) : null;
+  const nodeModulesPath = path.join(installRoot, 'node_modules');
+  if (vendoredPath && exists(vendoredPath) && !exists(nodeModulesPath)) {
+    await fsp.rename(vendoredPath, nodeModulesPath);
+  }
+  if (!exists(nodeModulesPath)) {
+    throw new Error(`Bundled engine ${ENGINE_PACKAGE}@${ENGINE_VERSION} is missing its vendored dependency tree. Repackage the extension.`);
+  }
+
+  log(`Hydrated bundled ${ENGINE_PACKAGE}@${ENGINE_VERSION} into ${bundledPrefix}.`);
+}
+
+// Resolves the engine root. The local workspace checkout remains the guaranteed
+// dev fallback, and installed VSIX builds can hydrate a bundled engine before
+// trying any registry install path.
 async function resolveEngine(context) {
   const config = vscode.workspace.getConfiguration('microwebstacks.preview');
   const source = config.get('engineSource') || 'auto';
@@ -454,7 +759,7 @@ async function resolveEngine(context) {
   if (configured) {
     const root = path.resolve(configured);
     if (isEngineRoot(root)) {
-      return root;
+      return {root, label: `configured engine path (${root})`};
     }
     throw new Error(`microwebstacks.preview.enginePath is set to "${root}" but no engine was found there (missing server/server.js, scripts/collect.js, or config.js).`);
   }
@@ -462,8 +767,7 @@ async function resolveEngine(context) {
   if (source !== 'registry') {
     for (const candidate of [path.resolve(__dirname, '..', '..'), path.resolve(__dirname)]) {
       if (isEngineRoot(candidate)) {
-        log(`Using local workspace engine at ${candidate}.`);
-        return candidate;
+        return {root: candidate, label: `local workspace engine (${candidate})`};
       }
     }
     if (source === 'local') {
@@ -471,17 +775,27 @@ async function resolveEngine(context) {
     }
   }
 
+  if (source === 'auto' && hasBundledEnginePackage()) {
+    const bundledInstalled = getBundledInstalledEngineRoot(context);
+    if (!isUsableInstalledEngine(bundledInstalled)) {
+      await hydrateBundledEngine(context);
+    }
+    if (isUsableInstalledEngine(bundledInstalled)) {
+      await cleanupOldEngines(context);
+      return {root: bundledInstalled, label: `bundled VSIX engine (${bundledInstalled})`};
+    }
+    throw new Error(`Bundled engine ${ENGINE_PACKAGE}@${ENGINE_VERSION} could not be activated at ${bundledInstalled}.`);
+  }
+
   const installed = getInstalledEngineRoot(context);
   if (isUsableInstalledEngine(installed)) {
-    log(`Using installed engine at ${installed}.`);
-    return installed;
+    return {root: installed, label: `installed engine package (${installed})`};
   }
 
   await installEngine(context);
   if (isUsableInstalledEngine(installed)) {
-    log(`Using installed engine at ${installed}.`);
     await cleanupOldEngines(context);
-    return installed;
+    return {root: installed, label: `installed engine package (${installed})`};
   }
   throw new Error(`Engine ${ENGINE_PACKAGE}@${ENGINE_VERSION} was installed but could not be located at ${installed}.`);
 }
@@ -516,7 +830,8 @@ async function buildRuntime(context) {
     throw new Error('Open a workspace folder before starting the docs preview.');
   }
 
-  const engineRoot = await resolveEngine(context);
+  const engine = await resolveEngine(context);
+  const engineRoot = engine.root;
   const workspaceRoot = workspaceFolder.uri.fsPath;
   const manifestPath = path.join(workspaceRoot, 'manifest.yaml');
   const docsRoot = resolveDocsRoot(workspaceRoot, manifestPath);
@@ -542,6 +857,7 @@ async function buildRuntime(context) {
   const runtime = {
     workspaceFolder,
     engineRoot,
+    engineSourceLabel: engine.label,
     workspaceRoot,
     docsRoot: docsRoot.path,
     passDocsRootToEngine: docsRoot.passToEngine,
@@ -551,13 +867,10 @@ async function buildRuntime(context) {
     outDir,
     manifestPath: exists(manifestPath) ? manifestPath : null
   };
-  log(`Workspace root: ${runtime.workspaceRoot}`);
-  log(`Docs root: ${runtime.docsRoot}`);
-  log(`Engine root: ${runtime.engineRoot}`);
+  logPreviewSummary(runtime);
   log(`Storage root: ${runtime.storageRoot}`);
   log(`DB path: ${runtime.dbPath}`);
   log(`SSR outDir: ${runtime.outDir}`);
-  log(`Manifest path: ${runtime.manifestPath ?? '(none; using defaults)'}`);
   return runtime;
 }
 
@@ -584,6 +897,7 @@ function createRuntimeEnv(runtime, port) {
     DOCS_PROFILE: 'lite',
     DOCS_BACKEND: 'json',
     MICROWEBSTACKS_ENGINE_ROOT: runtime.engineRoot,
+    MICROWEBSTACKS_EXTENSION_MODE: 'true',
     MICROWEBSTACKS_WORKSPACE_ROOT: runtime.workspaceRoot,
     MICROWEBSTACKS_DB_PATH: runtime.dbPath,
     MICROWEBSTACKS_STORE_PATH: runtime.storePath,
@@ -603,13 +917,20 @@ async function runNodeScript(runtime, scriptPath, env) {
     log(`Node runtime: ${runner.execPath}`);
     const child = spawnLogged(runner.execPath, [scriptPath], {
       cwd: runtime.engineRoot,
-      env: {...env, ...runner.extraEnv}
+      env: {...env, ...runner.extraEnv},
+      logMode: path.basename(scriptPath) === 'diagrams.js' ? 'diagrams' : 'passthrough'
     });
     child.on('error', (error) => {
       reject(new Error(`Could not run ${scriptPath} (${error.message}).`));
     });
     child.on('exit', (code) => {
       if (code === 0) {
+        if (child.mwsLogMode === 'diagrams') {
+          const {generated, reused, linked, clientRendered} = child.mwsSummary;
+          if (generated || reused || linked || clientRendered) {
+            log(`Diagram summary: generated=${generated}, reused=${reused}, linked=${linked}, client-rendered=${clientRendered}.`);
+          }
+        }
         resolve();
         return;
       }
@@ -679,7 +1000,7 @@ async function ensureServer(context) {
   return vscode.window.withProgress(
     {location: vscode.ProgressLocation.Notification, title: 'MicroWebStacks Docs'},
     async (progress) => {
-      progress.report({message: 'resolving engine (first run downloads it, which can take a few minutes)…'});
+      progress.report({message: 'resolving engine (first run may hydrate the bundled engine or download the pinned fallback)…'});
       const runtime = await buildRuntime(context);
       const port = await getFreePort();
       const env = createRuntimeEnv(runtime, port);

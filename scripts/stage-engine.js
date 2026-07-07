@@ -23,6 +23,8 @@ import path from 'node:path';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 
+import {buildArtifactMetadata, formatBuildMetadata, writeBuildMetadata} from './build-metadata.js';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
 
@@ -127,6 +129,10 @@ async function main() {
     dependencies[name] = range;
   }
 
+  const stagedFiles = args.vendor
+    ? [...RUNTIME_PATHS, 'build-meta.json', VENDOR_DIR_NAME]
+    : [...RUNTIME_PATHS, 'build-meta.json'];
+
   const enginePkg = {
     name: PACKAGE_NAME,
     version,
@@ -134,7 +140,7 @@ async function main() {
     type: 'module',
     private: false,
     license: rootPkg.license ?? 'UNLICENSED',
-    files: args.vendor ? [...RUNTIME_PATHS, VENDOR_DIR_NAME] : RUNTIME_PATHS,
+    files: stagedFiles,
     dependencies,
     engines: {node: '>=18'},
     // Tells the VS Code extension's installer (extension.js installEngine)
@@ -142,9 +148,17 @@ async function main() {
     // and can be installed with a plain HTTPS fetch, no npm required.
     ...(args.vendor ? {vendoredModulesDir: VENDOR_DIR_NAME} : {})
   };
+  const buildMetadata = buildArtifactMetadata({
+    repoRoot,
+    kind: 'engine',
+    version
+  });
+  enginePkg.buildMetadata = buildMetadata;
   await fsp.writeFile(path.join(outDir, 'package.json'), `${JSON.stringify(enginePkg, null, 2)}\n`, 'utf8');
+  await writeBuildMetadata(path.join(outDir, 'build-meta.json'), buildMetadata);
 
   console.log(`Staged ${PACKAGE_NAME}@${version} -> ${outDir}`);
+  console.log(`Build stamp: ${formatBuildMetadata(buildMetadata)}`);
 
   const localDeps = Object.entries(dependencies).filter(([, range]) => /^(\.|file:|link:)/.test(String(range)));
   if (localDeps.length > 0) {

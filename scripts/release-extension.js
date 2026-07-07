@@ -12,6 +12,8 @@ import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
 
+import {buildArtifactMetadata, formatBuildMetadata} from './build-metadata.js';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
 const extDir = path.join(repoRoot, 'packages', 'vscode-extension');
@@ -42,6 +44,12 @@ function capture(command, cliArgs, options = {}) {
 async function main() {
   const extPkg = JSON.parse(fs.readFileSync(path.join(extDir, 'package.json'), 'utf8'));
   const {version, engineVersion, publisher, name} = extPkg;
+  const buildMetadata = buildArtifactMetadata({
+    repoRoot,
+    kind: 'vscode-extension',
+    version,
+    engineVersion
+  });
 
   const engineOnNpm = capture('npm', ['view', `${ENGINE_NAME}@${engineVersion}`, 'version']);
   if (engineOnNpm !== engineVersion) {
@@ -51,8 +59,9 @@ async function main() {
     );
   }
 
-  run('npm', ['exec', '--yes', '@vscode/vsce', '--', 'package', '--no-dependencies', '-o', VSIX_NAME], {
-    cwd: extDir
+  console.log(`Preparing release package from ${formatBuildMetadata(buildMetadata)}.`);
+  run('node', [path.join('scripts', 'package-extension.js'), '--vsix', path.join('packages', 'vscode-extension', VSIX_NAME)], {
+    cwd: repoRoot
   });
 
   console.log(`\nPackaged ${publisher}.${name} ${version} (engine ${engineVersion}).`);

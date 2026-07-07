@@ -64,7 +64,7 @@ if(process.env.ENABLE_AUTH === "true"){
     const { authRouter } = await import('./auth/auth_router.js');
     app.use(authRouter)
     console.log(" with auth")
-}else{
+}else if (process.env.MICROWEBSTACKS_EXTENSION_MODE !== "true"){
     console.log("\n -- !!! no auth !!! -- Authentication is disabled -- \n")
 }
 

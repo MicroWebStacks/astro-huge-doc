@@ -87,12 +87,12 @@
             "registry"
           ],
           "enumDescriptions": [
-            "Use enginePath if set (or a source checkout when the extension runs from one), else a previously installed engine, else install from the npm registry.",
+            "Use enginePath if set (or a source checkout when the extension runs from one), else the bundled VSIX engine, else a previously installed engine, else install from the npm registry.",
             "Only use enginePath (or a source checkout when the extension runs from one). Never contacts the npm registry (fully offline).",
-            "Skip local discovery and use (or install) the published @microwebstacks/md-render engine."
+            "Skip local discovery and the bundled VSIX engine, and use (or install) the published @microwebstacks/md-render engine."
           ],
           "default": "auto",
-          "description": "Where the docs rendering engine is sourced from. For an installed extension, local discovery requires enginePath pointing at an astro-huge-doc checkout; 'auto' otherwise installs the engine from the npm registry on first use."
+          "description": "Where the docs rendering engine is sourced from. For an installed extension, local discovery requires enginePath pointing at an astro-huge-doc checkout; 'auto' otherwise uses the bundled VSIX engine first and only falls back to the npm registry when needed."
         },
         "microwebstacks.preview.enginePath": {
           "type": "string",

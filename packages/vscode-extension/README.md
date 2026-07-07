@@ -21,9 +21,10 @@ documentation site, not a single-file preview.
 ## Requirements
 
 - No system Node.js or npm is required on the normal install path. On first
-  use the extension downloads the pinned rendering engine from the npm registry
-  and runs its scripts with VS Code's own bundled runtime. Later runs are
-  offline unless the pinned engine version changes.
+  use the extension runs the bundled lite/json engine shipped inside the VSIX
+  and uses VS Code's own bundled runtime to execute its scripts. In `auto`
+  mode the npm registry is only a fallback path when the bundled payload is
+  unavailable; `registry` mode forces that published-engine path explicitly.
 - Rare fallback case: if a VS Code/Electron build disables
   `ELECTRON_RUN_AS_NODE`, set `MICROWEBSTACKS_NODE_PATH` to a Node.js 18+
   executable or make `node` available on PATH.
