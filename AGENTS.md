@@ -33,6 +33,18 @@ This repository reserves `specification/` for stable requirements and uses
   expected and actual results, and any gaps that remain untested.
 - Close the plan as soon as implementation is finished. Testing can happen
   before or after closure and does not change the plan's definition of done.
+- Treat "write `[######] Done` in implementation.md" and "move the packet's
+  row from `plans/open.md` to `plans/closed.md`" as one atomic step, not two.
+  Do the index edit in the same turn you write the Done marker — never as a
+  separate follow-up the maintainer has to ask for.
+- The Progress marker in `implementation.md` must be its own line starting
+  with `[` (e.g. `[####] Done - ...` or `[##----] Phase 2/6 - ...`), not
+  embedded mid-sentence — `pnpm check:plans` parses it literally and a
+  reformatted marker will read as missing.
+- Run `pnpm check:plans` after any plan-index edit (new packet, phase update,
+  or closure). It cross-checks every packet's `implementation.md` Progress
+  marker against `open.md`/`closed.md` and fails loudly on drift — treat a
+  failure as something to fix immediately, not defer.
 
 When a plan changes during implementation, update the dated plan folder and the
 top-level plan indexes so the packet, implementation notes, optional test

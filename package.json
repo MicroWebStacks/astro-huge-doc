@@ -14,6 +14,7 @@
     "server": "node server/server.js",
     "collect": "node scripts/collect.js",
     "diagrams": "node scripts/diagrams.js",
+    "check:plans": "node scripts/check-plans.js",
     "clean:diagrams": "node scripts/clean-diagrams.js",
     "export-json": "node scripts/export-json.js",
     "ext:stage-engine": "node scripts/stage-engine.js",

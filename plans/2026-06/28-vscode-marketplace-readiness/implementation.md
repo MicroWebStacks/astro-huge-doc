@@ -1,5 +1,8 @@
 # Implementation - Phase 2 (Engine Package + Extension Bootstrap)
 
+[##----] Phase 2/? - bundled VSIX engine fallback landed; runtime hardening,
+trust review, platform validation, and publishing flow still remain.
+
 Tracks the Option B work: the extension resolves a `@microwebstacks/md-render`
 engine instead of assuming a repo checkout, while the local workspace checkout
 stays a guaranteed fallback and the release VSIX now carries its own bundled

@@ -57,6 +57,16 @@ finished. If `implementation.md` is present and its Progress marker says
 `plans/open.md`. Testing may happen before or after closure and should not
 block, delay, or reopen the plan by itself.
 
+Writing the Done marker and moving the index row are the same action, done in
+the same edit — not "implement, then remember to close later." Run
+`pnpm check:plans` (`scripts/check-plans.js`) after touching either index; it
+walks every `plans/*/*/implementation.md`, reads the Progress marker on its
+own line (`[#-----]` in progress, fully-filled `[######]` done — bracket width
+tracks that packet's own phase count, it does not have to be six), and fails
+if a packet's Done/in-progress status disagrees with which index file lists
+it, or if a packet is missing from both, listed in both, or has an
+implementation.md with no parseable marker.
+
 Keep three top-level packet surfaces current:
 
 - `plans/README.md` - concise layout guidance for the directory itself;
@@ -162,6 +172,8 @@ Use the smallest meaningful verification for the change:
 - `pnpm collect` for content collection changes;
 - `pnpm fetch` for fetch workflow changes when credentials and network access
   are available;
+- `pnpm check:plans` for any change touching `plans/open.md`, `plans/closed.md`,
+  or a packet's `implementation.md`;
 - focused script or server checks for targeted behavior;
 - document consistency review for workflow-only changes.
 
