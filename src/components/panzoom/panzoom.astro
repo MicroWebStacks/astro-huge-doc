@@ -13,6 +13,8 @@ export interface Props {
   width?: string;
   center?: boolean;
   showOpenButton?: boolean;
+  themeLazy?: boolean;
+  versionId?: string;
 }
 
 const {
@@ -25,6 +27,8 @@ const {
   width,
   center,
   showOpenButton = true,
+  themeLazy = false,
+  versionId,
 } = Astro.props as Props;
 // Inline image-directive options. A bare numeric value gets a px unit.
 const withUnit = (v?: string) => (v == null || v === '' ? undefined : /^\d+$/.test(v) ? `${v}px` : v);
@@ -54,6 +58,9 @@ const isImg = !isSvg
       data-name={data_name}
       data-sid={hash}
       data-meta={JSON.stringify(meta)}
+      data-theme-lazy={themeLazy ? "true" : undefined}
+      data-dark-url={themeLazy ? asseturl : undefined}
+      data-version-id={themeLazy ? versionId : undefined}
       >
   {showOpenButton &&
     <div class="header open" title="Open full view" aria-label="Open full view">

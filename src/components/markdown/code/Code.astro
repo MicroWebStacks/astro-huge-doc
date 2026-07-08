@@ -5,6 +5,7 @@ import Cards from '../cards/Cards.astro'
 import Gallery from '../../gallery/gallery.astro';
 import { config } from '@/config.js';
 import { getAssetInfoBlob_version } from '@/libs/structure-db';
+import { normalizeDiagramLanguage } from '@/libs/diagram-render.js';
 import DiagramCode from './DiagramCode.astro';
 
 export interface Props {
@@ -23,15 +24,6 @@ const versionId = item.version_id ?? config.collect.version_id;
 const {asset, buffer} = getAssetInfoBlob_version(item.asset_uid, versionId)
 const code = buffer ? new TextDecoder().decode(buffer) : ''
 const diagramLanguages = config.diagram?.languages ?? {}
-const diagramAliases = config.diagram?.aliases ?? {}
-function normalizeDiagramLanguage(value) {
-    const normalized = String(value ?? '').trim().toLowerCase()
-    if (!normalized) {
-        return ''
-    }
-    const trimmed = normalized.startsWith('.') ? normalized.slice(1) : normalized
-    return diagramAliases[trimmed] ?? trimmed
-}
 const assetLanguage = normalizeDiagramLanguage(asset?.ext)
 let language = assetLanguage || 'text'
 const params = asset?.params?asset.params.split(' '):[]

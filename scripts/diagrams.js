@@ -6,6 +6,7 @@ import {join} from 'path';
 import {gunzipSync} from 'zlib';
 import {config} from '../config.js';
 import {blobFileName} from '../src/libs/blob-files.js';
+import {normalizeDiagramLanguage, renderKrokiDiagram, resolveRendererName} from '../src/libs/diagram-render.js';
 
 const diagramTypeMap = {
     codeblock: 'code_diagram',
@@ -15,23 +16,9 @@ const diagramTypeMap = {
 const diagramConfig = config.diagram ?? {};
 const diagramLanguages = diagramConfig.languages ?? {plantuml: 'kroki', blockdiag: 'kroki', mermaid: 'client'};
 const diagramExts = new Set(Object.keys(diagramLanguages));
-const languageAliases = diagramConfig.aliases ?? {puml: 'plantuml', mmd: 'mermaid'};
 
 function sha512(buffer) {
     return createHash('sha512').update(buffer).digest('hex');
-}
-
-function normalizeLanguage(value) {
-    const normalized = String(value ?? '').trim().toLowerCase();
-    if (!normalized) {
-        return '';
-    }
-    const trimmed = normalized.startsWith('.') ? normalized.slice(1) : normalized;
-    return languageAliases[trimmed] ?? trimmed;
-}
-
-function resolveRendererName(language) {
-    return diagramLanguages[language] ?? diagramConfig.default_renderer;
 }
 
 function parseBlobUid(blobUid) {
@@ -55,25 +42,6 @@ async function writeStaticBlob(blobsDir, hash, ext, buffer) {
     const fileName = blobFileName(hash, ext);
     await writeFile(join(blobsDir, fileName), buffer);
     return fileName;
-}
-
-async function renderDiagram(language, code) {
-    const rendererName = resolveRendererName(language);
-    const renderer = diagramConfig.renderers?.[rendererName];
-    const server = renderer?.server ?? renderer?.base_url ?? config.kroki_server;
-    if (!server) {
-        throw new Error(`No diagram renderer server configured for ${language}`);
-    }
-    const serverUrl = String(server).replace(/\/+$/, '');
-    const response = await fetch(`${serverUrl}/${language}/svg/`, {
-        method: 'POST',
-        body: code,
-        headers: {'Content-Type': 'text/plain'}
-    });
-    if (!response.ok) {
-        throw new Error(`${rendererName ?? 'diagram'} render failed (${response.status})`);
-    }
-    return response.text();
 }
 
 function resolveSqliteBlobBuffer(configOutdir, row) {
@@ -184,7 +152,7 @@ async function runSqlite() {
 
         for (const asset of diagramSources) {
             const diagramType = diagramTypeMap[asset.type];
-            const ext = normalizeLanguage(asset.ext);
+            const ext = normalizeDiagramLanguage(asset.ext);
             if (!diagramType || !diagramExts.has(ext)) {
                 continue;
             }
@@ -231,7 +199,9 @@ async function runSqlite() {
 
             let svgText;
             try {
-                svgText = await renderDiagram(ext, codeBlob.buffer.toString('utf-8'));
+                // PlantUML (code fences and linked .puml files — both render through
+                // DiagramCode) is themed dark at build time; blockdiag stays untouched.
+                svgText = await renderKrokiDiagram(ext, codeBlob.buffer.toString('utf-8'), ext === 'plantuml' ? 'dark' : undefined);
             } catch (error) {
                 console.error(`Render failed for ${asset.uid}: ${error.message}`);
                 continue;
@@ -324,7 +294,7 @@ async function runJson() {
 
     for (const asset of diagramSources) {
         const diagramType = diagramTypeMap[asset.type];
-        const ext = normalizeLanguage(asset.ext);
+        const ext = normalizeDiagramLanguage(asset.ext);
         if (!diagramType || !diagramExts.has(ext)) {
             continue;
         }
@@ -365,7 +335,9 @@ async function runJson() {
 
         let svgText;
         try {
-            svgText = await renderDiagram(ext, codeBuffer.toString('utf-8'));
+            // PlantUML (code fences and linked .puml files — both render through
+            // DiagramCode) is themed dark at build time; blockdiag stays untouched.
+            svgText = await renderKrokiDiagram(ext, codeBuffer.toString('utf-8'), ext === 'plantuml' ? 'dark' : undefined);
         } catch (error) {
             console.error(`Render failed for ${asset.uid}: ${error.message}`);
             continue;

@@ -41,7 +41,7 @@ const languageLabel = language
 
 ---
 {hasDiagram &&
-    <div class:list={['diagram-shell', {'mermaid-shell': isClientDiagram}]} data-code-shell data-uid={uid} data-view="diagram">
+    <div class:list={['diagram-shell', {'mermaid-shell': isClientDiagram}]} data-code-shell data-uid={uid} data-language={language} data-view="diagram">
         <div class="diagram-toolbar" role="toolbar" aria-label="Diagram controls">
             <span class="toolbar-language">{languageLabel}</span>
             <div class="toolbar-group" aria-label="Diagram view mode">
@@ -103,7 +103,8 @@ const languageLabel = language
         </div>
         {!isClientDiagram && diagram_url &&
             <div class="diagram visible" data-role="diagram" data-uid={uid}>
-                <Panzoom src={diagram_url} alt={alt} title={title} meta={meta} hash={uid} showOpenButton={false}/>
+                <Panzoom src={diagram_url} alt={alt} title={title} meta={meta} hash={uid} showOpenButton={false}
+                    themeLazy={language === 'plantuml'} versionId={versionId}/>
             </div>
         }
         {isClientDiagram &&
@@ -142,6 +143,16 @@ const languageLabel = language
 }
 .mermaid-panel{
     background-color: var(--mermaid-surface-bg);
+}
+/* PlantUML is theme-aware (dark baked at build, light swapped lazily), so its
+   surface + fullscreen backdrop follow the active theme instead of the
+   "always light" --diagram-surface-bg compromise. */
+.diagram-shell[data-language="plantuml"]{
+    background-color: var(--plantuml-surface-bg);
+}
+.diagram-shell[data-language="plantuml"] .diagram{
+    background-color: var(--plantuml-surface-bg);
+    --lightbox-surface-bg: var(--plantuml-surface-bg);
 }
 .mermaid-diagram{
     padding: 10px;

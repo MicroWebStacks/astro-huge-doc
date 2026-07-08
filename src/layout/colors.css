@@ -93,6 +93,15 @@
      Mermaid is client-rendered, so it can follow the active site theme. */
   --diagram-surface-bg: #EDEDED;
   --mermaid-surface-bg: #252526;
+  /* Theme-aware PlantUML (dark baked at build, light rendered lazily).
+     ink/line/panel/note are mirrored as hex in src/libs/diagram-render.js
+     (PLANTUML_THEME_COLORS) because Kroki cannot read CSS variables —
+     keep both sides in sync. */
+  --plantuml-surface-bg: #252526;      /* matches --mermaid-surface-bg */
+  --plantuml-ink-color: #CCCCCC;       /* matches --content-color */
+  --plantuml-line-color: #888888;      /* matches --menu-border-left-color */
+  --plantuml-panel-bg: #2D2D2D;        /* matches --surface-2-bg */
+  --plantuml-note-bg: #444551;         /* matches --note-bg-color */
   --model-viewer-bg: #2A2A30;
   --lightbox-overlay-color: rgba(0, 0, 0, 0.6);
   --lightbox-surface-bg: #F4F4F4;
@@ -183,6 +192,12 @@
   /* "Always light" content surfaces stay genuinely white in light mode. */
   --diagram-surface-bg: #FFFFFF;
   --mermaid-surface-bg: #FFFFFF;
+  /* Theme-aware PlantUML light palette; hex mirrored in diagram-render.js. */
+  --plantuml-surface-bg: #FFFFFF;
+  --plantuml-ink-color: #24292F;       /* matches --content-color */
+  --plantuml-line-color: #6B6B6B;      /* matches --menu-arrow-color */
+  --plantuml-panel-bg: #ECECEC;        /* matches --surface-2-bg */
+  --plantuml-note-bg: #E8E8F6;         /* matches --note-bg-color */
   --model-viewer-bg: #EEF0FA;
   --lightbox-overlay-color: rgba(0, 0, 0, 0.45);
   --lightbox-surface-bg: #FEFEFE;
