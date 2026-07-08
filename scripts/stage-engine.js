@@ -84,14 +84,38 @@ function vendorDependencies(outDir) {
   }
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// A node_modules tree that npm install just finished writing is briefly held
+// open on Windows (Defender/indexer scanning the new files), which fails the
+// immediately-following rename with EPERM. Same class of transient lock as
+// the engine-cleanup EBUSY fixed in extension.js; retrying a few times with a
+// short backoff clears it without needing an AV exclusion.
+async function retryFsOp(op, {attempts = 6, delayMs = 500} = {}) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await op();
+    } catch (error) {
+      const retryable = error.code === 'EPERM' || error.code === 'EBUSY';
+      if (!retryable || attempt === attempts) {
+        throw error;
+      }
+      console.warn(`  ${error.code} (attempt ${attempt}/${attempts}), retrying in ${delayMs}ms...`);
+      await sleep(delayMs);
+    }
+  }
+}
+
 async function hideVendoredModules(outDir) {
   const nodeModules = path.join(outDir, 'node_modules');
   if (!fs.existsSync(nodeModules)) {
     throw new Error(`Expected ${nodeModules} after npm install; nothing to vendor.`);
   }
   const vendored = path.join(outDir, VENDOR_DIR_NAME);
-  await fsp.rm(vendored, {recursive: true, force: true});
-  await fsp.rename(nodeModules, vendored);
+  await retryFsOp(() => fsp.rm(vendored, {recursive: true, force: true}));
+  await retryFsOp(() => fsp.rename(nodeModules, vendored));
 }
 
 async function readJson(file) {
