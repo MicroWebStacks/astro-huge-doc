@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.0.12 - 2026-07-08
+
+- No system Node.js or npm required anymore: the extension now runs its
+  scripts on VS Code's own bundled runtime, falling back to a
+  `MICROWEBSTACKS_NODE_PATH` override or a system Node only if that runtime
+  can't be used.
+- The VSIX now bundles a self-contained lite/json engine payload, so the
+  first preview works fully offline or behind a corporate proxy; the npm
+  registry is now only a fallback/explicit path (engine 0.0.7).
+- Inline and block math (`$...$` / `$$...$$`) now renders with KaTeX.
+- Fixed the PlantUML/BlockDiag "expand full view" button doing nothing on
+  some pages.
+- `microwebstacks.preview.docsRoot` now defaults to the manifest's
+  `render.folder` when set, falling back to `output.content`.
+
 ## 0.0.11 - 2026-07-04
 
 - Mermaid now renders client-side in the browser and no longer depends on
