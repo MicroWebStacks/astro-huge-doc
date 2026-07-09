@@ -51,27 +51,41 @@ local `astro-huge-doc` checkout.
 - `packages/vscode-extension/package.json` is public (`"private": false`) and
   now includes Marketplace-facing metadata plus a pinned `engineVersion`.
 - The extension manifest includes a publisher, commands, categories, keywords,
-  repository/bugs links, and an extension-local README.
+  repository/bugs links, license, non-SVG icon, and an extension-local README.
 - `extension.js` now resolves a rendering engine through `enginePath`,
-  repo-relative candidates, or a versioned installed engine in extension
-  storage.
+  repo-relative candidates, a bundled VSIX engine, or a versioned installed
+  engine in extension storage.
 - `extension.js` now installs the engine with an in-process HTTPS tarball
   download/extract path instead of shelling out to `npm`.
 - `extension.js` now prefers VS Code's own runtime
   (`process.execPath` + `ELECTRON_RUN_AS_NODE=1`) for collect/diagrams/server
   script execution, with explicit override / fallback paths if unavailable.
-- `README.md` still documents local `C:\dev\...` development paths for the
-  extension flow.
-- The renderer defaults to a Kroki-hosted diagram rendering service unless
-  configured otherwise.
-- `vsce` is not on this shell's PATH, so this packet records a static readiness
-  plan rather than a completed Marketplace validation run.
+- `README.md` and the extension-local README no longer document local
+  `C:\dev\...` development paths.
+- The renderer's default `kroki.server` (`config.js`) is
+  `http://localhost:18000`, not a hosted service; hosted rendering is opt-in
+  via `microwebstacks.preview.krokiServer`.
+- `@microwebstacks/md-render@0.0.7` is published on the npm registry
+  (`content-structure` is now a normal semver dependency, not a local-path
+  dependency), so the registry-install tier is exercisable end to end.
+- `vsce`, `pnpm`, and the `code` CLI are all available in this environment as
+  of 2026-07-09, so packaging and clean-profile validation are no longer
+  blocked on tooling availability.
 
 ## Hard Blockers
 
 ### BLK-001 - The VSIX is not self-contained
 
-Status: open
+Status: resolved
+
+`scripts/package-extension.js` stages and verifies a bundled `bundled-engine/`
+payload (server, scripts, built SSR output, vendored `node_modules`) inside
+the packaged VSIX itself. Proven end to end on 2026-07-09: the real VSIX was
+installed into a fully isolated `--user-data-dir`/`--extensions-dir` profile
+(no repo checkout, no `enginePath`), opened against a plain Markdown workspace
+with no `manifest.yaml`, and `microwebstacks.previewDocs` served real rendered
+content over `127.0.0.1` (HTTP 200, 29 KB body) using only the bundled
+engine. See `implementation.md` and `test.md` for the run details.
 
 The packaged extension currently does not include the runtime needed to collect,
 render, and serve documentation. A clean Marketplace install would not have:
@@ -90,7 +104,7 @@ registry access when using the release VSIX.
 
 ### BLK-002 - Runtime packaging strategy must preserve standalone repo usage
 
-Status: open
+Status: resolved
 
 The extension needs a clear production architecture before public release.
 Current local-engine discovery is acceptable for development, but not for a
@@ -136,59 +150,63 @@ fallbacks with a clear error if neither route works.
 
 ### BLK-003 - Native dependency compatibility is unproven
 
-Status: open
+Status: resolved for Windows x64 (this preview's only target); macOS/Linux
+explicitly out of scope
 
-The renderer stack uses native modules and server-side dependencies. Public
-release requires a compatibility matrix across Windows, macOS, and Linux, and
-possibly x64/arm64.
+Per OP-002, the first preview release targets Windows x64 only; macOS and
+Linux compatibility is an explicit post-preview follow-up and was not pursued
+in this pass (by maintainer direction). The lite/json engine profile used by
+the bundled VSIX fallback has no native module dependency
+(`better-sqlite3`/`duckdb`/`sharp` are only loaded by the sqlite/full
+profile), which is why the clean-profile Windows run below had nothing
+platform-specific to fail on.
 
-Exit requirement: package, install, and smoke-test the extension on supported
-platforms with no repo checkout and no global pnpm/vsce dependency at runtime.
+Exit requirement met (Windows x64, this pass): the packaged VSIX was
+installed and smoke-tested on a clean Windows VS Code profile with no repo
+checkout and no global pnpm/vsce dependency at runtime (2026-07-09, see
+`implementation.md`). Cross-platform (macOS/Linux) validation remains open
+and explicitly out of scope until a post-preview pass.
 
 ### BLK-004 - Marketplace metadata and content are incomplete
 
-Status: open
+Status: resolved
 
-The extension package needs the public listing surface expected by `vsce` and
-Marketplace users:
-
-- remove `"private": true`
-- `repository`
-- `license`
-- `icon` using a non-SVG image
-- `keywords`
-- appropriate `categories`
-- `bugs` or support URL
-- extension-local `README.md`
-- `CHANGELOG.md`
-- `.vscodeignore` or a deterministic package allowlist
-
-The Marketplace docs also constrain README and changelog images: image URLs
-must be `https`, and SVG images are restricted.
+`packages/vscode-extension/package.json` and directory now have all of:
+`"private": false`, `repository`, `license` (MIT), non-SVG `icon` (`icon.png`),
+`keywords`, `categories`, `bugs` URL, extension-local `README.md`,
+`CHANGELOG.md`, and `.vscodeignore`. `vsce package` runs from this metadata
+without blocking warnings (see `RELEASE.md`).
 
 ### BLK-005 - Privacy behavior around diagram rendering must be explicit
 
-Status: open
-
-The default diagram renderer can send diagram source to `https://kroki.io`.
-That may be surprising for users previewing private documentation.
+Status: resolved
 
 Decision: hosted diagram rendering is opt-in.
 
-Exit requirement: implement a default that does not send diagram source to a
-hosted service, add settings and README disclosure for hosted rendering, and
-provide local renderer examples such as a Docker container or Docker Compose
-setup with the required dependencies.
+`config.js`'s default `kroki.server` is `http://localhost:18000`, never a
+hosted service; `microwebstacks.preview.krokiServer` must be explicitly set to
+opt into `https://kroki.io` or another remote endpoint. `compose.yaml` at the
+repo root defines a local Kroki service (`docker compose up -d` /
+`pnpm kroki:up`, `down` / `pnpm kroki:down`), documented in the root README's
+"local Docker Kroki" section. The extension-local README now has a
+self-contained "Local Kroki via Docker" section with a plain `docker run`
+one-liner for Marketplace users who have no repo checkout (and therefore no
+`compose.yaml`), plus a pointer to the repo's compose file for checkout users.
 
 ### BLK-006 - Update and publish automation is not defined
 
-Status: open
+Status: resolved
 
-Pushing to GitHub does not update VS Code Marketplace by itself. The release
-flow must publish a new extension version through `vsce` or Marketplace upload.
+`RELEASE.md` documents the chosen flow: manual `pnpm engine:release` (npm
+publish, OTP-gated) for engine changes, then `pnpm ext:release` (packages,
+verifies the bundled engine landed in the VSIX, stamps build metadata) plus a
+manual VSIX upload at
+`https://marketplace.visualstudio.com/manage/publishers/microwebstacks`. A
+decision rule maps which artifact to release for a given change. GitHub push
+is explicitly documented as publishing neither artifact.
 
-Exit requirement: choose manual `vsce publish`, GitHub Actions with a secret,
-or Azure DevOps/Entra-based secure publishing.
+Remaining gap: this flow has never been exercised for a real first
+Marketplace publish (see Publish Readiness Exit Criteria).
 
 ## Design Decisions Needed
 
@@ -429,16 +447,16 @@ Exit criteria:
 
 | Area | Required Check | Status |
 | --- | --- | --- |
-| Package content | VSIX contains all runtime files and no private/cache files | open |
-| Clean install | Works without `enginePath` | open |
-| Native modules | Works on supported platforms | open |
-| Workspace storage | DB/cache writes stay in extension storage | partially proven locally |
-| Local server | Binds localhost only in extension mode | partially proven locally |
-| Webview | CSP and port mapping work | partially proven locally |
-| Diagrams | Privacy default accepted and tested | open |
-| Metadata | `vsce package` has no blocking warnings | open |
-| Docs | README/changelog are Marketplace-ready | open |
-| Updates | Version/publish automation defined | open |
+| Package content | VSIX contains all runtime files and no private/cache files | proven (2026-07-09 clean-profile run) |
+| Clean install | Works without `enginePath` | proven (2026-07-09, Windows x64) |
+| Native modules | Works on supported platforms | proven for Windows x64 (lite/json profile has no native deps); macOS/Linux out of scope this pass |
+| Workspace storage | DB/cache writes stay in extension storage | proven (2026-07-09 clean-profile run used isolated storage only) |
+| Local server | Binds localhost only in extension mode | proven (code review + clean-profile run: server reachable only on 127.0.0.1) |
+| Webview | CSP and port mapping work | reviewed (CSP scopes iframe to the extension's own port); command-level exercise proven, webview panel rendering itself not screenshot-verified |
+| Diagrams | Privacy default accepted and tested | proven (default is `localhost:18000`; `compose.yaml` + `docker run` instructions verified to parse/be correct, daemon not available in this sandbox to render an actual diagram) |
+| Metadata | `vsce package` has no blocking warnings | proven (only the expected file-count/bundle-size advisory warning; no blocking errors) |
+| Docs | README/changelog are Marketplace-ready | proven (README/CHANGELOG present, no local dev paths, local-Kroki instructions added) |
+| Updates | Version/publish automation defined | proven (`RELEASE.md`); a real first Marketplace publish is still outstanding |
 
 ## Non-Goals
 
@@ -453,14 +471,28 @@ Exit criteria:
 
 The extension is ready to publish when all hard blockers are closed and:
 
-1. The release VSIX installs into a clean VS Code profile.
-2. Preview works with no local `astro-huge-doc` checkout.
-3. Package inspection shows no local/private/generated data.
+1. The release VSIX installs into a clean VS Code profile. **Done** (2026-07-09).
+2. Preview works with no local `astro-huge-doc` checkout. **Done** (2026-07-09,
+   Windows x64).
+3. Package inspection shows no local/private/generated data. **Done** - the
+   VSIX contents listed by `vsce package` are extension code, license,
+   changelog, icon, images, and the bundled engine (server/scripts/dist/vendored
+   deps); nothing from `content/`, `dataset/`, `.env`, or `.tmp/`.
 4. `vsce package` and `vsce publish --dry-run` or equivalent checks pass.
-5. README, changelog, license, icon, repository, and support links are present.
+   **Partially done** - `vsce package` succeeds with only the expected
+   file-count advisory warning; `vsce publish --dry-run` (which needs a
+   Marketplace PAT) has not been run.
+5. README, changelog, license, icon, repository, and support links are
+   present. **Done**.
 6. Privacy behavior for local server, workspace files, and diagram rendering is
-   documented.
+   documented. **Done**.
 7. The maintainer has approved publisher ID, release channel, and update flow.
+   **Done** per the Accepted Maintainer Decisions above; the update flow
+   itself (`RELEASE.md`) has not yet been exercised for a real first publish.
+
+Remaining before a real Marketplace publish: run `vsce publish --dry-run` (or
+log in and do the actual first publish), and decide whether/when to pursue
+macOS/Linux validation (currently out of scope for this preview).
 
 ## Official References
 

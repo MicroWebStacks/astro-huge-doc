@@ -1,7 +1,9 @@
 # Implementation - Phase 2 (Engine Package + Extension Bootstrap)
 
-[##----] Phase 2/? - bundled VSIX engine fallback landed; runtime hardening,
-trust review, platform validation, and publishing flow still remain.
+[####--] Phase 4/? - metadata, privacy default, runtime hardening, and a
+Windows clean-profile install pass are done; macOS/Linux validation stays
+explicitly out of scope for this preview, and a real first Marketplace
+publish is still outstanding.
 
 Tracks the Option B work: the extension resolves a `@microwebstacks/md-render`
 engine instead of assuming a repo checkout, while the local workspace checkout
@@ -76,8 +78,12 @@ step; the script validates the build exists before staging.
 - [x] `engineSource` setting + extension version bump
 - [x] `scripts/stage-engine.js`
 - [x] Bundled VSIX engine fallback staged and hydrated before registry install
-- [ ] Publish `@microwebstacks/md-render` (blocked on content-structure)
-- [ ] End-to-end clean-profile registry install validation
+- [x] Publish `@microwebstacks/md-render` (`@microwebstacks/md-render@0.0.7` is
+      live on npm; `content-structure` is a normal semver dependency now)
+- [x] End-to-end clean-profile install validation (bundled-engine path, 2026-07-09)
+- [ ] End-to-end clean-profile validation of the `engineSource=registry` tier
+      specifically (the 2026-07-09 run exercised the default `auto` path,
+      which resolves to the bundled engine, not the registry-download tier)
 
 ## Follow-up: node-free bootstrap landing
 
@@ -134,3 +140,164 @@ To close that gap:
 
 This changes the proof standard from "the staging folder looked right" to "the
 final VSIX archive demonstrably contains the bundled engine payload."
+
+## 2026-07-09 - Plan reconciliation, runtime hardening, Kroki default proof, clean-profile install
+
+Re-audited the whole packet against the actual repo state (not just what
+plan.md said) and found several blockers marked "open" were already resolved
+in code but never reconciled in the doc:
+
+- BLK-004 (metadata): `package.json` already had `private: false`, license,
+  repository, bugs, icon, keywords, categories, `.vscodeignore`, `CHANGELOG.md`.
+- BLK-005 (privacy default): `config.js`'s default `kroki.server` was already
+  `http://localhost:18000`, not hosted `kroki.io`. What was actually missing
+  was a Marketplace-facing README section with a concrete, repo-independent
+  Docker command - the repo already had `compose.yaml` and root README
+  instructions, but those assume a checkout, which Marketplace users won't have.
+- BLK-002 (registry tier): `@microwebstacks/md-render@0.0.7` is published on
+  npm (`npm view @microwebstacks/md-render version` returns `0.0.7`), and
+  `content-structure` is now a normal semver dependency, not a local-path
+  dependency. Tier 4/5 (registry install) is exercisable now, not blocked.
+- BLK-006 (publish automation): `RELEASE.md` already documented a full manual
+  `vsce`/Marketplace-upload flow with a decision rule for which artifact to
+  release. This was done, just not reflected in plan.md's blocker status.
+
+`plan.md` was updated in place to mark BLK-002/004/005/006 resolved, scope
+BLK-003 down to "Windows x64 only, this pass" (macOS/Linux stays an explicit
+post-preview follow-up per OP-002, not pursued here), and mark BLK-001
+"resolved pending clean-profile proof."
+
+### Privacy/local-Kroki gap actually closed
+
+- `packages/vscode-extension/README.md` gained a "Local Kroki via Docker"
+  section with a plain `docker run -d --name mws-kroki -p 18000:8000
+  yuzutech/kroki:latest` one-liner usable with zero repo checkout, plus a
+  pointer to the repo's `compose.yaml` for checkout users.
+- Root `package.json` gained `kroki:up` / `kroki:down` scripts wrapping
+  `docker compose up -d` / `down`; root `README.md`'s existing "local Docker
+  Kroki" section now shows both forms.
+- `docker compose config` was run against the existing `compose.yaml` and
+  parses correctly. Actually starting the container was not exercised in this
+  sandbox (`docker compose up -d` fails here with `dockerDesktopLinuxEngine
+  pipe not found` - the Docker daemon is not running in this environment), so
+  the Kroki container itself was validated statically (config parses,
+  `docker run` command is correct for the image/port), not by an end-to-end
+  render.
+
+### Runtime hardening (Phase 3), in `packages/vscode-extension/extension.js`
+
+- **Removed `shell: true`/manual quoting entirely** (`runCapture`, and the
+  `quoteForShell`/`useShell` logic in `spawnLogged`). Verified experimentally
+  in this environment that `cp.spawnSync`/`cp.spawn` on Windows already quote
+  arguments correctly for `CreateProcess` without `shell: true`, for both bare
+  PATH-resolved commands (`git`) and full paths containing spaces - the
+  original `shell: true` was added in commit `20fce26` to work around
+  `npm.cmd` needing a shell, but npm invocation was removed by the node-free
+  bootstrap work and never revisited. `shell: true` now only remains
+  necessary (and is used, with `shell: true` set explicitly) in the
+  standalone clean-profile test harness's own `code.cmd` invocation, which is
+  test infrastructure, not the extension itself.
+- **Minimal child-process environment**: added `minimalChildEnv()` -
+  collect/diagrams/server children (and the node-runner probe) now inherit
+  only an explicit OS-necessity allowlist (`SystemRoot`/`PATH`/`TEMP`/etc. on
+  Windows, `PATH`/`HOME`/etc. on POSIX) plus proxy vars, instead of the full
+  host `process.env`. Confirmed via `grep` that `config.js`/`server.js`/
+  `collect.js`/`diagrams.js` only ever read the explicit `MICROWEBSTACKS_*`/
+  `DOCS_*` vars the extension already sets itself, so nothing relies on
+  inheriting arbitrary host environment.
+- **Orphan cleanup**: added an `activeChildren` set that every
+  `spawnLogged`-spawned child registers into and removes itself from on exit;
+  `stopDocsPreviewServer()` (called by `deactivate()`, restart, and the file-
+  watcher refresh path) now calls `killActiveChildren()`, so an in-flight
+  `collect`/`diagrams` child is killed too if the window closes mid-refresh,
+  not just the long-lived server process.
+- **Host binding**: confirmed (not changed) `server/server.js` binds
+  `config.server.host`, which `createRuntimeEnv` sets to `MICROWEBSTACKS_HOST
+  = '127.0.0.1'` in extension mode - already correct.
+- **Webview CSP**: confirmed (not changed) `renderWebviewHtml`'s CSP
+  (`default-src 'none'; frame-src http://localhost:<port> http://127.0.0.1:
+  <port>; style-src 'unsafe-inline' <cspSource>`) already scopes the iframe to
+  the extension's own port only - already correct, no change needed.
+
+### Clean-profile install validation (BLK-001, replacing the static plan)
+
+Built a throwaway `@vscode/test-electron`-based harness (not committed to the
+repo; lives in the session scratchpad) that:
+
+1. Packages the real VSIX via `pnpm ext:package` (not a dev-mode load).
+2. Installs it with `code --install-extension` into a fully isolated
+   `--user-data-dir`/`--extensions-dir` (no real profile, no real installed
+   extensions).
+3. Opens a plain Markdown workspace with no `manifest.yaml` and no
+   `astro-huge-doc` checkout anywhere on the path.
+4. Drives the real Extension Host: activates the extension, executes
+   `microwebstacks.previewDocs`, detects the new `127.0.0.1` listening port
+   the extension opens (via `netstat` diffing, since the extension doesn't
+   expose its port through any public API), does a real HTTP GET and checks
+   for a 200 with a non-trivial body, then executes
+   `microwebstacks.stopDocsPreviewServer` and confirms the port stops
+   responding.
+
+Two dead ends before landing a working harness, both worth recording since
+they'll recur:
+
+- `@vscode/test-electron`'s `runTests()` requires an `extensionDevelopmentPath`
+  and internally launches `Code.exe` with `--extensionTestsPath`; in this VS
+  Code build/Node combination that launch path crashed with
+  `Cannot find module '<workspace-dir>'` (Electron tried to `require()` the
+  workspace folder as a script entry) before any extension code ran. Not
+  pursued further given the fix below was simpler and more direct anyway.
+- Launching `Code.exe` directly hit the *same* `Cannot find module` crash, for
+  an unrelated reason: this shell's environment has `ELECTRON_RUN_AS_NODE=1`
+  set (used elsewhere by this same extension's own node-free bootstrap
+  trick). Any Electron binary inherits that and runs as plain Node instead of
+  launching the app, treating `argv[1]` (the workspace path) as a module to
+  require. Fix: `env -u ELECTRON_RUN_AS_NODE` before invoking `Code.exe`
+  directly from a shell that has it set.
+
+Working harness, run 2026-07-09:
+
+1. `pnpm ext:package` (real run, not `--stage-only`) - built
+   `markdown-site-preview.vsix`, 65.37 MB / 22,846 files, and the script's own
+   post-package check confirmed 22,605 vendored `_modules` entries inside the
+   archive.
+2. Installed into a throwaway, fully isolated profile:
+   `code.cmd --user-data-dir <tmp>/user-data --extensions-dir <tmp>/extensions
+   --install-extension markdown-site-preview.vsix` - printed "was successfully
+   installed."
+3. A second, minimal probe extension (`onStartupFinished`, no relation to the
+   product code) was placed in the same isolated `extensions-dir` and
+   registered in that directory's `extensions.json` (VS Code only loads
+   extension folders listed there, not anything merely present on disk - this
+   cost one throwaway run to discover). On activation it: finds and activates
+   `microwebstacks.markdown-site-preview`, runs
+   `microwebstacks.previewDocs`, detects the new `127.0.0.1` listening port by
+   diffing `netstat` output before/after (the extension has no public API to
+   query its own port), does a real `http.get` against it, then runs
+   `microwebstacks.stopDocsPreviewServer` and confirms the port stops
+   responding - writing a pass/fail JSON result to disk and quitting the
+   window.
+4. Launched `Code.exe <clean-workspace-with-no-manifest.yaml>
+   --user-data-dir ... --extensions-dir ... --disable-workspace-trust` (env
+   without `ELECTRON_RUN_AS_NODE`), no `enginePath` set, `engineSource` left
+   at its default `auto`.
+
+Result: **pass**. `previewDocs` hydrated the bundled engine, ran collect and
+diagrams, started the server, and a new `127.0.0.1` port appeared well inside
+the poll window; `GET /` returned HTTP 200 with a 29,097-byte body (real
+rendered page, not an error page); `stopDocsPreviewServer` then made the port
+stop responding. No leftover `Code.exe`/`node.exe` processes remained after
+the run (checked via `Get-CimInstance Win32_Process` filtered to the isolated
+`user-data-dir`), confirming the `killActiveChildren()` hardening change did
+not introduce a hang or leave stragglers.
+
+This is Windows x64 only, exercised the default `auto` -> bundled-engine path
+(not the `engineSource=registry` tier), and did not visually confirm the
+webview panel's rendering (the probe drove the underlying HTTP server
+directly, since that's what `previewDocs` actually depends on; the webview is
+a thin iframe over the same URL with CSP reviewed separately, not code that
+independently needed live proof here).
+
+The scratch harness itself (dummy/probe extensions, `runClean.js`) was not
+committed - it lives only in the session scratchpad, not this repo, since it
+was throwaway test infrastructure rather than a reusable project asset.

@@ -279,6 +279,114 @@ Known gaps:
 - `engineSource=registry` remains dependent on the pinned npm package existing
   and reachable, as intended.
 
+## 2026-07-09 - Plan reconciliation, runtime hardening, local-Kroki docs, real clean-profile validation
+
+Expected:
+
+- Re-check plan.md against actual repo state and mark genuinely-resolved
+  blockers/decisions as resolved instead of leaving stale "open" statuses.
+- Harden the extension runtime (Phase 3): drop unnecessary `shell: true`,
+  narrow the child-process environment, add child-process cleanup on
+  deactivate, and audit host binding / webview CSP.
+- Make the local-Kroki privacy story concrete for Marketplace users with no
+  repo checkout: a start command and README instructions.
+- Run a real clean-profile VS Code install of the packaged VSIX (skip
+  cross-platform/macOS/Linux validation, per explicit direction).
+
+Actual:
+
+- Updated `plan.md`: BLK-002, BLK-004, BLK-005, BLK-006 marked resolved;
+  BLK-001 and BLK-003 marked resolved after the clean-profile run below;
+  Current Evidence, Validation Matrix, and Publish Readiness Exit Criteria
+  updated to match actual repo/npm state (`@microwebstacks/md-render@0.0.7` is
+  published; `config.js`'s Kroki default is already `localhost:18000`; no
+  `C:\dev\...` paths remain in either README; `RELEASE.md` documents a real
+  publish flow).
+- `packages/vscode-extension/extension.js`: removed `shell: true` and the
+  `quoteForShell` workaround from `runCapture`/`spawnLogged` (verified
+  experimentally that Node's `spawn`/`spawnSync` on Windows already quote
+  arguments correctly for real `.exe` targets, so `shell: true` was pure added
+  risk left over from a since-removed `npm.cmd` invocation); added
+  `minimalChildEnv()` so collect/diagrams/server children get an explicit
+  OS-necessity + proxy allowlist instead of the full host `process.env`;
+  tracked all `spawnLogged` children in an `activeChildren` set and added
+  `killActiveChildren()`, called from `stopDocsPreviewServer()`, so a
+  still-running collect/diagrams child gets killed on deactivate/restart/
+  refresh, not just the long-lived server process.
+- Confirmed (no code change needed): `server/server.js` binds
+  `config.server.host`, which is `127.0.0.1` in extension mode; the webview's
+  CSP already scopes `frame-src` to the extension's own `127.0.0.1`/
+  `localhost` port with `default-src 'none'`.
+- Discovered `compose.yaml` (local Kroki) already existed at the repo root
+  with root-README instructions, contrary to an earlier session's claim of a
+  missing Docker example - the actual gap was Marketplace users have no repo
+  checkout and thus no `compose.yaml`. Added `kroki:up`/`kroki:down` pnpm
+  scripts (wrapping `docker compose up -d`/`down`) and a self-contained
+  "Local Kroki via Docker" section with a plain `docker run` one-liner to
+  `packages/vscode-extension/README.md`.
+- Ran `docker compose config` against the existing `compose.yaml` - parses
+  correctly. `pnpm kroki:up` itself failed in this sandbox
+  (`dockerDesktopLinuxEngine` pipe not found - no Docker daemon running here),
+  so the container was validated statically, not by actually rendering a
+  diagram.
+- Built the real VSIX (`pnpm ext:package`) and ran a genuine clean-profile
+  install/exercise: isolated `--user-data-dir`/`--extensions-dir`, `--install-
+  extension` of the built VSIX, a throwaway probe extension driving
+  `microwebstacks.previewDocs`/`stopDocsPreviewServer` and checking real HTTP
+  behavior via `netstat` port-diffing (see `implementation.md` for the two
+  dead ends hit first: `@vscode/test-electron`'s bootstrap crashing, and this
+  shell's inherited `ELECTRON_RUN_AS_NODE=1` making a direct `Code.exe` launch
+  crash the same way until `env -u ELECTRON_RUN_AS_NODE` was used).
+
+Verified:
+
+- `node --check packages/vscode-extension/extension.js` passes after the
+  hardening edits.
+- `pnpm ext:package` succeeds; its own post-package check confirms
+  `extension/bundled-engine/package.json` and 22,605 vendored `_modules`
+  entries inside the actual VSIX archive (65.37 MB, 22,846 files total).
+- Clean-profile run result (`result.json` from the probe extension): `pass:
+  true`. `previewDocs` hydrated the bundled engine and started the server
+  with no `enginePath`/repo checkout; a new `127.0.0.1` port appeared well
+  within the poll window; `GET /` returned HTTP 200 with a 29,097-byte body;
+  `stopDocsPreviewServer` made the port stop responding.
+- No leftover `Code.exe`/`node.exe` processes remained after the run
+  (`Get-CimInstance Win32_Process` filtered to the isolated `user-data-dir`
+  returned zero matches), i.e. shutdown/cleanup did not hang or orphan
+  anything.
+
+Commands run:
+
+```txt
+npm view @microwebstacks/md-render version
+grep -n "process.env\." src/libs/load-env.js config.js server/server.js scripts/collect.js scripts/diagrams.js
+node --check packages/vscode-extension/extension.js
+docker --version
+docker compose version
+docker compose config
+pnpm kroki:up            # failed: Docker daemon not running in this sandbox
+pnpm ext:package
+code --install-extension ... --user-data-dir <isolated> --extensions-dir <isolated>
+Code.exe <clean-workspace> --user-data-dir <isolated> --extensions-dir <isolated> --disable-workspace-trust ...  (env -u ELECTRON_RUN_AS_NODE)
+Get-CimInstance Win32_Process -Filter "Name='Code.exe'" | Where-Object { $_.CommandLine -like '*mws-clean-profile-run*' }
+```
+
+Known gaps:
+
+- Cross-platform (macOS/Linux) native-module validation was explicitly not
+  pursued, per direction - stays open, scoped to a post-preview pass (OP-002).
+- The clean-profile run exercised `engineSource=auto` (bundled-engine path),
+  not `engineSource=registry` end to end.
+- The local Kroki container itself was not actually started/rendered against
+  in this sandbox (no Docker daemon available); only config correctness was
+  verified.
+- The webview panel's own rendering was not screenshot/visually verified;
+  the underlying HTTP server it iframes was verified directly.
+- No real `vsce publish`/`vsce publish --dry-run` has been run.
+- The scratch test harness (dummy/probe extensions) was intentionally not
+  committed to the repo - it was throwaway validation infrastructure, not a
+  reusable project asset, per this repo's plan-packet conventions.
+
 ## 2026-07-07 - VSIX payload verification gap
 
 Expected:

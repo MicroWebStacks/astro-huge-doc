@@ -183,7 +183,8 @@ MICROWEBSTACKS_KROKI_SERVER=http://localhost:18000
 Start the local renderer:
 
 ```powershell
-docker compose up -d
+pnpm kroki:up
+# equivalent to: docker compose up -d
 ```
 
 Then run one of the normal preview flows:
@@ -230,7 +231,8 @@ content hash remains in the dataset metadata.
 When you are done with the local renderer:
 
 ```powershell
-docker compose down
+pnpm kroki:down
+# equivalent to: docker compose down
 ```
 
 ### public Kroki

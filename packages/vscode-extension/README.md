@@ -53,6 +53,26 @@ PlantUML and BlockDiag need a reachable Kroki server at the configured URL - the
 simplest is a local one via Docker. Mermaid renders client-side with no server
 setting. After changing a setting, run **Markdown Site Preview: Restart Server**.
 
+### Local Kroki via Docker
+
+Nothing is sent off your machine. Start a local Kroki server on the default
+port the extension already expects (`http://localhost:18000`):
+
+```powershell
+docker run -d --name mws-kroki -p 18000:8000 yuzutech/kroki:latest
+```
+
+Stop it when you're done:
+
+```powershell
+docker stop mws-kroki && docker rm mws-kroki
+```
+
+If you have the `astro-huge-doc` repository checked out, `compose.yaml` at the
+repo root defines the same service - run `docker compose up -d` /
+`docker compose down` (or `pnpm kroki:up` / `pnpm kroki:down`) from there
+instead.
+
 > Advanced: `microwebstacks.preview.engineSource` and
 > `microwebstacks.preview.enginePath` control where the rendering engine is
 > loaded from. The defaults are fine for most users.

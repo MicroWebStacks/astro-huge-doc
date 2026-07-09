@@ -48,7 +48,6 @@ function runCapture(command, cliArgs, options = {}) {
   try {
     const result = cp.spawnSync(command, cliArgs, {
       encoding: 'utf8',
-      shell: process.platform === 'win32',
       windowsHide: true,
       ...options
     });
@@ -274,6 +273,27 @@ function exists(filePath) {
   return fs.existsSync(filePath);
 }
 
+// OS-level variables a spawned Node process needs to work at all (DNS/TLS on
+// Windows, temp dirs, PATH for anything the engine itself shells out to,
+// terminal/proxy config a corporate machine may require for the registry
+// download). Everything else in the host's process.env - other extensions'
+// tokens, the user's shell customizations, unrelated app config - is
+// deliberately not passed through to the collect/diagrams/server children.
+const ENV_PASSTHROUGH_KEYS = process.platform === 'win32'
+  ? ['SystemRoot', 'windir', 'ComSpec', 'PATH', 'PATHEXT', 'TEMP', 'TMP', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'ProgramData']
+  : ['PATH', 'HOME', 'TMPDIR', 'LANG', 'LC_ALL'];
+const ENV_PROXY_PASSTHROUGH_KEYS = ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy'];
+
+function minimalChildEnv(extra = {}) {
+  const base = {};
+  for (const key of [...ENV_PASSTHROUGH_KEYS, ...ENV_PROXY_PASSTHROUGH_KEYS]) {
+    if (process.env[key] !== undefined) {
+      base[key] = process.env[key];
+    }
+  }
+  return {...base, ...extra};
+}
+
 // Probes whether `execPath` (run with `extraEnv` merged into its environment)
 // behaves as a JS engine that understands `node -e <script>`. Used to detect
 // both a real system Node and VS Code's own runtime under
@@ -291,7 +311,7 @@ function probeNodeRunner(execPath, extraEnv) {
     };
     try {
       child = cp.spawn(execPath, ['-e', 'process.stdout.write("mws-node-ok")'], {
-        env: {...process.env, ...extraEnv},
+        env: minimalChildEnv(extraEnv),
         windowsHide: true
       });
     } catch {
@@ -373,12 +393,6 @@ async function resolveNodeRunner(runtime) {
 const ENGINE_PACKAGE = '@microwebstacks/md-render';
 const ENGINE_VERSION = extensionPackage.engineVersion || extensionPackage.version;
 
-// With shell:true, cmd.exe splits unquoted spaces (e.g. C:\Users\John Doe\...).
-// Windows paths cannot contain double quotes, so wrapping is sufficient.
-function quoteForShell(value) {
-  return /\s/.test(value) ? `"${value}"` : value;
-}
-
 function filterChildLogLine(line, mode, summary) {
   const text = String(line ?? '');
   if (mode !== 'diagrams') {
@@ -437,18 +451,33 @@ function attachLoggedStream(stream, mode, summary) {
   });
 }
 
+// Tracks every child process spawned via spawnLogged so deactivate()/stop can
+// kill stragglers (e.g. an in-flight collect/diagrams script) instead of only
+// the long-lived preview server. Node's spawn already quotes args correctly
+// for CreateProcess on Windows for real executables, so this never needs
+// shell:true - shell would also make args vulnerable to shell-metacharacter
+// injection (&, |, ^, %) that manual double-quote wrapping does not guard
+// against.
+const activeChildren = new Set();
+
 function spawnLogged(executable, args, options = {}) {
   const {logMode = 'passthrough', ...spawnOptions} = options;
-  const useShell = process.platform === 'win32';
-  const command = useShell ? quoteForShell(executable) : executable;
-  const finalArgs = useShell ? args.map(quoteForShell) : args;
-  const child = cp.spawn(command, finalArgs, {...spawnOptions, shell: useShell, windowsHide: true});
+  const child = cp.spawn(executable, args, {...spawnOptions, windowsHide: true});
+  activeChildren.add(child);
+  child.on('exit', () => activeChildren.delete(child));
   const summary = {generated: 0, reused: 0, linked: 0, clientRendered: 0};
   attachLoggedStream(child.stdout, logMode, summary);
   attachLoggedStream(child.stderr, logMode, summary);
   child.mwsLogMode = logMode;
   child.mwsSummary = summary;
   return child;
+}
+
+function killActiveChildren() {
+  for (const child of activeChildren) {
+    activeChildren.delete(child);
+    child.kill();
+  }
 }
 
 function isEngineRoot(candidate) {
@@ -888,8 +917,7 @@ async function getFreePort() {
 
 function createRuntimeEnv(runtime, port) {
   const krokiServer = (vscode.workspace.getConfiguration('microwebstacks.preview').get('krokiServer') || '').trim();
-  return {
-    ...process.env,
+  return minimalChildEnv({
     ...(krokiServer ? {MICROWEBSTACKS_KROKI_SERVER: krokiServer} : {}),
     // The previewed workspace's .env must not clobber this explicit runtime
     // config (profile, port, paths); it only fills in keys not set here.
@@ -907,7 +935,7 @@ function createRuntimeEnv(runtime, port) {
     MICROWEBSTACKS_PROTOCOL: 'http',
     ...(runtime.passDocsRootToEngine ? {MICROWEBSTACKS_DOCS_ROOT: runtime.docsRoot} : {}),
     ...(runtime.manifestPath ? {MICROWEBSTACKS_MANIFEST_PATH: runtime.manifestPath} : {})
-  };
+  });
 }
 
 async function runNodeScript(runtime, scriptPath, env) {
@@ -1100,11 +1128,13 @@ async function stopDocsPreviewServer(showMessage) {
     fileWatcher.dispose();
     fileWatcher = null;
   }
-  if (serverProcess) {
-    const child = serverProcess;
-    serverProcess = null;
-    serverState = null;
-    child.kill();
+  const hadServer = Boolean(serverProcess);
+  serverProcess = null;
+  serverState = null;
+  // Also kills any still-running collect/diagrams child from an in-flight
+  // ensureServer() (e.g. the window closed mid-refresh), not just the server.
+  killActiveChildren();
+  if (hadServer) {
     log('Stopped preview server.');
   }
   if (showMessage) {
