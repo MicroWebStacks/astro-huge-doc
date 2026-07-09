@@ -21,27 +21,31 @@ const summary = Object.hasOwn(attributes,"summary")?attributes.summary:"Details.
 <style>
 details{
   background-color: var(--surface-2-bg);
-  border-radius: 5px;
-  padding:0.5rem;
-  margin-top: 0.5rem;
-  margin-bottom: 0.5rem;
+  border-radius: var(--radius-sm);
+  padding:var(--space-2);
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-2);
   min-width: 98%;
   width: fit-content;
 }
-details[open] summary {border-radius: 5px 5px 0 0;}
+details[open] summary {border-radius: var(--radius-sm) var(--radius-sm) 0 0;}
 
 summary{
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  padding:0.5rem;
+  padding:var(--space-2);
   list-style: none;
   display:flex;
   align-items: center;
   justify-content: space-between;
 }
+summary:focus-visible{
+  outline: 2px solid var(--front-blue);
+  outline-offset: -2px;
+}
 article{
   background-color: var(--content-bg-color);
-  padding: 10px;
+  padding: var(--space-3);
 }
 .arrow :global(svg){
   width:16px;

@@ -40,4 +40,23 @@
   /* Radius — two roles only. */
   --radius-sm: 4px; /* controls, chips, small cards */
   --radius-md: 8px; /* larger panels */
+
+  /* Elevation — single-layer shadow, tinted per-theme via --card-shadow-color
+     (colors.css). Decorative accent bars (SideMenu active-item inset,
+     Heading left rule, SubMenu caret) are not elevation and stay literal. */
+  --shadow-raised: 0 1px 3px var(--card-shadow-color);
+}
+
+/* Respect the OS-level reduced-motion preference for all non-essential
+   transitions/animations sitewide, rather than wrapping each declaration
+   individually. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

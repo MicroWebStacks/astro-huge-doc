@@ -69,12 +69,12 @@ const diagramIcon = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none"
         padding: 0px;
     }
     ul.nested{
-        padding-left: 8px;
+        padding-left: var(--space-2);
         border-top:   0px;
         border-left:  1px solid var(--menu-border-left-color);
         border-right: 0px;
         border-bottom:0px;
-        margin-left: 8px;
+        margin-left: var(--space-2);
         overflow: hidden;
         max-height: 200vh;
         transition-property: max-height;
@@ -100,27 +100,31 @@ const diagramIcon = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none"
         text-decoration: none;
         flex-grow: 1;
     }
+    .entry_container>a:focus-visible{
+        outline: 2px solid var(--front-blue);
+        outline-offset: -2px;
+    }
     /* active when nav menu item is matching url */
     .entry_container.active{
         background-color: var(--menu-active-color);
     }
     span.icon{
-        padding:3px;
-        padding-right:5px;
+        padding:var(--space-1);
+        padding-right:var(--space-1);
         flex-grow: 0;
     }
     span.text{
         padding:2px;
-        padding-top:3px;
-        padding-bottom:3px;
+        padding-top:var(--space-1);
+        padding-bottom:var(--space-1);
         color:var(--menu-text-color);
         display: block;
         flex-grow: 1;
     }
     span.text:not(.parent){
-        padding:10px;
-        padding-top:4px;
-        padding-bottom:4px;
+        padding:var(--space-3);
+        padding-top:var(--space-1);
+        padding-bottom:var(--space-1);
     }
 
     span.icon > svg{
@@ -151,7 +155,7 @@ const diagramIcon = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none"
         opacity: 0.55;
     }
     span.toc-mark:last-child{
-        margin-right: 8px;
+        margin-right: var(--space-2);
     }
 
     /* scroll-spy cross-highlight: toc link matching the heading in view.
@@ -161,7 +165,7 @@ const diagramIcon = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none"
         position: relative;
         background-color: var(--menu-active-color);
         color: var(--content-color);
-        padding-left: 12px;
+        padding-left: var(--space-3);
     }
     a.toc_href.active > span.text::before{
         content: "";

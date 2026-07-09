@@ -80,20 +80,20 @@ const isImg = !isSvg
 
 <style >
 .container{
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   display:flex;
   justify-content: flex-start;
   gap:0px;
   flex-direction: column;
   align-items: center;
-  padding:10px;
+  padding:var(--space-3);
   width:100%;
   box-sizing: border-box;
   border-top: 4px solid transparent;
   position: relative;
 }
 .container.with-open-button{
-  padding-top:20px;
+  padding-top:var(--space-5);
 }
 /* `center` option on an inline image directive */
 .container.center{
@@ -102,7 +102,7 @@ const isImg = !isSvg
 .container.with-open-button:hover{
   border: 0px solid transparent;
   border-color: transparent;
-  padding-left:10px;
+  padding-left:var(--space-3);
   padding-top:0px;
 }
 .header{
@@ -113,7 +113,7 @@ const isImg = !isSvg
   align-items: stretch;
   width:5em;/* not clear why right side padding is ignored */
   padding: 2px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
 }
 .header:hover{
   background:var(--menu-span-hover-color);

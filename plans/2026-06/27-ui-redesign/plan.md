@@ -68,7 +68,11 @@ and safe to land as described.
 
 **Landed (2026-06-28):** C1 (`tokens.css`), C2 (root system font stack), C4
 (GitHub-aligned heading scale + article reading rhythm: line-height 1.5, block
-spacing, lists/inline-code/blockquote), C11 (footer removed). Remaining: C3, C5–C10.
+spacing, lists/inline-code/blockquote), C11 (footer removed).
+
+**Landed (2026-07-09):** C3, C5, C6, C7, C8, C9, C10 — see
+`implementation.md` for the full file list and per-value token mapping
+decisions. All phases are now complete.
 
 | # | Phase | Change | Files / count | Impact | Confidence |
 |---|-------|--------|---------------|--------|------------|

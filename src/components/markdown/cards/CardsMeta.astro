@@ -64,7 +64,7 @@ let hasTags = Object.hasOwn(data,"tags") && (data.tags.length > 0)
     flex-direction: column;
     align-items: center;
     justify-content: space-between;
-    padding: 10px;
+    padding: var(--space-3);
     height:100%;
 }
 .content{
@@ -97,31 +97,31 @@ img{
 ul{
     width:100%;
     margin: 0px;
-    margin-top: 10px;
+    margin-top: var(--space-3);
     padding: 0px;
 }
 li{
     list-style-type: none;
-    padding: 3px;
+    padding: var(--space-1);
     display: flex;
     align-items: center;
 }
 .check{
-    margin-right: 5px;
+    margin-right: var(--space-1);
     background-color: var(--check-bg-color);
-    padding: 5px;
+    padding: var(--space-1);
     width:5px;
     height:5px;
     border-radius: 30%;
 }
 .tags.container{
     display: flex;
-    gap:5px;
+    gap:var(--space-1);
 }
 .tag{
     background-color: var(--tag-bg-color);
-    padding: 5px;
-    border-radius: 5px;
+    padding: var(--space-1);
+    border-radius: var(--radius-sm);
     color: var(--tag-text-color);
 }
 </style>

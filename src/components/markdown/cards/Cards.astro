@@ -34,17 +34,17 @@ const resolvedCards = entries
     
 }
 .cards.container{
-    padding-top: 10px;
+    padding-top: var(--space-3);
     display:flex;
     flex-wrap:wrap;
-    gap:20px;
+    gap:var(--space-5);
 }
 .card{
     background-color: var(--surface-raised-bg);
-    box-shadow: 2px 2px 3px 3px var(--card-shadow-color);
-    border-radius:10px;
+    box-shadow: var(--shadow-raised);
+    border-radius:var(--radius-md);
     width:15rem;
-    padding:10px;
+    padding:var(--space-3);
 }
 .card :global(.paragraph:has(>img)) {
     text-align: center;

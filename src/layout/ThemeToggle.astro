@@ -37,15 +37,19 @@
 	justify-content:center;
 	background:transparent;
 	border:1px solid transparent;
-	border-radius:5px;
-	padding:6px;
-	margin:6px;
+	border-radius:var(--radius-sm);
+	padding:var(--space-2);
+	margin:var(--space-2);
 	cursor:pointer;
 	color:var(--content-color);
 	line-height:0;
 }
 .theme-toggle:hover{
 	background-color:var(--header-active-color);
+}
+.theme-toggle:focus-visible{
+	outline:2px solid var(--front-blue);
+	outline-offset:2px;
 }
 .theme-toggle .ico{
 	display:none;

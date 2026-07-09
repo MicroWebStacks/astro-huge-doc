@@ -68,7 +68,6 @@
 
   /* Buttons (directive call-to-action) */
   --button-accent-color: #729EF7;
-  --button-shadow-color: rgba(0, 0, 0, 0.5);
 
   /* Headings affordance icons */
   --heading-icon-color: rgb(101, 96, 96);
@@ -171,7 +170,6 @@
 
   /* Buttons (directive call-to-action) */
   --button-accent-color: #1B5FC9;
-  --button-shadow-color: rgba(60, 64, 67, 0.25);
 
   /* Headings affordance icons */
   --heading-icon-color: #9AA0A6;
