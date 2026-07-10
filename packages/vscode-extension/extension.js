@@ -43,6 +43,9 @@ let operation = Promise.resolve();
 const BUILD_META_FILE = 'build-meta.json';
 const BOX_WIDTH = 98;
 const BUNDLED_ENGINE_DIR = 'bundled-engine';
+const BUNDLED_MANIFEST_FILE = 'manifest.json';
+const BUNDLED_TARBALL_FILE = 'engine.tgz';
+const BUNDLED_MANIFEST_SCHEMA_VERSION = 1;
 
 function runCapture(command, cliArgs, options = {}) {
   try {
@@ -492,13 +495,14 @@ function getBundledEnginePackageRoot() {
   return path.join(__dirname, BUNDLED_ENGINE_DIR);
 }
 
+// Presence-only check (AD-003/Phase 2): the bundled payload is now an
+// unopened manifest.json + engine.tgz pair, not an exploded engine
+// directory, so this can no longer call isEngineRoot() against it. Content
+// validity (schema, digest, nested package metadata) is checked by
+// hydrateBundledEngine(), which fails loudly rather than falling back here.
 function hasBundledEnginePackage() {
   const bundledRoot = getBundledEnginePackageRoot();
-  if (!isEngineRoot(bundledRoot)) {
-    return false;
-  }
-  const pkg = readJson(path.join(bundledRoot, 'package.json'));
-  return pkg?.name === ENGINE_PACKAGE;
+  return exists(path.join(bundledRoot, BUNDLED_MANIFEST_FILE)) && exists(path.join(bundledRoot, BUNDLED_TARBALL_FILE));
 }
 
 // Each engine version gets its own prefix. In-place npm upgrades of a shared
@@ -714,15 +718,87 @@ async function extractTarGz(buffer, destDir) {
   }
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// A directory just written by extraction (or about to be removed to make way
+// for a fresh install) can be briefly held open on Windows by Defender/an
+// indexer, or by an orphaned preview server process from a previous window -
+// same class of transient lock as the vendoring-time EPERM fixed in
+// scripts/stage-engine.js. Retrying a few times with a short backoff clears
+// it without needing an AV exclusion or killing the offending process.
+async function retryFsOp(op, {attempts = 6, delayMs = 500} = {}) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await op();
+    } catch (error) {
+      const retryable = error.code === 'EPERM' || error.code === 'EBUSY';
+      if (!retryable || attempt === attempts) {
+        throw error;
+      }
+      log(`${error.code} while activating the engine (attempt ${attempt}/${attempts}), retrying in ${delayMs}ms...`);
+      await sleep(delayMs);
+    }
+  }
+}
+
+// Shared post-download work for both the bundled and registry tiers
+// (AD-003): extract into a fresh temporary sibling directory, validate the
+// extracted package before trusting it, then promote it into the versioned
+// install location. A partially extracted or mismatched directory is never
+// treated as a valid cached engine, and interrupted/failed extraction leaves
+// no usable partial install behind.
+async function extractAndActivateEngine({tarballBuffer, expectedPackage, expectedVersion, installRoot, sourceLabel}) {
+  const tempRoot = `${installRoot}.tmp-${crypto.randomBytes(4).toString('hex')}`;
+  await fsp.mkdir(path.dirname(tempRoot), {recursive: true});
+  await fsp.rm(tempRoot, {recursive: true, force: true});
+  await fsp.mkdir(tempRoot, {recursive: true});
+  try {
+    try {
+      await extractTarGz(tarballBuffer, tempRoot);
+    } catch (error) {
+      throw new Error(`Could not extract ${sourceLabel} (${error.message}).`);
+    }
+
+    const pkg = readJson(path.join(tempRoot, 'package.json'));
+    if (!pkg || pkg.name !== expectedPackage || pkg.version !== expectedVersion) {
+      throw new Error(
+        `${sourceLabel} extracted to an unexpected package ` +
+        `(got ${pkg?.name ?? 'unknown'}@${pkg?.version ?? 'unknown'}, expected ${expectedPackage}@${expectedVersion}).`
+      );
+    }
+
+    const vendoredDir = pkg.vendoredModulesDir;
+    if (!vendoredDir || !exists(path.join(tempRoot, vendoredDir))) {
+      throw new Error(
+        `${sourceLabel} was not published with vendored dependencies; this extension version can only install a ` +
+        'vendored engine build. Republish it with scripts/stage-engine.js (vendoring is on by default).'
+      );
+    }
+    await fsp.rename(path.join(tempRoot, vendoredDir), path.join(tempRoot, 'node_modules'));
+
+    if (!isUsableInstalledEngine(tempRoot)) {
+      throw new Error(`${sourceLabel} extracted but failed the usable-engine checks at ${tempRoot}.`);
+    }
+
+    await retryFsOp(() => fsp.rm(installRoot, {recursive: true, force: true}));
+    await retryFsOp(() => fsp.rename(tempRoot, installRoot));
+  } catch (error) {
+    await fsp.rm(tempRoot, {recursive: true, force: true}).catch(() => {});
+    throw error;
+  }
+}
+
 // Installs the engine with a plain HTTPS download of its published npm
 // tarball, extracted in-process - no npm (or system Node) involved (plans/
 // 2026-07/05-vscode-node-free-bootstrap OP-002). The tarball's production
 // dependencies are pre-vendored under a disguised directory name by
 // scripts/stage-engine.js (npm's packer always strips a real "node_modules"
-// out of a published tarball); this renames it back after extracting.
+// out of a published tarball); extractAndActivateEngine() renames it back
+// after extracting.
 async function installEngine(context) {
   const enginePrefix = getEnginePrefix(context);
-  await fsp.mkdir(enginePrefix, {recursive: true});
   const url = engineTarballUrl(ENGINE_PACKAGE, ENGINE_VERSION);
   log(`Installing ${ENGINE_PACKAGE}@${ENGINE_VERSION} from ${url} (this runs once and needs network access).`);
 
@@ -733,48 +809,71 @@ async function installEngine(context) {
     throw new Error(`Could not download ${ENGINE_PACKAGE}@${ENGINE_VERSION} (${error.message}).`);
   }
 
-  const installRoot = getInstalledEngineRoot(context);
-  await fsp.rm(installRoot, {recursive: true, force: true});
-  await fsp.mkdir(installRoot, {recursive: true});
   try {
-    await extractTarGz(buffer, installRoot);
+    await extractAndActivateEngine({
+      tarballBuffer: buffer,
+      expectedPackage: ENGINE_PACKAGE,
+      expectedVersion: ENGINE_VERSION,
+      installRoot: getInstalledEngineRoot(context),
+      sourceLabel: `${ENGINE_PACKAGE}@${ENGINE_VERSION} (registry)`
+    });
   } catch (error) {
-    throw new Error(`Could not extract ${ENGINE_PACKAGE}@${ENGINE_VERSION} (${error.message}).`);
+    throw new Error(`Could not install ${ENGINE_PACKAGE}@${ENGINE_VERSION} (${error.message}).`);
   }
-
-  const installedPkg = JSON.parse(await fsp.readFile(path.join(installRoot, 'package.json'), 'utf8'));
-  const vendoredDir = installedPkg.vendoredModulesDir;
-  if (!vendoredDir || !exists(path.join(installRoot, vendoredDir))) {
-    throw new Error(`${ENGINE_PACKAGE}@${ENGINE_VERSION} was not published with vendored dependencies; this extension version can only install a vendored engine build. Republish it with scripts/stage-engine.js (vendoring is on by default).`);
-  }
-  await fsp.rename(path.join(installRoot, vendoredDir), path.join(installRoot, 'node_modules'));
   log(`Installed ${ENGINE_PACKAGE}@${ENGINE_VERSION} into ${enginePrefix}.`);
 }
 
+// Reads and authenticates the bundled outer manifest.json + engine.tgz pair
+// (AD-001) before handing the exact tarball bytes to the same
+// extraction-and-activation path installEngine() uses. A manifest or tarball
+// that fails to parse, name the expected package/version, or match its own
+// declared digest is treated as corrupt bundled data and fails loudly here -
+// it is never silently reinterpreted as "no bundled engine" (that would
+// route through to the registry tier instead, masking a packaging bug).
 async function hydrateBundledEngine(context) {
   const bundledRoot = getBundledEnginePackageRoot();
   if (!hasBundledEnginePackage()) {
     throw new Error(`Bundled engine payload is missing at ${bundledRoot}. Repackage the extension.`);
   }
 
-  const bundledPrefix = getBundledEnginePrefix(context);
-  const installRoot = getBundledInstalledEngineRoot(context);
-  await fsp.rm(bundledPrefix, {recursive: true, force: true});
-  await fsp.mkdir(path.dirname(installRoot), {recursive: true});
-  await fsp.cp(bundledRoot, installRoot, {recursive: true});
-
-  const installedPkg = JSON.parse(await fsp.readFile(path.join(installRoot, 'package.json'), 'utf8'));
-  const vendoredDir = installedPkg.vendoredModulesDir;
-  const vendoredPath = vendoredDir ? path.join(installRoot, vendoredDir) : null;
-  const nodeModulesPath = path.join(installRoot, 'node_modules');
-  if (vendoredPath && exists(vendoredPath) && !exists(nodeModulesPath)) {
-    await fsp.rename(vendoredPath, nodeModulesPath);
-  }
-  if (!exists(nodeModulesPath)) {
-    throw new Error(`Bundled engine ${ENGINE_PACKAGE}@${ENGINE_VERSION} is missing its vendored dependency tree. Repackage the extension.`);
+  const manifestPath = path.join(bundledRoot, BUNDLED_MANIFEST_FILE);
+  const manifest = readJson(manifestPath);
+  if (
+    !manifest ||
+    manifest.schemaVersion !== BUNDLED_MANIFEST_SCHEMA_VERSION ||
+    manifest.package !== ENGINE_PACKAGE ||
+    manifest.version !== ENGINE_VERSION ||
+    !manifest.tarball ||
+    typeof manifest.byteLength !== 'number' ||
+    !manifest.sha256
+  ) {
+    throw new Error(`Bundled engine manifest at ${manifestPath} is invalid or does not describe ${ENGINE_PACKAGE}@${ENGINE_VERSION}. Repackage the extension.`);
   }
 
-  log(`Hydrated bundled ${ENGINE_PACKAGE}@${ENGINE_VERSION} into ${bundledPrefix}.`);
+  const tarballPath = path.join(bundledRoot, manifest.tarball);
+  let tarballBuffer;
+  try {
+    tarballBuffer = await fsp.readFile(tarballPath);
+  } catch (error) {
+    throw new Error(`Could not read bundled engine tarball at ${tarballPath} (${error.message}). Repackage the extension.`);
+  }
+  if (tarballBuffer.length !== manifest.byteLength) {
+    throw new Error(`Bundled engine tarball at ${tarballPath} is ${tarballBuffer.length} bytes but the manifest expects ${manifest.byteLength}. Repackage the extension.`);
+  }
+  const actualDigest = crypto.createHash('sha256').update(tarballBuffer).digest('hex');
+  if (actualDigest !== manifest.sha256) {
+    throw new Error(`Bundled engine tarball at ${tarballPath} failed digest verification (expected ${manifest.sha256}, got ${actualDigest}). Repackage the extension.`);
+  }
+
+  await extractAndActivateEngine({
+    tarballBuffer,
+    expectedPackage: manifest.package,
+    expectedVersion: manifest.version,
+    installRoot: getBundledInstalledEngineRoot(context),
+    sourceLabel: `bundled engine ${manifest.package}@${manifest.version}`
+  });
+
+  log(`Hydrated bundled ${ENGINE_PACKAGE}@${ENGINE_VERSION} into ${getBundledEnginePrefix(context)}.`);
 }
 
 // Resolves the engine root. The local workspace checkout remains the guaranteed
@@ -1211,3 +1310,25 @@ module.exports = {
   activate,
   deactivate
 };
+
+// Test-only seam (plans/2026-07/09-vsix-packaging-performance): exposes the
+// engine extraction/activation internals so a harness can exercise AD-003's
+// failure scenarios (bad manifest, digest mismatch, corrupt tar, missing
+// runtime files, wrong version, missing vendored deps, failure cleanup)
+// directly, without a real VS Code host. Never set in a real activated
+// extension - opt-in only, and does not change activate()/deactivate().
+if (process.env.MWS_TEST_INTERNALS === '1') {
+  module.exports.__testInternals = {
+    hasBundledEnginePackage,
+    hydrateBundledEngine,
+    installEngine,
+    extractAndActivateEngine,
+    isUsableInstalledEngine,
+    isEngineRoot,
+    getBundledEnginePackageRoot,
+    getEnginePrefix,
+    getBundledEnginePrefix,
+    getInstalledEngineRoot,
+    getBundledInstalledEngineRoot
+  };
+}

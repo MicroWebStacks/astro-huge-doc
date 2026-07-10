@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.13 - 2026-07-10
+
+- The bundled offline engine now ships inside the VSIX as a single
+  authenticated package (a manifest plus one packed archive) instead of
+  tens of thousands of loose files. Packaging and installation are both
+  much faster, and antivirus/indexer overhead from scanning huge file
+  counts on Windows is gone. No change to what the engine does or which
+  version is bundled (engine 0.0.7, unchanged).
+
 ## 0.0.12 - 2026-07-08
 
 - No system Node.js or npm required anymore: the extension now runs its
