@@ -3,7 +3,8 @@
 ## Progress
 
 ```text
-[##----] Phase 2/4 - quick wins + footnotes done; math support (Phase 3) next.
+[######] Closed 2026-07-10 - phases 1-3 done (math shipped in 0.0.12);
+         OP-007 and the OP-008 footnote gap deferred to future packets.
 ```
 
 ## Changes made
@@ -22,6 +23,21 @@
   `title: Footnotes`, `order: 21`, slotted between `Notes` (20) and `Iframe
   Directive` (25)). Demonstrates a reused footnote reference, a
   multi-paragraph footnote, and a citation-style footnote.
+- Phase 3 (math, `OP-003`) landed on 2026-07-05 in commit `b8b65a9` ("added
+  math") and shipped in extension release 0.0.12 — recorded here at closure
+  because this log wasn't updated when the commit landed:
+  - `src/libs/render-math.js` (new): KaTeX post-processing pass over
+    rendered HTML — walks text outside tags, converts `$...$` (inline) and
+    `$$...$$` (display) via `katex.renderToString` with
+    `output: 'htmlAndMathml'`, `throwOnError: false`; handles escaped `\$`
+    and HTML entities; leaves unmatched delimiters untouched.
+  - `src/components/markdown/AstroMarkdown.astro`: `renderAstToHtml` now
+    pipes `toHtml(toHast(ast))` through `renderMathInHtml`.
+  - `src/layout/Layout.astro`: `import 'katex/dist/katex.min.css'`
+    (self-hosted via the bundler — no CDN) plus `.katex-display` overflow
+    styling.
+  - `demo/math.md` (new): inline/block formula demo; `package.json` gained
+    `katex@0.16.47`.
 
 ## Decisions
 
@@ -46,14 +62,23 @@
   no implementation scheduled.
 - Demo/sample-content bundling (`OP-007`) recorded as a recommendation only;
   scoping deferred to a future dated plan packet.
+- Math (`OP-003`) was implemented as an HTML post-processing pass in the
+  site app rather than the planned `remark-math`/`rehype-katex` plugins in
+  `packages/md-render` — this fits the per-item `toHast` rendering
+  architecture (no remark pipeline runs at render time) and keeps
+  `content-structure` untouched. Demo location deviated too: `demo/math.md`
+  instead of the planned `content/examples/formulas/readme.md`.
+- Footnote render check (the follow-up risk flagged below) was performed at
+  closure on 2026-07-10 and **failed** — footnotes do not render as
+  footnotes in the app. Root cause and recommendation recorded as `OP-008`
+  in `plan.md`; fix deferred to a future packet against the sibling
+  `content-structure` repo, since the stored items no longer carry the
+  footnote definition identifiers a render-side fix would need. The demo
+  page stays as the test case for that packet.
 
 ## Follow-up risks
 
-- Phase 3 (math/KaTeX) is not yet started; `plan.md` scopes it as the next
-  step in this same packet.
-- No visual/browser check was performed for the footnotes example beyond
-  `pnpm collect` succeeding and the raw markdown being persisted into
-  `dataset/content.db`. A quick visual check (does the default footnote HTML
-  look reasonable with our current CSS, no `.footnotes`/`data-footnote-ref`
-  styling was found in `packages/md-render/src`) is worth doing before this
-  packet is considered fully closed.
+- ~~Phase 3 (math/KaTeX) is not yet started~~ — done, see above.
+- ~~No visual/browser check was performed for the footnotes example~~ —
+  check performed at closure (see `test.md`); result was a real rendering
+  gap, now tracked as `OP-008` in `plan.md`.

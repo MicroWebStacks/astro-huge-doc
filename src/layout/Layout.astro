@@ -26,6 +26,11 @@ const appbar_menu = navigation.appBarMenu ?? []
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width" />
+		{/* Before any CSS arrives the browser paints its default canvas; this
+		    meta makes that canvas follow the OS scheme (dark instead of white
+		    for dark-mode users). The inline script below narrows it to the
+		    resolved theme once the stored preference is known. */}
+		<meta name="color-scheme" content="dark light" />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
 		<link rel="icon" type="image/x-icon" href={`/favicon.ico`}>
@@ -47,12 +52,50 @@ const appbar_menu = navigation.appBarMenu ?? []
 					var root = document.documentElement;
 					root.setAttribute('data-theme', resolved);
 					root.setAttribute('data-theme-pref', pref);
+					// Narrow the color-scheme meta to the resolved theme so the
+					// pre-paint canvas matches even when the stored preference
+					// disagrees with the OS scheme.
+					var meta = document.querySelector('meta[name="color-scheme"]');
+					if (meta) meta.setAttribute('content', resolved);
 				} catch (e) {
 					document.documentElement.setAttribute('data-theme', 'dark');
 					document.documentElement.setAttribute('data-theme-pref', 'auto');
 				}
 			})();
 		</script>
+		<style is:inline>
+			/* Critical pre-stylesheet paint: give the page its real background
+			   the instant anything paints, instead of a white flash while the
+			   bundled CSS downloads. Hex values mirror --content-bg-color in
+			   colors.css (keep in sync). Default is dark, matching the site's
+			   no-JS fallback. */
+			html { background-color: #1E1E1E; }
+			html[data-theme="light"] { background-color: #FFFFFF; }
+
+			/* Boot spinner: visible only while <body> has no parsed content yet
+			   (the SSR streaming gap on large pages); disappears as soon as the
+			   first body element arrives. Neutral grey works on both themes.
+			   Browsers without :has() drop the rule — they just keep the plain
+			   background. */
+			html:not(:has(body > *))::after {
+				content: "";
+				position: fixed;
+				inset: 0;
+				margin: auto;
+				width: 28px;
+				height: 28px;
+				border-radius: 50%;
+				border: 3px solid rgba(128, 128, 128, 0.3);
+				border-top-color: rgba(128, 128, 128, 0.85);
+				animation: boot-spin 0.8s linear infinite;
+			}
+			@keyframes boot-spin {
+				to { transform: rotate(360deg); }
+			}
+			@media (prefers-reduced-motion: reduce) {
+				html:not(:has(body > *))::after { animation: none; }
+			}
+		</style>
 	</head>
 	<body >
 		<div class="appbar-nav_content-footer">

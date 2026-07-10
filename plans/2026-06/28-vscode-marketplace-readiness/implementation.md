@@ -1,9 +1,9 @@
 # Implementation - Phase 2 (Engine Package + Extension Bootstrap)
 
-[####--] Phase 4/? - metadata, privacy default, runtime hardening, and a
-Windows clean-profile install pass are done; macOS/Linux validation stays
-explicitly out of scope for this preview, and a real first Marketplace
-publish is still outstanding.
+[######] Done - packet closed 2026-07-10. All hard blockers and design
+decisions are resolved; the packaged VSIX proved itself in a clean-profile
+Windows x64 install (2026-07-09). A few minor points were left as deferred
+follow-ups, not closure blockers (see "Packet closure" below).
 
 Tracks the Option B work: the extension resolves a `@microwebstacks/md-render`
 engine instead of assuming a repo checkout, while the local workspace checkout
@@ -83,7 +83,9 @@ step; the script validates the build exists before staging.
 - [x] End-to-end clean-profile install validation (bundled-engine path, 2026-07-09)
 - [ ] End-to-end clean-profile validation of the `engineSource=registry` tier
       specifically (the 2026-07-09 run exercised the default `auto` path,
-      which resolves to the bundled engine, not the registry-download tier)
+      which resolves to the bundled engine, not the registry-download tier) -
+      accepted as a deferred follow-up at closure, consistent with the same
+      accepted gap in `plans/2026-07/09-vsix-packaging-performance`
 
 ## Follow-up: node-free bootstrap landing
 
@@ -301,3 +303,32 @@ independently needed live proof here).
 The scratch harness itself (dummy/probe extensions, `runClean.js`) was not
 committed - it lives only in the session scratchpad, not this repo, since it
 was throwaway test infrastructure rather than a reusable project asset.
+
+## 2026-07-10 - Packet closure
+
+Closed by maintainer decision. Every hard blocker (BLK-001..006) and design
+decision (OP-001..008) is resolved, the clean-profile Windows x64 proof
+passed, and test-result gaps are explicitly not closure blockers for this
+packet. The following minor points were left open as deferred follow-ups:
+
+- **First real Marketplace publish.** `RELEASE.md` documents the flow, but no
+  `vsce publish --dry-run` (needs a Marketplace PAT) or actual first upload
+  has been run. When it happens, verify the exact publisher ID, issue URL,
+  and support URL (OP-006 residual) since they become the public listing
+  surface.
+- **`engineSource=registry` end-to-end.** The clean-profile run exercised the
+  default `auto` -> bundled-engine path only; the registry download/extract
+  tier has never been driven in a clean profile. Same gap was accepted as
+  deferred in `plans/2026-07/09-vsix-packaging-performance`.
+- **macOS/Linux platform validation.** Explicitly post-preview per OP-002;
+  Windows x64 remains the only validated target.
+- **Minor validation gaps** (recorded in `test.md`): the local Kroki
+  container was validated statically (no Docker daemon in the sandbox, no
+  live diagram render), and the webview panel was verified via its underlying
+  HTTP server rather than visually.
+
+Later work has already built on this packet:
+`plans/2026-07/09-vsix-packaging-performance` (closed 2026-07-10) replaced
+the loose bundled-engine files with one authenticated `engine.tgz` +
+`manifest.json`, and 0.0.13 was installed and confirmed working in the
+maintainer's real VS Code profile.

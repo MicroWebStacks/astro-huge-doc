@@ -18,7 +18,9 @@ our zero-config, folder-based documentation-site identity.
 ## Scope
 
 - Math/formula rendering (KaTeX), including a demo example.
-- Footnotes: verified already supported; demo example added.
+- Footnotes: demo example added; collect-level support confirmed, but the
+  closure-time render check found they don't render as footnotes in the
+  app — see `OP-008`.
 - Quick UX wins: keybinding and editor-title button for "Open Preview".
 - Record a recommendation for demo/sample-content packaging (`OP-007`) as a
   future follow-up, not implemented in this pass beyond today's footnotes
@@ -89,23 +91,52 @@ our zero-config, folder-based documentation-site identity.
   continues to land under `content/examples/<feature>/`, following the
   existing convention (e.g. `content/examples/footnotes/` added this pass) —
   that convention is exactly what a future bundled fixture would draw from.
+- `OP-008` — **Footnotes do not actually render as footnotes (found at
+  packet closure, 2026-07-10).** The Phase 2 conclusion "already supported
+  via `remark-gfm`, no pipeline work needed" holds only at the mdast level.
+  The site renders each stored top-level item through `toHast` in isolation
+  (`AstroMarkdown.astro`), and `mdast-util-to-hast` only emits the
+  footnotes section when references and definitions share one tree. Worse,
+  `content-structure`'s collect flattens `footnoteDefinition` nodes into
+  plain paragraph items, losing the identifier entirely. Net effect on the
+  rendered page (verified against `dataset/content.db` items for
+  `examples/footnotes`): references become superscript links to anchors
+  that exist nowhere (dead links), numbering restarts per paragraph (a
+  third footnote can display as "1"), and definitions appear as bare
+  unnumbered paragraphs with no back-references. No shipped claim is
+  affected (extension README/CHANGELOG never advertised footnotes; only
+  this packet does). A render-side fix in this repo is not possible because
+  the definition identifiers are already gone from the stored items — the
+  fix belongs in the sibling `content-structure` repo (preserve
+  `footnoteDefinition` items with their identifiers, or emit a ready-made
+  footnotes section per document), followed by a small render change here.
+  Recommendation: scope that as its own dated packet; the existing
+  `content/examples/footnotes/readme.md` page stays as the ready test case
+  for it.
 
 ## Implementation Phases
 
 1. **Quick wins (`OP-006`) — done.** Added `ctrl+k m` keybinding and an
    `editor/title` icon button for `microwebstacks.previewDocs` in
    `packages/vscode-extension/package.json`.
-2. **Footnotes (`comparison.md` row) — done.** Confirmed `remark-gfm@4.0.1`
-   (wired in via `content-structure`) already supports GFM footnotes with no
-   plugin work. Added `content/examples/footnotes/readme.md` and verified
-   with `pnpm collect`.
-3. **Math support (`OP-003`) — next.** Add formula rendering to
-   `packages/md-render`'s pipeline (e.g. `remark-math` + `rehype-katex` or
-   equivalent), self-host KaTeX CSS/font assets (no CDN, matching our
-   offline-first stance), and add a demo example at
-   `content/examples/formulas/readme.md` following the existing convention.
-   Verify inline and block formulas render correctly via `pnpm collect` plus
-   a visual check.
+2. **Footnotes (`comparison.md` row) — done at collect level, but see
+   `OP-008`.** Confirmed `remark-gfm@4.0.1` (wired in via
+   `content-structure`) parses GFM footnotes with no plugin work, and added
+   `content/examples/footnotes/readme.md`, verified with `pnpm collect`.
+   The closure-time render check then showed the parsed footnotes do not
+   survive the item pipeline (`OP-008`) — real support needs a
+   `content-structure` change, deferred to a future packet.
+3. **Math support (`OP-003`) — done (2026-07-05, commit `b8b65a9`).**
+   Implemented differently from the original sketch above, with the same
+   outcome: instead of `remark-math`/`rehype-katex` inside
+   `packages/md-render`'s remark pipeline, a KaTeX post-processing pass
+   (`src/libs/render-math.js`) rewrites `$...$`/`$$...$$` in the HTML
+   produced by `toHast`/`toHtml`, wired in via
+   `src/components/markdown/AstroMarkdown.astro`. KaTeX CSS is self-hosted
+   through the bundler import in `src/layout/Layout.astro` (offline-first
+   requirement satisfied, no CDN). The demo landed at `demo/math.md` rather
+   than the planned `content/examples/formulas/readme.md`. Shipped in
+   extension release 0.0.12 (`packages/vscode-extension/CHANGELOG.md`).
 4. **Demo/sample content packaging (`OP-007`) — future, separate packet.**
    Not scheduled here; open a new dated plan when ready to scope what ships
    in a bundled sample-docs fixture and how the extension falls back to it.
@@ -123,8 +154,14 @@ our zero-config, folder-based documentation-site identity.
 
 ## Exit Criteria
 
-- Math/formula rendering is implemented, demoed, and verified (Phase 3).
+- Math/formula rendering is implemented, demoed, and verified (Phase 3). ✔
+  (commit `b8b65a9`, shipped in extension 0.0.12)
 - All open points have a recorded status (declined/deferred/accepted/done)
-  in this file — none left silently unscoped.
+  in this file — none left silently unscoped. ✔
 - `OP-007` has a clear recommendation on record even though implementation is
-  deferred to a future packet.
+  deferred to a future packet. ✔
+- `OP-008` (footnote rendering gap, found at closure) has its finding and a
+  recommendation on record; the fix is explicitly deferred to a future
+  packet against `content-structure`. ✔
+
+Packet closed 2026-07-10.

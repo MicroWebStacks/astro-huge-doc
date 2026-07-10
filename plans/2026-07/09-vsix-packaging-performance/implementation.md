@@ -3,12 +3,10 @@
 ## Progress
 
 ```text
-[##-] Phases 1-2 done and verified; Phase 3 partially done - bundled-tier
-      hydration/authentication/extraction proven directly on disk in a real
-      clean-profile VS Code install, but full HTTP-200 preview proof (both
-      tiers) is blocked by an environment-specific child-process spawn issue
-      unrelated to this packet's diff. See test.md for the full writeup and
-      recommended follow-up (re-run on a less-loaded machine).
+[###] Done - released as 0.0.13, installed and confirmed working by the
+      maintainer in their real VS Code profile. engineSource=registry was
+      not separately exercised end-to-end; accepted as a deferred gap (see
+      test.md) since registry-tier behavior is unchanged by this packet.
 ```
 
 ## Changes made
@@ -78,16 +76,16 @@
 
 ## Follow-up risks
 
-- Full HTTP-200 clean-profile proof (both `engineSource=auto` and
-  `engineSource=registry`) is not yet obtained - blocked by an
-  environment-specific `child_process.spawn` `ENOTCONN` in unrelated,
-  unchanged code (`spawnLogged`/`resolveNodeRunner`) on this heavily-loaded
-  dev machine (126+ concurrent `Code.exe` processes). This packet's own
-  diff does not touch that code path; a plain `node -e` spawn outside the
-  extension host succeeded 3/3 times on the same machine. See test.md's
-  2026-07-10 Phase 3 entry for the full evidence and a positive,
-  disk-verified proof that bundled-engine hydration/authentication/
-  extraction itself works correctly in a real clean-profile install.
-- Recommended next step before closing this packet: re-run the same
-  clean-profile harness (method documented in test.md) on a less-loaded
-  machine to get the HTTP-200 proof and close Exit Criteria 5 and 6.
+- `engineSource=registry` was never exercised end-to-end in a live VS Code
+  host (network reachability alone was confirmed). It shares
+  `extractAndActivateEngine()` with the now-confirmed bundled tier, but
+  that is shared-code coverage, not independent proof. Low risk since this
+  packet's diff changed nothing about `installEngine()`'s download step or
+  the registry tarball format (both explicit non-goals) - if it regresses,
+  it would be from unrelated causes, not this packet.
+- The isolated-harness runs (test.md, 2026-07-10 Phase 3 entry) hit an
+  environment-specific `child_process.spawn` `ENOTCONN` inside unrelated,
+  unchanged code (`spawnLogged`/`resolveNodeRunner`) on a heavily-loaded
+  dev machine (126+ concurrent `Code.exe` processes) - not reproduced in
+  the maintainer's real profile, so treated as a throwaway-harness
+  environment issue, not a product defect.

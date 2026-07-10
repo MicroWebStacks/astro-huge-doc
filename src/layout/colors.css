@@ -23,7 +23,9 @@
   --header-active-color: #454646;
   --nav-bg-color: #252526;
 
-  /* Content surface + text */
+  /* Content surface + text.
+     --content-bg-color is mirrored as a hex literal in Layout.astro's
+     inline critical style (pre-stylesheet paint) — keep both in sync. */
   --content-bg-color: #1E1E1E;
   --content-color: #CCCCCC;
   --content-color-muted: #BBBBBB;
@@ -125,7 +127,8 @@
   --header-active-color: #D2D2D2;
   --nav-bg-color: #F3F3F3;
 
-  /* Content surface + text */
+  /* Content surface + text (light --content-bg-color also mirrored in
+     Layout.astro's inline critical style). */
   --content-bg-color: #FFFFFF;
   --content-color: #24292F;
   --content-color-muted: #4A4A4A;

@@ -490,9 +490,9 @@ The extension is ready to publish when all hard blockers are closed and:
    **Done** per the Accepted Maintainer Decisions above; the update flow
    itself (`RELEASE.md`) has not yet been exercised for a real first publish.
 
-Remaining before a real Marketplace publish: run `vsce publish --dry-run` (or
-log in and do the actual first publish), and decide whether/when to pursue
-macOS/Linux validation (currently out of scope for this preview).
+Packet closed 2026-07-10 with a few minor points left as deferred follow-ups
+(first real Marketplace publish, `engineSource=registry` end-to-end run,
+post-preview macOS/Linux coverage); details live in `implementation.md`.
 
 ## Official References
 

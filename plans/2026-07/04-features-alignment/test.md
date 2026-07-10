@@ -98,3 +98,47 @@ reflected in `plan.md`:
   `implementation.md`.
 - Math/formula support (Phase 3) has not been implemented yet; this test
   record will need a follow-up entry once that phase lands.
+
+## Closure verification (2026-07-10)
+
+### Math (Phase 3, `OP-003`)
+
+- Confirmed implemented in commit `b8b65a9` ("added math", 2026-07-05):
+  `src/libs/render-math.js` + wiring in `AstroMarkdown.astro`, KaTeX CSS
+  self-hosted via the bundler import in `src/layout/Layout.astro`, demo at
+  `demo/math.md`.
+- Shipped in extension release 0.0.12 (`b4c8b84`); the extension
+  `CHANGELOG.md` documents "Inline and block math (`$...$` / `$$...$$`) now
+  renders with KaTeX" and `README.md` lists Math as a feature — the feature
+  went through a real release, which is the packet's verification signal.
+  No offline-stance violation: no CDN URL is involved, the CSS/fonts ship
+  with the built site.
+
+### Footnotes render check (previously flagged gap) — FAILED
+
+- Method: rendered the stored items of the `examples/footnotes` document
+  from `dataset/content.db` (latest `version_id`) through the exact
+  production path — `toHtml(toHast(item.ast))`, as `AstroMarkdown.astro`'s
+  `renderAstToHtml` does — via a throwaway Node script.
+- Findings:
+  - Footnote references render as `<sup><a href="#user-content-fn-…"
+    data-footnote-ref …>` — but no element with those ids exists anywhere
+    on the page, so every reference is a dead link.
+  - Footnote numbering restarts per top-level item (each `toHast` call has
+    its own footnote state): the third footnote (`[^source]`) renders as
+    "1".
+  - Footnote definitions are stored by `content-structure`'s collect as
+    plain `paragraph` items — the `footnoteDefinition` wrapper and its
+    identifier are gone — so they render as bare unnumbered paragraphs with
+    no ids and no back-references, and no footnotes section is emitted.
+- Consequence: the earlier "already supported via `remark-gfm`" conclusion
+  was true at the mdast level but does not survive the per-item render
+  pipeline. Recorded as `OP-008` in `plan.md`; fix deferred to a future
+  packet against the sibling `content-structure` repo. Nothing shipped
+  claims footnote support (extension README/CHANGELOG checked — no mention).
+
+### Result
+
+Packet closed. Accepted scope (quick wins, footnotes demo content, math) is
+implemented and shipped; `OP-007` (demo packaging) and `OP-008` (footnote
+rendering) are recorded, recommended, and deferred to future packets.

@@ -231,3 +231,48 @@ proof" instruction):
 - The scratch probe extension and harness scripts were not committed (same
   convention as the marketplace-readiness packet) - throwaway validation
   infrastructure, not a reusable project asset.
+
+## 2026-07-10 - Release (0.0.13) and real-profile confirmation
+
+Actual:
+
+- Bumped the extension to 0.0.13 (`packages/vscode-extension/package.json`,
+  `CHANGELOG.md`), committed alongside the Phase 1-2 implementation
+  (`325612c`).
+- `pnpm ext:release` confirmed the pinned engine `@microwebstacks/md-render
+  @0.0.7` is live on npm, then packaged the release VSIX: **12 total
+  entries, 2 bundled-engine entries**, `engine.tgz` 77,398,913 bytes
+  containing 24,336 vendored dependency files (AD-004 verification passed).
+  Total packaging time 97.6s.
+- Compared against the 2026-07-09 baseline recorded in
+  `plans/2026-06/28-vscode-marketplace-readiness/test.md` (65.37 MB VSIX,
+  22,846 files, 20-30 min packaging): entry count and packaging time both
+  dropped by an order of magnitude or more; the final `.vsix` size went
+  **up** slightly (65.37 MB -> 73.9 MB, +~13%), an explicitly anticipated
+  tradeoff (`npm pack`'s gzip output doesn't meaningfully re-compress a
+  second time inside the outer VSIX zip) - size reduction was never this
+  packet's goal.
+- `pnpm ext:install` installed the 0.0.13 VSIX into the maintainer's real,
+  everyday VS Code profile (not an isolated harness profile).
+- **User-confirmed**: ran the real "Markdown Site Preview: Open Preview"
+  command against this build in their normal daily-driver editor and
+  reported it works. This closes the gap the 2026-07-10 Phase 3 entry above
+  left open (the isolated-harness runs proved hydration/authentication/
+  extraction on disk but never got a live HTTP 200 due to an
+  environment-specific spawn issue on the throwaway profile's host
+  process). A real user, in a real profile, running the real command is
+  stronger end-to-end proof for the `engineSource=auto` bundled tier than
+  the throwaway isolated-profile harness would have been.
+
+Known gaps at closure:
+
+- `engineSource=registry` was still not exercised end-to-end in a live VS
+  Code host. Registry reachability itself was confirmed earlier (direct
+  HTTPS GET of the published tarball returned 200), and the shared
+  `extractAndActivateEngine()` path is the same code the bundled tier just
+  proved works - but that is shared-code coverage, not an independent live
+  run, per AD-003's own instruction not to claim one as the other. Accepted
+  as an explicit, deferred gap rather than a blocker to closing this packet
+  (maintainer decision, 2026-07-10) - the packaging/verification work this
+  packet is actually about (Phases 1-2) is complete and independently
+  verified, and registry-tier behavior is unchanged by this packet's diff.
