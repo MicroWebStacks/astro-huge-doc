@@ -6,6 +6,7 @@ closure gate. See each folder for details.
 
 | Plan | Date | Status | Summary | Implementation / Notes |
 | --- | --- | --- | --- | --- |
+| [2026-07-10-ui-audit-polish](2026-07/10-ui-audit-polish/) | 2026-07-10 | closed | Implemented the screenshot-backed navigation, responsive layout, accessibility, copy, scroll-tracking, and rendering polish audit. | Durable contracts, implementation details, build results, and desktop/mobile browser proof are recorded in [implementation.md](2026-07/10-ui-audit-polish/implementation.md) and [test.md](2026-07/10-ui-audit-polish/test.md). |
 | [2026-06-27-toc-menu-controls](2026-06/27-toc-menu-controls/) | 2026-06-27 | closed | Replaced the TOC depth slider with button controls and added TOC/page cross-highlight behavior. | Implementation and build proof recorded in [implementation.md](2026-06/27-toc-menu-controls/implementation.md) and [test.md](2026-06/27-toc-menu-controls/test.md). |
 | [2026-06-27-vscode-ext](2026-06/27-vscode-ext/) | 2026-06-27 | closed | Added the desktop VS Code preview extension baseline for the docs site. | Extension/config validation recorded in [implementation.md](2026-06/27-vscode-ext/implementation.md) and [test.md](2026-06/27-vscode-ext/test.md). |
 | [2026-06-28-diagram-toolbar](2026-06/28-diagram-toolbar/) | 2026-06-28 | closed | Unified diagram controls into a consistent toolbar with full-view handling. | Packet proof lives in [implementation.md](2026-06/28-diagram-toolbar/implementation.md) and [test.md](2026-06/28-diagram-toolbar/test.md). |

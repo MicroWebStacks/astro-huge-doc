@@ -60,26 +60,17 @@ const state_scope = createHash('sha1')
 const state_key = `microwebstacks:${state_scope}:${category}`;
 ---
 <nav class={`${open_class} ${category}`} data-width={data_width} data-max-level={max_level} data-default-level={default_level} data-state-key={state_key}>
+    <div class="menu-title">{category === "toc_menu" ? "On this page" : "Pages"}</div>
     {(items.length > 0 && max_level > 1) &&
-      <div class="depth-controls" data-category={category} role="group" aria-label="Expand controls">
-        <button type="button" class="depth-btn" data-action="min" title="Collapse all" aria-label="Collapse all">&#9198;</button>
-        <button type="button" class="depth-btn" data-action="down" title="Collapse one level" aria-label="Collapse one level">&#9664;</button>
+      <div class="depth-controls" data-category={category} role="group" aria-label="Tree depth">
+        <button type="button" class="depth-btn" data-action="min" title="Show top level" aria-label="Show top level">1</button>
+        <button type="button" class="depth-btn" data-action="down" title="Show one less level" aria-label="Show one less level">&minus;</button>
         <button type="button" class={`depth-btn auto${initial_mode === "manual" ? " manual" : ""}`} data-action="auto" data-mode={initial_mode} title={initial_title} aria-label={initial_title}>
-          <span class={`mode-icon mode-icon-auto${initial_mode === "manual" ? " is-hidden" : ""}`} aria-hidden={initial_mode === "manual" ? "true" : "false"} data-mode-icon="auto">
-            <svg viewBox="0 0 16 16" width="14" height="14" focusable="false">
-              <circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.4"></circle>
-              <circle cx="8" cy="8" r="1.8" fill="currentColor"></circle>
-            </svg>
-          </span>
-          <span class={`mode-icon mode-icon-manual${initial_mode === "auto" ? " is-hidden" : ""}`} aria-hidden={initial_mode === "auto" ? "true" : "false"} data-mode-icon="manual">
-            <svg viewBox="0 0 16 16" width="14" height="14" focusable="false">
-              <path d="M3 4.5h10M3 8h10M3 11.5h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path>
-            </svg>
-          </span>
+          <span data-mode-label>{initial_mode === "auto" ? "Auto" : "Manual"}</span>
           <span class={`mode-level${show_initial_depth ? "" : " is-hidden"}`} aria-hidden={show_initial_depth ? "false" : "true"} data-depth-label>{initial_depth}</span>
         </button>
-        <button type="button" class="depth-btn" data-action="up" title="Expand one level" aria-label="Expand one level">&#9654;</button>
-        <button type="button" class="depth-btn" data-action="max" title="Expand all" aria-label="Expand all">&#9197;</button>
+        <button type="button" class="depth-btn" data-action="up" title="Show one more level" aria-label="Show one more level">+</button>
+        <button type="button" class="depth-btn all" data-action="max" title="Show all levels" aria-label="Show all levels">All</button>
       </div>
     }
     <SubMenu items={items} level={1} visibleLevel={default_level} activePath={activePath} forceVisible={false} linkClass={link_class} />
@@ -92,6 +83,20 @@ nav{
     height:100%;
     overflow-y: auto;
     flex-shrink: 0;
+}
+.menu-title{
+  position:sticky;
+  top:0;
+  z-index:2;
+  min-height:2.5rem;
+  display:flex;
+  align-items:center;
+  padding-inline:var(--space-3);
+  font-size:var(--text-sm);
+  font-weight:600;
+  color:var(--content-color-muted);
+  background:var(--nav-bg-color);
+  border-bottom:1px solid var(--soft-border-color);
 }
 nav.closed{
     width:0px;
@@ -126,7 +131,7 @@ nav::-webkit-scrollbar-corner {
    while the menu scrolls. */
 .depth-controls{
   position: sticky;
-  top: 0;
+  top: 2.5rem;
   z-index: 1;
   display:flex;
   align-items:center;
@@ -145,7 +150,7 @@ nav.toc_menu .depth-controls{
 }
 .depth-btn{
   width: 2rem;
-  height: 1.75rem;
+  height: 2rem;
   display:inline-flex;
   align-items:center;
   justify-content:center;
@@ -158,6 +163,11 @@ nav.toc_menu .depth-controls{
   line-height: 1;
   cursor: pointer;
   user-select: none;
+}
+.depth-btn.all{
+  width:auto;
+  min-width:2.25rem;
+  padding-inline:var(--space-1);
 }
 .depth-btn:focus-visible{
   outline: 2px solid var(--front-blue);
@@ -180,11 +190,6 @@ nav.toc_menu .depth-controls{
 .depth-btn.auto.manual{
   color: var(--content-color-muted);
 }
-.mode-icon{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-}
 .mode-level{
   min-width: 0.65rem;
   font-size: var(--text-sm);
@@ -198,11 +203,6 @@ nav.toc_menu .depth-controls{
 .depth-btn.active .mode-level,
 .depth-btn.auto.manual .mode-level{
   color: var(--content-color);
-}
-.depth-btn.auto[data-mode="auto"] .mode-icon-manual,
-.depth-btn.auto[data-mode="manual"] .mode-icon-auto,
-.mode-icon.is-hidden{
-  display:none;
 }
 nav.measuring ul.nested{
   transition-duration: 0s;

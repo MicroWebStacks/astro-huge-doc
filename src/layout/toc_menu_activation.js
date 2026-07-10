@@ -266,17 +266,13 @@ function setCenterModeIcon(nav){
     const state = getState(nav);
     const btn = nav.querySelector('.depth-controls [data-action="auto"]');
     if(!btn){ return; }
-    const autoIcon = btn.querySelector('.mode-icon-auto');
-    const manualIcon = btn.querySelector('.mode-icon-manual');
+    const modeLabel = btn.querySelector('[data-mode-label]');
     const depthLabel = btn.querySelector('[data-depth-label]');
     const isAuto = state.mode === 'auto';
     const showDepthLabel = isAuto ? !isToc(nav) : state.manualKind !== 'custom';
     btn.setAttribute('data-mode', isAuto ? 'auto' : 'manual');
-    if(autoIcon && manualIcon){
-        autoIcon.classList.toggle('is-hidden', !isAuto);
-        manualIcon.classList.toggle('is-hidden', isAuto);
-        autoIcon.setAttribute('aria-hidden', isAuto ? 'false' : 'true');
-        manualIcon.setAttribute('aria-hidden', isAuto ? 'true' : 'false');
+    if(modeLabel){
+        modeLabel.textContent = isAuto ? 'Auto' : 'Manual';
     }
     if(depthLabel){
         depthLabel.textContent = String(state.depth);
@@ -487,6 +483,10 @@ function initScrollSpy(nav){
     function currentEntry(){
         const artRect = article.getBoundingClientRect();
         const threshold = artRect.top + 4;
+        const remaining = article.scrollHeight - article.clientHeight - article.scrollTop;
+        if(remaining <= 2){
+            return entries[entries.length - 1];
+        }
         let current = entries[0];
         for(const e of entries){
             if(e.target.getBoundingClientRect().top <= threshold){

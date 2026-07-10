@@ -23,7 +23,7 @@ const HeadingLevel = `h${item.level}`
     {item.body_text}
     </div>
   <div class="icon link">
-      <a href={`#${item.slug}`} class="link">
+      <a href={`#${item.slug}`} class="link" aria-label={`Link to ${item.body_text}`} title={`Link to ${item.body_text}`}>
         <Svgicons filename="link"/>
       </a>
       <div class="icon copy" title="copy short link" data-url={data.url + `#${item.slug}`}>

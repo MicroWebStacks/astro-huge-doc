@@ -48,12 +48,16 @@ preferred contract.
 
 ## Label Rules
 
-- Directory entries use their source folder name unless they also own a routed
-  document title.
-- Markdown file entries display their filename without the `.md` suffix.
-- `README.md` remains visible as `README` in the pages tree.
+- Renderable entries use their document title when it is meaningful; source
+  names are the fallback for untitled entries and organizational folders.
+- Markdown filenames are implementation detail and must not override a useful
+  reader-facing title.
+- Root and README-style documents use `Overview` when their title is missing,
+  `.`, or merely repeats the source filename.
+- Labels use the title's authored capitalization rather than forcing lowercase
+  filename casing.
 - The app bar may still label the root route as `Home`; that does not change the
-  pages-tree filename rule.
+  pages-tree reader-facing label rule.
 
 ## README Directory Rule
 

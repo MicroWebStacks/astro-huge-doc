@@ -75,7 +75,7 @@ const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.ali
 .navbar{
     display:flex;
     justify-content: space-between;
-    min-width: 400px;
+    min-width: 0;
 }
 .navbar-left {
     display: flex;
@@ -141,6 +141,8 @@ a.active{
     padding:var(--space-2);
     color:var(--content-color-muted);
     cursor:pointer;
+    min-width:2.75rem;
+    min-height:2.75rem;
 }
 .nav-toggle:hover{
     background-color:var(--header-active-color);
@@ -160,5 +162,20 @@ a.active{
 }
 .nav-toggle[aria-expanded="false"] .fill{
     opacity:0;
+}
+@media only screen and (max-width: 700px) {
+    a{
+        padding-inline:var(--space-3);
+    }
+    .navbar-left,
+    .navbar-right{
+        flex-wrap:nowrap;
+        min-width:0;
+    }
+    .nav-toggle{
+        margin:0;
+        min-width:44px;
+        min-height:44px;
+    }
 }
 </style>

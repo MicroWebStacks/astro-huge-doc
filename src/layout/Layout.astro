@@ -109,7 +109,7 @@ const appbar_menu = navigation.appBarMenu ?? []
 				<div id="resize-left" class="nav-resize active"/>
 				<article class="content scroll">
 					<div id="mobile-nav">
-						<SideMenu items={pages_menu_items} category="pages_menu"/>
+						<SideMenu items={pages_menu_items} category="pages_menu" initialOpen={false}/>
 					</div>
 					<div class="article-slot">
 						<slot/>
@@ -122,6 +122,7 @@ const appbar_menu = navigation.appBarMenu ?? []
 					}
 				</div>
 			</main>
+			<button id="mobile-nav-backdrop" type="button" aria-label="Close navigation menus"></button>
 		</div>
 	</body>
 </html>
@@ -137,6 +138,9 @@ body{
 	flex-direction: row;
 	background-color: var(--content-bg-color);
 	color: var(--content-color);
+}
+body.mobile-nav-open{
+	overflow:hidden;
 }
 /* Body => .appbar-nav_content-footer (full width; the app bar owns nav toggles) */
 .appbar-nav_content-footer{
@@ -158,6 +162,7 @@ main{
 	flex-direction: row;
 	height:80vh;
 	max-width: 100vw;
+	min-width: 0;
 }
 /* main => #wide-nav, resize-left, article.content, #resize-right, #toc-nav-div */
 
@@ -174,6 +179,8 @@ main{
 	flex-grow: 0;
 	overflow:auto;
 	padding:var(--space-3);
+	box-sizing:border-box;
+	min-width:0;
     scroll-behavior: smooth;
     scroll-padding-top: var(--space-3);
 }
@@ -187,6 +194,8 @@ main{
 .nav-resize{
 	width:var(--space-2);
 	background-color: var(--content-bg-color);
+	border-inline:1px solid transparent;
+	box-sizing:border-box;
 }
 .active.nav-resize{
 	cursor:col-resize;
@@ -194,6 +203,9 @@ main{
 .active.nav-resize:hover{
 	background-color: var(--front-blue);
 	transition: background-color 0.5s;
+}
+#mobile-nav-backdrop{
+	display:none;
 }
 .scroll::-webkit-scrollbar {
 	width: 1rem;
@@ -212,23 +224,60 @@ main{
 }
 
 @media only screen and (max-width: 700px) {
-	#resize-right, #resize-left, #toc-nav-div {
+	#resize-right, #resize-left {
 		display:none;
 	}
 	.content{
-		display:flex;
-		flex-direction: column;
+		padding:var(--space-4);
 	}
 	#wide-nav{
 		display:none;
 	}
+	#mobile-nav,
+	#toc-nav-div{
+		display:block;
+		position:fixed;
+		top:54px;
+		bottom:0;
+		z-index:20;
+		width:min(84vw, 20rem);
+		background:var(--nav-bg-color);
+		box-shadow:var(--shadow-raised);
+		transition:transform 0.2s ease;
+		pointer-events:none;
+	}
 	#mobile-nav{
-		display: block;
+		left:0;
+		transform:translateX(-102%);
 	}
-	.article-slot{
-
+	#toc-nav-div{
+		right:0;
+		transform:translateX(102%);
 	}
-
+	#mobile-nav.mobile-open,
+	#toc-nav-div.mobile-open{
+		transform:translateX(0);
+		pointer-events:auto;
+	}
+	#mobile-nav :global(nav),
+	#toc-nav-div :global(nav){
+		width:100% !important;
+		height:100%;
+	}
+	#mobile-nav-backdrop{
+		position:fixed;
+		inset:54px 0 0;
+		z-index:19;
+		width:100%;
+		height:auto;
+		border:0;
+		padding:0;
+		background:rgba(0,0,0,0.42);
+		cursor:pointer;
+	}
+	#mobile-nav-backdrop.visible{
+		display:block;
+	}
 }
 
 /* --- Article reading surface -------------------------------------------

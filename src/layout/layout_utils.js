@@ -355,13 +355,13 @@ function sortSourceNodes(a, b) {
 }
 
 function labelFromSourceEntry(entry) {
-    if (entry.document_title && entry.document_title !== '.') {
-        if (entry.entry_type === 'dir') {
-            return entry.document_title;
-        }
+    const documentTitle = String(entry.document_title ?? '').trim();
+    if (documentTitle && documentTitle !== '.') {
+        return documentTitle;
     }
     if (entry.entry_type === 'file' && entry.name.toLowerCase().endsWith('.md')) {
-        return entry.name.slice(0, -3);
+        const stem = entry.name.slice(0, -3);
+        return /^readme$/i.test(stem) ? 'Overview' : labelFromUrl(stem);
     }
     return entry.name;
 }

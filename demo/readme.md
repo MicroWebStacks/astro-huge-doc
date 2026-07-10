@@ -10,7 +10,7 @@ This repository can now render a local top-level `demo/` tree even while
 
 Use these pages to smoke-test the main rich-content features:
 
-- [Math formulas](./math)
+- [Math formulas](./math-demo)
 - [PlantUML diagrams](./plantuml-demo)
 
 ## Why this folder exists

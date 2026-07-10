@@ -10,24 +10,38 @@ tree navigation menus rendered by `SideMenu.astro`:
 - the right **table-of-contents menu** (`category="toc_menu"`), a tree of the
   current page's headings.
 
-It replaces the prior depth slider with a fixed button cluster and defines the
-auto-expansion, manual-expansion, persistence, and cross-highlight behavior.
+It defines the compact depth toolbar, auto-expansion, manual-expansion,
+persistence, and cross-highlight behavior.
 
 ## Control Cluster
 
-When a menu has more than one nesting level (`data-max-level > 1`), it renders
-a single horizontal cluster of five controls, ordered like media transport
-buttons:
+Each menu has a visible surface label: **Pages** for document navigation and
+**On this page** for the current-page outline. When a menu has more than one
+nesting level (`data-max-level > 1`), it renders a compact horizontal cluster
+of five controls. The controls must not resemble media transport controls:
 
 | Order | Action | Meaning |
 |-------|--------|---------|
-| 1 | `min`  | Collapse the menu fully (depth 1, only top level visible). |
-| 2 | `down` | Collapse one nesting level relative to the current depth. |
-| 3 | `auto` | Enter auto mode or restore the last manual state. |
-| 4 | `up`   | Expand one nesting level relative to the current depth. |
-| 5 | `max`  | Expand the menu fully (all nesting levels visible). |
+| 1 | `min`  | Visible `1` label; collapse to top level. |
+| 2 | `down` | Visible minus label; collapse one nesting level. |
+| 3 | `auto` | Visible `Auto` or `Manual` mode label, plus depth when meaningful. |
+| 4 | `up`   | Visible plus label; expand one nesting level. |
+| 5 | `max`  | Visible `All` label; expand fully. |
 
 A menu with a single level renders no cluster.
+
+## Responsive Navigation
+
+- At widths above 700px, Pages and On this page are independent resizable side
+  panes controlled from the app bar.
+- At widths of 700px or below, each menu becomes a modal side drawer. Only one
+  drawer may be open at a time.
+- A mobile drawer has a backdrop, can be dismissed by that backdrop or Escape,
+  and returns focus to its trigger when dismissed.
+- Closed mobile drawers must not consume document space or create horizontal
+  overflow.
+- App-bar navigation controls provide at least a 44 by 44 CSS-pixel target on
+  touch layouts.
 
 ## Modes
 
