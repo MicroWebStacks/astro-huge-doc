@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.14 - 2026-07-11
+
+- PlantUML now renders client-side by default, so Mermaid and PlantUML diagrams
+  work without Java, Docker, or an external Kroki service. PlantUML can still
+  be routed to Kroki from the manifest when server-side rendering is needed.
+- Refined the preview layout and navigation controls, including the initial
+  viewport, sidebar behavior, app bar, links, headings, and table-of-contents
+  interactions (engine 0.0.8).
+- Added focused local diagnostics for corporate endpoint or filesystem-policy
+  failures during bundled-engine activation.
+
 ## 0.0.13 - 2026-07-10
 
 - The bundled offline engine now ships inside the VSIX as a single
