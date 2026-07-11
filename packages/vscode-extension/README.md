@@ -25,9 +25,11 @@ documentation site, not a single-file preview.
   and uses VS Code's own bundled runtime to execute its scripts. In `auto`
   mode the npm registry is only a fallback path when the bundled payload is
   unavailable; `registry` mode forces that published-engine path explicitly.
-- Rare fallback case: if a VS Code/Electron build disables
-  `ELECTRON_RUN_AS_NODE`, set `MICROWEBSTACKS_NODE_PATH` to a Node.js 18+
-  executable or make `node` available on PATH.
+- No runtime flags need to be configured. The extension automatically probes
+  VS Code's runtime with `ELECTRON_RUN_AS_NODE`; users should not set that
+  variable themselves. On the rare VS Code/Electron build where this internal
+  mode is unavailable, install Node.js 18+ on `PATH` or, for an explicit
+  administrator override, point `MICROWEBSTACKS_NODE_PATH` at its executable.
 - Optional: a reachable [Kroki](https://kroki.io) server if your docs contain
   BlockDiag or explicitly Kroki-routed diagrams. Mermaid and PlantUML need no
   Java, Docker, or external server.

@@ -67,14 +67,38 @@ async function main() {
     ['package/dist/server/entry.mjs', ''],
     ['package/_modules/diagnostic-package/index.js', 'module.exports = true;']
   ]));
-  const installRoot = path.join(scratchRoot, 'activated-engine');
+  const storageRoot = path.join(scratchRoot, 'global-storage');
+  const context = {globalStorageUri: {fsPath: storageRoot}};
+  const installRoot = path.join(storageRoot, `bundled-engine-${pkg.version}`, 'node_modules', '@microwebstacks', 'md-render');
   let ok = true;
   try {
-    await internals.extractAndActivateEngine({tarballBuffer: payload, expectedPackage: pkg.name, expectedVersion: pkg.version, installRoot, sourceLabel: 'diagnostic engine'});
+    let activationCount = 0;
+    const activate = async () => {
+      activationCount += 1;
+      await internals.extractAndActivateEngine({tarballBuffer: payload, expectedPackage: pkg.name, expectedVersion: pkg.version, installRoot, sourceLabel: 'diagnostic engine'});
+    };
+    await Promise.all([
+      internals.activateWithStorageLock(context, 'bundled', installRoot, activate),
+      internals.activateWithStorageLock(context, 'bundled', installRoot, activate)
+    ]);
     ok = report('engine activation', fs.existsSync(installRoot)) && ok;
+    ok = report('one activation across concurrent windows', activationCount === 1, `${activationCount} activation(s)`) && ok;
     ok = report('direct node_modules extraction', fs.existsSync(path.join(installRoot, 'node_modules', 'diagnostic-package', 'index.js'))) && ok;
     ok = report('no vendored alias remains', !fs.existsSync(path.join(installRoot, '_modules'))) && ok;
     ok = report('usable engine validation', internals.isUsableInstalledEngine(installRoot)) && ok;
+    ok = report('activation lock removed', !fs.existsSync(path.join(storageRoot, `.mws-engine-activation-lock-bundled-${pkg.version}`))) && ok;
+    ok = report('activation temp removed', !(await fsp.readdir(storageRoot)).some((entry) => entry.startsWith('.mws-engine-activation-'))) && ok;
+
+    await Promise.all([
+      fsp.mkdir(path.join(storageRoot, 'engine'), {recursive: true}),
+      fsp.mkdir(path.join(storageRoot, 'engine-0.0.7'), {recursive: true}),
+      fsp.mkdir(path.join(storageRoot, 'bundled-engine-0.0.9'), {recursive: true})
+    ]);
+    await internals.cleanupOldEngines(context);
+    ok = report('legacy engine cleanup', !fs.existsSync(path.join(storageRoot, 'engine'))) && ok;
+    ok = report('older engine cleanup', !fs.existsSync(path.join(storageRoot, 'engine-0.0.7'))) && ok;
+    ok = report('current engine preserved', fs.existsSync(path.join(storageRoot, `bundled-engine-${pkg.version}`))) && ok;
+    ok = report('newer engine preserved', fs.existsSync(path.join(storageRoot, 'bundled-engine-0.0.9'))) && ok;
   } catch (error) {
     report('engine activation', false, error.code || error.message);
     ok = false;

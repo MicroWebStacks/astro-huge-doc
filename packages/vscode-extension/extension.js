@@ -529,7 +529,6 @@ function getBundledInstalledEngineRoot(context) {
 // later run; it never blocks the active engine.
 async function cleanupOldEngines(context) {
   const storageRoot = context.globalStorageUri.fsPath;
-  const keep = new Set([`engine-${ENGINE_VERSION}`, `bundled-engine-${ENGINE_VERSION}`]);
   let entries = [];
   try {
     entries = await fsp.readdir(storageRoot);
@@ -537,7 +536,26 @@ async function cleanupOldEngines(context) {
     return;
   }
   for (const entry of entries) {
-    if ((entry === 'engine' || entry.startsWith('engine-') || entry.startsWith('bundled-engine-')) && !keep.has(entry)) {
+    const match = /^(?:engine|bundled-engine)-(\d+)\.(\d+)\.(\d+)$/.exec(entry);
+    const entryVersion = match ? match.slice(1).map(Number) : null;
+    const currentVersion = ENGINE_VERSION.split('.').map(Number);
+    const isOlder = entryVersion && entryVersion.some((part, index) => {
+      if (part === currentVersion[index]) return false;
+      return entryVersion.slice(0, index).every((value, prior) => value === currentVersion[prior]) && part < currentVersion[index];
+    });
+    const isStaleActivationArtifact = entry.startsWith('.mws-engine-activation-');
+    let removeStaleActivationArtifact = false;
+    if (isStaleActivationArtifact) {
+      try {
+        const stat = await fsp.stat(path.join(storageRoot, entry));
+        removeStaleActivationArtifact = Date.now() - stat.mtimeMs > 60 * 60 * 1000;
+      } catch {
+        removeStaleActivationArtifact = true;
+      }
+    }
+    // Never delete a newer engine. An older extension host may remain alive
+    // after VS Code installs an update, and all windows share globalStorage.
+    if (entry === 'engine' || isOlder || removeStaleActivationArtifact) {
       try {
         await fsp.rm(path.join(storageRoot, entry), {recursive: true, force: true});
         log(`Removed old engine install ${entry}.`);
@@ -794,6 +812,43 @@ async function retryFsOp(op, {attempts = 6, delayMs = 500} = {}) {
   }
 }
 
+async function activateWithStorageLock(context, kind, installedRoot, activate) {
+  const storageRoot = context.globalStorageUri.fsPath;
+  const lockRoot = path.join(storageRoot, `.mws-engine-activation-lock-${kind}-${ENGINE_VERSION}`);
+  const deadline = Date.now() + 2 * 60 * 1000;
+  await fsp.mkdir(storageRoot, {recursive: true});
+
+  while (true) {
+    if (isUsableInstalledEngine(installedRoot)) return;
+    try {
+      await fsp.mkdir(lockRoot);
+      break;
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      try {
+        const stat = await fsp.stat(lockRoot);
+        if (Date.now() - stat.mtimeMs > 5 * 60 * 1000) {
+          await fsp.rm(lockRoot, {recursive: true, force: true});
+          continue;
+        }
+      } catch (statError) {
+        if (statError.code === 'ENOENT') continue;
+        throw statError;
+      }
+      if (Date.now() >= deadline) {
+        throw new Error(`Timed out waiting for another VS Code window to activate ${ENGINE_PACKAGE}@${ENGINE_VERSION}.`);
+      }
+      await sleep(250);
+    }
+  }
+
+  try {
+    if (!isUsableInstalledEngine(installedRoot)) await activate();
+  } finally {
+    await fsp.rm(lockRoot, {recursive: true, force: true}).catch(() => {});
+  }
+}
+
 // Shared post-download work for both the bundled and registry tiers
 // (AD-003): extract into a fresh temporary sibling directory, validate the
 // extracted package before trusting it, then promote it into the versioned
@@ -801,7 +856,12 @@ async function retryFsOp(op, {attempts = 6, delayMs = 500} = {}) {
 // treated as a valid cached engine, and interrupted/failed extraction leaves
 // no usable partial install behind.
 async function extractAndActivateEngine({tarballBuffer, expectedPackage, expectedVersion, installRoot, sourceLabel}) {
-  const tempRoot = `${installRoot}.tmp-${crypto.randomBytes(4).toString('hex')}`;
+  const enginePrefix = path.resolve(installRoot, '..', '..', '..');
+  const storageRoot = path.dirname(enginePrefix);
+  // Keep extraction outside the versioned engine prefix. A still-running old
+  // extension window may remove a newer prefix during an update, but it cannot
+  // erase this neutral activation directory; promotion then repairs the target.
+  const tempRoot = path.join(storageRoot, `.mws-engine-activation-${path.basename(enginePrefix)}-${crypto.randomBytes(4).toString('hex')}`);
   let activationStage = 'prepare temporary directory';
   let vendoredDir = null;
   await fsp.mkdir(path.dirname(tempRoot), {recursive: true});
@@ -841,6 +901,7 @@ async function extractAndActivateEngine({tarballBuffer, expectedPackage, expecte
     activationStage = 'replace previous engine';
     await retryFsOp(() => fsp.rm(installRoot, {recursive: true, force: true}));
     activationStage = 'activate extracted engine';
+    await fsp.mkdir(path.dirname(installRoot), {recursive: true});
     await retryFsOp(() => fsp.rename(tempRoot, installRoot));
   } catch (error) {
     await runActivationDiagnostics({error, stage: activationStage, tempRoot, installRoot, vendoredModulesDir: vendoredDir}).catch((diagnosticError) => {
@@ -967,7 +1028,7 @@ async function resolveEngine(context) {
   if (source === 'auto' && hasBundledEnginePackage()) {
     const bundledInstalled = getBundledInstalledEngineRoot(context);
     if (!isUsableInstalledEngine(bundledInstalled)) {
-      await hydrateBundledEngine(context);
+      await activateWithStorageLock(context, 'bundled', bundledInstalled, () => hydrateBundledEngine(context));
     }
     if (isUsableInstalledEngine(bundledInstalled)) {
       await cleanupOldEngines(context);
@@ -981,7 +1042,7 @@ async function resolveEngine(context) {
     return {root: installed, label: `installed engine package (${installed})`};
   }
 
-  await installEngine(context);
+  await activateWithStorageLock(context, 'registry', installed, () => installEngine(context));
   if (isUsableInstalledEngine(installed)) {
     await cleanupOldEngines(context);
     return {root: installed, label: `installed engine package (${installed})`};
@@ -1384,6 +1445,8 @@ if (process.env.MWS_TEST_INTERNALS === '1') {
     hydrateBundledEngine,
     installEngine,
     extractAndActivateEngine,
+    activateWithStorageLock,
+    cleanupOldEngines,
     extractTarGz,
     runActivationDiagnostics,
     isUsableInstalledEngine,

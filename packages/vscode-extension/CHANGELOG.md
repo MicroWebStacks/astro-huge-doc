@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.15 - 2026-07-11
+
+- Fixed a cross-window upgrade race where a VS Code window still running an
+  older extension could remove the newer bundled engine while another window
+  was extracting it. Engine cleanup now removes only strictly older versions,
+  never newer ones, and extraction uses a protected temporary location that
+  can complete even during an in-place Marketplace update.
+- Failed activation directories are removed immediately, while abandoned
+  activation artifacts older than one hour are reclaimed automatically on a
+  later successful startup (engine 0.0.8, unchanged).
+
 ## 0.0.14 - 2026-07-11
 
 - PlantUML now renders client-side by default, so Mermaid and PlantUML diagrams
