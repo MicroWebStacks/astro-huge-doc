@@ -107,7 +107,7 @@
         "microwebstacks.preview.krokiServer": {
           "type": "string",
           "default": "http://localhost:18000",
-          "markdownDescription": "Base URL of the Kroki-compatible server that renders PlantUML and BlockDiag diagrams. Mermaid renders client-side in the preview. Use a local Docker Kroki (`http://localhost:18000`), the public service (`https://kroki.io`), or your organization's internal endpoint. Leave blank to fall back to the workspace `.env` or environment."
+          "markdownDescription": "Base URL of the Kroki-compatible server used for BlockDiag and explicitly Kroki-routed diagram languages. Mermaid and PlantUML render client-side in the preview with no external setup. Use a local Docker Kroki (`http://localhost:18000`), the public service (`https://kroki.io`), or your organization's internal endpoint. Leave blank to fall back to the workspace `.env` or environment."
         }
       }
     }

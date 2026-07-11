@@ -32,7 +32,7 @@ if(params && (params.length > 0)){
     title = params[0]
 }
 const modalName = title || uid;
-const mermaidSourceJson = JSON.stringify(code).replace(/</g, '\\u003c');
+const diagramSourceJson = JSON.stringify(code).replace(/</g, '\\u003c');
 const languageLabel = language
     .split(/[-_]+/g)
     .filter(Boolean)
@@ -41,7 +41,7 @@ const languageLabel = language
 
 ---
 {hasDiagram &&
-    <div class:list={['diagram-shell', {'mermaid-shell': isClientDiagram}]} data-code-shell data-uid={uid} data-language={language} data-view="diagram">
+    <div class:list={['diagram-shell', {'client-diagram-shell': isClientDiagram}]} data-code-shell data-uid={uid} data-language={language} data-view="diagram">
         <div class="diagram-toolbar" role="toolbar" aria-label="Diagram controls">
             <span class="toolbar-language">{languageLabel}</span>
             <div class="toolbar-group" aria-label="Diagram view mode">
@@ -103,17 +103,16 @@ const languageLabel = language
         </div>
         {!isClientDiagram && diagram_url &&
             <div class="diagram visible" data-role="diagram" data-uid={uid}>
-                <Panzoom src={diagram_url} alt={alt} title={title} meta={meta} hash={uid} showOpenButton={false}
-                    themeLazy={language === 'plantuml'} versionId={versionId}/>
+                <Panzoom src={diagram_url} alt={alt} title={title} meta={meta} hash={uid} showOpenButton={false}/>
             </div>
         }
         {isClientDiagram &&
-            <div class="diagram mermaid-panel visible" data-role="diagram" data-uid={uid}>
-                <div class="mermaid-diagram" data-panzoom-root="true" data-uid={uid} data-name={modalName} data-sid={uid}>
-                    <div class="mermaid-output" data-mermaid-output></div>
-                    <div class="mermaid-error hidden" data-mermaid-error role="status" aria-live="polite"></div>
-                    <script type="application/json" data-mermaid-source set:html={mermaidSourceJson}></script>
-                    <PanZoomModal sourceSelector='[data-mermaid-output] svg' />
+            <div class="diagram client-diagram-panel visible" data-role="diagram" data-uid={uid}>
+                <div class="client-diagram" data-language={language} data-panzoom-root="true" data-uid={uid} data-name={modalName} data-sid={uid}>
+                    <div class="client-diagram-output" data-mermaid-output={language === 'mermaid' ? true : undefined} data-plantuml-output={language === 'plantuml' ? true : undefined}></div>
+                    <div class="client-diagram-error hidden" data-mermaid-error={language === 'mermaid' ? true : undefined} data-plantuml-error={language === 'plantuml' ? true : undefined} role="status" aria-live="polite"></div>
+                    <script type="application/json" data-mermaid-source={language === 'mermaid' ? true : undefined} data-plantuml-source={language === 'plantuml' ? true : undefined} set:html={diagramSourceJson}></script>
+                    <PanZoomModal sourceSelector='.client-diagram-output svg' />
                 </div>
             </div>
         }
@@ -141,12 +140,11 @@ const languageLabel = language
     background-color: var(--diagram-surface-bg);
     border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
-.mermaid-panel{
-    background-color: var(--mermaid-surface-bg);
+.client-diagram-panel{
+    background-color: var(--client-diagram-surface-bg);
 }
-/* PlantUML is theme-aware (dark baked at build, light swapped lazily), so its
-   surface + fullscreen backdrop follow the active theme instead of the
-   "always light" --diagram-surface-bg compromise. */
+/* Client PlantUML re-renders for the active theme, so its surface and
+   fullscreen backdrop do not use the static-diagram light-surface compromise. */
 .diagram-shell[data-language="plantuml"]{
     background-color: var(--plantuml-surface-bg);
 }
@@ -154,22 +152,22 @@ const languageLabel = language
     background-color: var(--plantuml-surface-bg);
     --lightbox-surface-bg: var(--plantuml-surface-bg);
 }
-.mermaid-diagram{
+.client-diagram{
     padding: var(--space-3);
-    --lightbox-surface-bg: var(--mermaid-surface-bg);
+    --lightbox-surface-bg: var(--client-diagram-surface-bg);
 }
-.mermaid-output{
+.client-diagram-output{
     display: flex;
     justify-content: center;
     width: 100%;
     min-width: min(100%, 20rem);
 }
-.mermaid-output :global(svg){
+.client-diagram-output :global(svg){
     display: block;
     width: 100%;
     height: auto;
 }
-.mermaid-error{
+.client-diagram-error{
     margin: var(--space-3);
     padding: var(--space-3);
     color: var(--chart-error-text-color);
@@ -191,8 +189,12 @@ const languageLabel = language
     border-radius: var(--radius-md);
     overflow: hidden;
 }
-.mermaid-shell{
-    background-color: var(--mermaid-surface-bg);
+.client-diagram-shell{
+    --client-diagram-surface-bg: var(--mermaid-surface-bg);
+    background-color: var(--client-diagram-surface-bg);
+}
+.client-diagram-shell[data-language="plantuml"]{
+    --client-diagram-surface-bg: var(--plantuml-surface-bg);
 }
 .diagram-toolbar{
     display: flex;
@@ -378,4 +380,5 @@ if (document.readyState === 'loading') {
 
 
 <script src="./mermaid-render.js" />
+<script src="./plantuml-render.js" />
 <script src="../../panzoom/panzoom_common.js" />

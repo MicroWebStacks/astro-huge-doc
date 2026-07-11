@@ -13,7 +13,7 @@ documentation site, not a single-file preview.
 
 - **File tree** - navigate a whole multi-folder docs repo from a sidebar, not one file at a time.
 - **Outline / table of contents** - jump between headings of the current page, with per-section table and diagram markers.
-- **Diagrams** - Mermaid renders client-side; PlantUML and BlockDiag render to SVG through Kroki.
+- **Diagrams** - Mermaid and PlantUML render client-side; BlockDiag renders to SVG through Kroki.
 - **Math** - inline and block formulas render with KaTeX.
 - **Tables** - Markdown tables become sortable, readable data tables.
 - **Syntax highlighting** - fenced code blocks highlighted with Shiki.
@@ -29,9 +29,8 @@ documentation site, not a single-file preview.
   `ELECTRON_RUN_AS_NODE`, set `MICROWEBSTACKS_NODE_PATH` to a Node.js 18+
   executable or make `node` available on PATH.
 - Optional: a reachable [Kroki](https://kroki.io) server if your docs contain
-  PlantUML or BlockDiag diagrams (see Configuration below). Mermaid does not
-  need a server. Pages still load without Kroki - only PlantUML/BlockDiag
-  diagrams are skipped.
+  BlockDiag or explicitly Kroki-routed diagrams. Mermaid and PlantUML need no
+  Java, Docker, or external server.
 
 ## Getting started
 
@@ -46,12 +45,21 @@ The workspace folder is the documentation root by default. Other commands:
 
 | Setting | Default | What it does |
 |---|---|---|
-| `microwebstacks.preview.krokiServer` | `http://localhost:18000` | Kroki URL for PlantUML and BlockDiag. Point it at a local [Kroki](https://kroki.io) (Docker), the public `https://kroki.io`, or your own internal endpoint. |
+| `microwebstacks.preview.krokiServer` | `http://localhost:18000` | Kroki URL for BlockDiag and explicitly Kroki-routed languages. Point it at a local [Kroki](https://kroki.io) (Docker), the public `https://kroki.io`, or your own internal endpoint. |
 | `microwebstacks.preview.docsRoot` | _manifest `render.folder` or `output.content`_ | Documentation root, if your docs live in a subfolder. |
 
-PlantUML and BlockDiag need a reachable Kroki server at the configured URL - the
-simplest is a local one via Docker. Mermaid renders client-side with no server
-setting. After changing a setting, run **Markdown Site Preview: Restart Server**.
+Mermaid and PlantUML render client-side with zero external setup. BlockDiag and
+explicitly Kroki-routed languages need a reachable server at the configured
+URL. After changing a setting, run **Markdown Site Preview: Restart Server**.
+
+PlantUML can be routed back to Kroki in `manifest.yaml` for content that relies
+on unsupported local includes or optional sprite bundles:
+
+```yaml
+diagram:
+  languages:
+    plantuml: kroki
+```
 
 ### Local Kroki via Docker
 
@@ -76,3 +84,22 @@ instead.
 > Advanced: `microwebstacks.preview.engineSource` and
 > `microwebstacks.preview.enginePath` control where the rendering engine is
 > loaded from. The defaults are fine for most users.
+
+## Corporate endpoint diagnostics
+
+If first-run engine activation fails, the **MicroWebStacks Docs** output
+channel automatically prints a local-only diagnostic block. It identifies the
+failed activation stage and reports storage checks as named `PASS`/`FAIL`
+results. Nothing is uploaded and the checks avoid printing the user's storage
+path.
+
+Administrators with Node.js 22 and a repository clone can run the same focused
+hydration check without VS Code or network access:
+
+```powershell
+node scripts/diagnose-extension-hydration.cjs
+```
+
+It uses disposable files under `.tmp/` and prints a short list of named
+`PASS`/`FAIL` results suitable for reporting without copying machine paths or
+logs.

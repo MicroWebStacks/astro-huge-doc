@@ -1,0 +1,9 @@
+@startuml
+actor Reader
+component Preview
+component "@plantuml/core" as PlantUML
+
+Reader --> Preview : open linked .puml
+Preview --> PlantUML : raw source
+PlantUML --> Preview : inline SVG
+@enduml

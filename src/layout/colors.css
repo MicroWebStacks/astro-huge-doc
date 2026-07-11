@@ -91,12 +91,12 @@
      Static diagrams (kroki) and 3d posters are authored with dark ink on a
      light backdrop, so they must stay light. In dark mode we dim them
      to a soft grey instead of pure white to avoid a blinding flash.
-     Mermaid is client-rendered, so it can follow the active site theme. */
+     Mermaid and PlantUML are client-rendered, so they follow the active site theme. */
   --diagram-surface-bg: #EDEDED;
   --mermaid-surface-bg: #252526;
-  /* Theme-aware PlantUML (dark baked at build, light rendered lazily).
-     ink/line/panel/note are mirrored as hex in src/libs/diagram-render.js
-     (PLANTUML_THEME_COLORS) because Kroki cannot read CSS variables —
+  /* Theme-aware client PlantUML. The palette is mirrored in
+     src/libs/plantuml-theme.js
+     (PLANTUML_THEME_COLORS) because the browser engine cannot read CSS variables —
      keep both sides in sync. */
   --plantuml-surface-bg: #252526;      /* matches --mermaid-surface-bg */
   --plantuml-ink-color: #CCCCCC;       /* matches --content-color */

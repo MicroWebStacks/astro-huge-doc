@@ -10,7 +10,7 @@ One codebase serves two profiles without forking, selected at runtime:
 - **full** — the standalone website / warehouse. SQLite backend, versioning,
   blob store, image optimization, GitHub fetch.
 - **lite** — the engine shipped inside the VS Code extension. JSON data backend,
-  no native dependencies, diagrams rendered by an external Kroki endpoint.
+  no native dependencies, with Mermaid and PlantUML rendered in the browser.
 
 | Switch | full | lite |
 |---|---|---|
@@ -23,7 +23,7 @@ One codebase serves two profiles without forking, selected at runtime:
 |---|---|---|---|
 | Standard Markdown (headings, paragraphs, links, lists) | ✅ | ✅ | shared `structure-db` + components |
 | Code highlighting (shiki) | ✅ | ✅ | shared |
-| Diagrams (mermaid, plantuml, blockdiag) | ✅ | ✅ | external Kroki endpoint (`MICROWEBSTACKS_KROKI_SERVER`) |
+| Diagrams (mermaid, plantuml, blockdiag) | ✅ | ✅ | Mermaid/PlantUML client-side; BlockDiag and explicitly routed languages via Kroki |
 | File-tree + TOC viewer | ✅ | ✅ | shared layout components |
 | Markdown tables | ✅ | ✅ | `@tanstack/react-table` (only surviving react-table) |
 | Images in Markdown | ✅ optimized | ✅ passthrough | Astro image service swap (sharp in full, passthrough in lite) |
@@ -141,7 +141,7 @@ User-facing env vars:
 |---|---|---|---|
 | `DOCS_PROFILE` | selects runtime profile | `full`, `lite` | `full` = standalone website/warehouse, `lite` = VS Code extension engine |
 | `DOCS_BACKEND` | selects data backend | `sqlite`, `json` | if unset, derived from `DOCS_PROFILE` |
-| `MICROWEBSTACKS_KROKI_SERVER` | diagram rendering endpoint | `http://localhost:18000`, `https://kroki.io`, internal URL | the engine POSTs Mermaid, PlantUML, and BlockDiag source here |
+| `MICROWEBSTACKS_KROKI_SERVER` | Kroki rendering endpoint | `http://localhost:18000`, `https://kroki.io`, internal URL | used by BlockDiag and languages explicitly routed to `kroki`; Mermaid and default PlantUML stay local |
 | `MICROWEBSTACKS_HOST` | server bind host | `127.0.0.1`, `0.0.0.0` | env wins over `manifest.yaml` |
 | `MICROWEBSTACKS_PORT` | server bind port | `4321` | env wins over `manifest.yaml` |
 | `MICROWEBSTACKS_PROTOCOL` | advertised protocol | `http`, `https` | env wins over `manifest.yaml` |
@@ -166,14 +166,29 @@ Advanced or runtime-injected env vars:
 
 ## diagram rendering
 
-Set `MICROWEBSTACKS_KROKI_SERVER` using `.env`, shell env, or the VS Code
-setting `microwebstacks.preview.krokiServer`, depending on the flow above.
-No Java renderer runs inside VS Code; the preview always calls a
-Kroki-compatible HTTP endpoint.
+Mermaid and PlantUML render client-side in the browser and VS Code preview.
+They require no Java, Docker, or external diagram server. PlantUML uses the
+official `@plantuml/core` browser engine and loads it only on pages containing
+PlantUML diagrams.
+
+BlockDiag and other languages routed to `kroki` use
+`MICROWEBSTACKS_KROKI_SERVER`. Set it through `.env`, the shell, or the VS Code
+setting `microwebstacks.preview.krokiServer` when those diagrams are present.
+PlantUML can be routed back to Kroki as a compatibility fallback:
+
+```yaml
+diagram:
+  languages:
+    plantuml: kroki
+```
+
+Client PlantUML cannot automatically read arbitrary local `!include` files,
+and the npm engine omits large optional sprite bundles. Use the explicit Kroki
+route when affected content is not compatible with client mode.
 
 ### local Docker Kroki
 
-Use this for offline/local testing and for VS Code preview without sending
+Use this for BlockDiag or explicitly Kroki-routed diagrams without sending
 diagram source to an external service:
 
 ```dotenv
@@ -222,8 +237,9 @@ pnpm diagrams
 pnpm dev
 ```
 
-After `pnpm clean:diagrams`, the next `pnpm diagrams` run must call the
-configured Kroki URL again for every diagram.
+After `pnpm clean:diagrams`, the next `pnpm diagrams` run calls the configured
+Kroki URL again only for Kroki-routed diagrams. Client Mermaid and PlantUML are
+skipped by the collection renderer.
 
 Rendered diagram SVG files are served from `/blobs/<12-hex>.svg`; the full
 content hash remains in the dataset metadata.

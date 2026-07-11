@@ -31,9 +31,9 @@ diagram:
     kroki:
       server: https://kroki.io
   languages:
-    plantuml: kroki
+    plantuml: client
     blockdiag: kroki
-    mermaid: client # browser-rendered; Kroki remains for PlantUML/BlockDiag
+    mermaid: client # browser-rendered; Kroki remains for BlockDiag
   aliases:
     puml: plantuml
     mmd: mermaid

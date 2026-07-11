@@ -31,7 +31,7 @@ const DEFAULT_MANIFEST = {
             }
         },
         languages: {
-            plantuml: 'kroki',
+            plantuml: 'client',
             blockdiag: 'kroki',
             mermaid: 'client'
         },

@@ -1,4 +1,4 @@
-# Local Kroki rendering for PlantUML/BlockDiag in MicroWebStacks.
+# Local Kroki rendering for BlockDiag and explicitly Kroki-routed languages.
 #
 # Runs Kroki locally so the default MICROWEBSTACKS_KROKI_SERVER=http://localhost:18000
 # works out of the box with zero secrets and no Java on the host / in VS Code.

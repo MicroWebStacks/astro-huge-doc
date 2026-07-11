@@ -695,14 +695,28 @@ function parseTarEntries(tarBuffer) {
   return entries;
 }
 
-async function extractTarGz(buffer, destDir) {
+async function extractTarGz(buffer, destDir, {mapVendoredModules = false} = {}) {
   const tarBuffer = zlib.gunzipSync(buffer);
   const resolvedDestDir = path.resolve(destDir);
-  for (const entry of parseTarEntries(tarBuffer)) {
+  const entries = parseTarEntries(tarBuffer);
+  let vendoredModulesDir = null;
+  if (mapVendoredModules) {
+    const packageEntry = entries.find((entry) => entry.name === 'package/package.json' && entry.type === 'file');
+    vendoredModulesDir = packageEntry ? JSON.parse(packageEntry.data.toString('utf8')).vendoredModulesDir ?? null : null;
+  }
+  for (const entry of entries) {
     // npm tarballs wrap every entry under a top-level "package/" directory.
-    const relPath = entry.name.replace(/^package\//, '');
+    let relPath = entry.name.replace(/^package\//, '');
     if (!relPath || relPath === '.') {
       continue;
+    }
+    // npm strips real node_modules directories when packing. The release
+    // artifact therefore carries dependencies under vendoredModulesDir. Map
+    // that tree while extracting so corporate filesystem filters never see a
+    // large, freshly-written directory rename from `_modules` to
+    // `node_modules`.
+    if (vendoredModulesDir && (relPath === vendoredModulesDir || relPath.startsWith(`${vendoredModulesDir}/`))) {
+      relPath = `node_modules${relPath.slice(vendoredModulesDir.length)}`;
     }
     const target = path.resolve(resolvedDestDir, relPath);
     const relativeToRoot = path.relative(resolvedDestDir, target);
@@ -715,6 +729,43 @@ async function extractTarGz(buffer, destDir) {
       await fsp.mkdir(path.dirname(target), {recursive: true});
       await fsp.writeFile(target, entry.data);
     }
+  }
+  return {vendoredModulesDir};
+}
+
+async function runActivationDiagnostics({error, stage, tempRoot, installRoot, vendoredModulesDir}) {
+  const checks = [];
+  const add = (name, passed, detail) => checks.push({name, passed, detail});
+  const parent = path.dirname(installRoot);
+  const probeBase = path.join(parent, `.mws-diagnostic-${crypto.randomBytes(4).toString('hex')}`);
+  const probeRenamed = `${probeBase}-renamed`;
+
+  add('temporary extraction directory exists', exists(tempRoot), exists(tempRoot) ? 'available' : 'missing');
+  add('mapped node_modules exists', exists(path.join(tempRoot, 'node_modules')), exists(path.join(tempRoot, 'node_modules')) ? 'available' : 'missing');
+  add('vendored alias is absent', !vendoredModulesDir || !exists(path.join(tempRoot, vendoredModulesDir)), !vendoredModulesDir || !exists(path.join(tempRoot, vendoredModulesDir)) ? 'absent' : 'still present');
+
+  try {
+    await fsp.mkdir(probeBase);
+    add('global storage write', true, 'small directory created');
+    await fsp.rename(probeBase, probeRenamed);
+    add('global storage directory rename', true, 'small directory renamed');
+  } catch (probeError) {
+    if (!exists(probeBase)) {
+      add('global storage write', false, probeError.code || 'failed');
+    } else {
+      add('global storage write', true, 'small directory created');
+      add('global storage directory rename', false, probeError.code || 'failed');
+    }
+  } finally {
+    await fsp.rm(probeBase, {recursive: true, force: true}).catch(() => {});
+    await fsp.rm(probeRenamed, {recursive: true, force: true}).catch(() => {});
+  }
+
+  log('Engine activation diagnostics (local only; no data was uploaded):');
+  log(`  Stage: ${stage}`);
+  log(`  Error code: ${error?.code || 'unavailable'}`);
+  for (const check of checks) {
+    log(`  ${check.passed ? 'PASS' : 'FAIL'} - ${check.name} (${check.detail})`);
   }
 }
 
@@ -751,14 +802,20 @@ async function retryFsOp(op, {attempts = 6, delayMs = 500} = {}) {
 // no usable partial install behind.
 async function extractAndActivateEngine({tarballBuffer, expectedPackage, expectedVersion, installRoot, sourceLabel}) {
   const tempRoot = `${installRoot}.tmp-${crypto.randomBytes(4).toString('hex')}`;
+  let activationStage = 'prepare temporary directory';
+  let vendoredDir = null;
   await fsp.mkdir(path.dirname(tempRoot), {recursive: true});
   await fsp.rm(tempRoot, {recursive: true, force: true});
   await fsp.mkdir(tempRoot, {recursive: true});
   try {
     try {
-      await extractTarGz(tarballBuffer, tempRoot);
+      activationStage = 'extract package';
+      const extracted = await extractTarGz(tarballBuffer, tempRoot, {mapVendoredModules: true});
+      vendoredDir = extracted.vendoredModulesDir;
     } catch (error) {
-      throw new Error(`Could not extract ${sourceLabel} (${error.message}).`);
+      const wrapped = new Error(`Could not extract ${sourceLabel} (${error.message}).`, {cause: error});
+      wrapped.code = error.code;
+      throw wrapped;
     }
 
     const pkg = readJson(path.join(tempRoot, 'package.json'));
@@ -769,22 +826,26 @@ async function extractAndActivateEngine({tarballBuffer, expectedPackage, expecte
       );
     }
 
-    const vendoredDir = pkg.vendoredModulesDir;
-    if (!vendoredDir || !exists(path.join(tempRoot, vendoredDir))) {
+    vendoredDir = pkg.vendoredModulesDir;
+    if (!vendoredDir || !exists(path.join(tempRoot, 'node_modules'))) {
       throw new Error(
         `${sourceLabel} was not published with vendored dependencies; this extension version can only install a ` +
         'vendored engine build. Republish it with scripts/stage-engine.js (vendoring is on by default).'
       );
     }
-    await fsp.rename(path.join(tempRoot, vendoredDir), path.join(tempRoot, 'node_modules'));
-
+    activationStage = 'validate extracted engine';
     if (!isUsableInstalledEngine(tempRoot)) {
       throw new Error(`${sourceLabel} extracted but failed the usable-engine checks at ${tempRoot}.`);
     }
 
+    activationStage = 'replace previous engine';
     await retryFsOp(() => fsp.rm(installRoot, {recursive: true, force: true}));
+    activationStage = 'activate extracted engine';
     await retryFsOp(() => fsp.rename(tempRoot, installRoot));
   } catch (error) {
+    await runActivationDiagnostics({error, stage: activationStage, tempRoot, installRoot, vendoredModulesDir: vendoredDir}).catch((diagnosticError) => {
+      log(`Engine activation diagnostics could not complete (${diagnosticError.code || diagnosticError.message}).`);
+    });
     await fsp.rm(tempRoot, {recursive: true, force: true}).catch(() => {});
     throw error;
   }
@@ -795,8 +856,8 @@ async function extractAndActivateEngine({tarballBuffer, expectedPackage, expecte
 // 2026-07/05-vscode-node-free-bootstrap OP-002). The tarball's production
 // dependencies are pre-vendored under a disguised directory name by
 // scripts/stage-engine.js (npm's packer always strips a real "node_modules"
-// out of a published tarball); extractAndActivateEngine() renames it back
-// after extracting.
+// out of a published tarball); extraction maps that path directly back to
+// node_modules without a post-extraction directory rename.
 async function installEngine(context) {
   const enginePrefix = getEnginePrefix(context);
   const url = engineTarballUrl(ENGINE_PACKAGE, ENGINE_VERSION);
@@ -1323,6 +1384,8 @@ if (process.env.MWS_TEST_INTERNALS === '1') {
     hydrateBundledEngine,
     installEngine,
     extractAndActivateEngine,
+    extractTarGz,
+    runActivationDiagnostics,
     isUsableInstalledEngine,
     isEngineRoot,
     getBundledEnginePackageRoot,

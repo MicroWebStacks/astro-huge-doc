@@ -41,4 +41,4 @@ sequenceDiagram
 |---|---|
 | `demo/readme.md` | render-root split plus Mermaid smoke test |
 | `demo/math.md` | inline and block math via KaTeX |
-| `demo/plantuml.md` | server-rendered PlantUML through Kroki |
+| `demo/plantuml.md` | client-rendered PlantUML with no server or Java |
