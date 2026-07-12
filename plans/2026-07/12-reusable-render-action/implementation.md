@@ -3,7 +3,7 @@
 ## Progress
 
 ```text
-[##---] Phase 2/5 - shared command done; package/extension isolation (Phase 3) next.
+[###--] Phase 3/5 - package/extension isolation done; thin Action (Phase 4) next.
 ```
 
 ## Phase 1 - static contract and route proof
@@ -221,3 +221,146 @@ node bin/md-render.js build --workspace . --out-dir .tmp/phase2-fixture-out
   `diagram_failed` in practice means the `diagrams.js` process itself
   crashed (e.g. missing dataset), not a single diagram's render failing.
   Worth calling out explicitly in Phase 5's error-path validation.
+
+## Phase 3 - package and extension isolation
+
+### Files changed
+
+- `scripts/stage-engine.js` - `RUNTIME_PATHS` grew from six entries to
+  fourteen: added `bin`, `src/pages`, `src/layout`, `src/components`,
+  `public`, `astro.config.shared.mjs`, `astro.config.static.mjs`,
+  `tsconfig.json` (everything `md-render build` needs to run a fresh `astro
+  build` from the published package, on top of what the extension already
+  needed). `astro.config.mjs` - the Node-adapter SSR config - is deliberately
+  not staged; the extension only ever runs prebuilt `dist/`. Generated
+  `package.json` gained `bin: {"md-render": "bin/md-render.js"}`.
+  `EXCLUDED_DEPS` lost `'@google/model-viewer'` (see Implementation facts).
+- `package.json` - moved `@rollup/plugin-yaml` from `devDependencies` to
+  `dependencies`: `astro.config.shared.mjs` imports it directly, and once
+  that file is staged and executed inside the published package, only
+  `dependencies` get vendored/installed for a consumer - a `devDependency`
+  would silently disappear outside this monorepo.
+- `src/libs/render-build.js` - `defaultBuildSteps`'s astro-build step no
+  longer hardcodes `path.join(engineRoot, 'node_modules', 'astro',
+  'astro.js')`. Added `resolveAstroBin()`, which uses
+  `createRequire(import.meta.url).resolve('astro/package.json')` and reads
+  the resolved package's own `bin` field. See Implementation facts for why
+  the hardcoded path was wrong.
+
+### Implementation facts
+
+- **Astro bin path bug, found by testing a real `npm install`, not the
+  vendored path.** Phase 2's fixture proof ran the command against this
+  monorepo's own checkout, where `astro` always sits directly under the
+  repo's `node_modules`. Phase 3 is the first time the command ran against a
+  package installed the way a real npm consumer (or, later, the Action)
+  would install it: `npm install <tarball>` in a clean directory. Plain npm
+  install hoists dependencies like `astro` to the *consumer's* top-level
+  `node_modules`, not nested under `node_modules/@microwebstacks/md-render/
+  node_modules/astro` - only the VS Code extension's vendored/renamed
+  `_modules` tree happens to keep everything nested, because that path
+  reuses `npm install` run *inside* the staged package directory itself
+  (`scripts/stage-engine.js`'s `vendorDependencies`), not a normal consumer
+  install. The hardcoded nested path crashed with `MODULE_NOT_FOUND` the
+  first time it was exercised against a real install. Fixed by resolving
+  through Node's own module resolution (`createRequire` from
+  `render-build.js`'s own location), which walks up every ancestor
+  `node_modules` and finds `astro` correctly regardless of where it landed.
+- **`@google/model-viewer` is not an optional, content-gated dependency for
+  a full-profile static build - it is unconditional.** `Link.astro` and
+  `Code.astro` import `ModelViewer.astro` / `ModelViewerCode.astro`
+  unconditionally at module scope, so Vite's client-script bundling pulls in
+  `@google/model-viewer` while building the client bundle for *every*
+  full-profile static build, whether or not any actual page content embeds a
+  3D model. This was invisible through Phase 2's fixture proof, because that
+  proof ran with this repo's own full `node_modules`, where
+  `@google/model-viewer` is already present as an ordinary root dependency.
+  It surfaced the moment the command ran against an isolated install of the
+  *staged* package, where `EXCLUDED_DEPS` had stripped it out for the
+  extension's lite-only footprint: `astro build` failed at the client-bundle
+  stage with `Rollup failed to resolve import "@google/model-viewer"`, even
+  though the fixture content was a single plain Markdown file with no 3D
+  content at all. Fixed by removing `'@google/model-viewer'` from
+  `EXCLUDED_DEPS`. Its own `three` peer dependency (`^0.183.0`, newer than
+  this repo's own pinned `three` range) is left unpinned in the engine
+  package; npm's default peer-dependency auto-install resolves a compatible
+  `three` on its own rather than reusing this repo's older pin.
+  `EXCLUDED_DEPS`'s remaining entries (`@octokit/rest`, `adm-zip`,
+  `better-sqlite3`, `express-session`, `passport`, `passport-github`,
+  `sharp`, `three`, `xlsx`) were re-checked against `collect.js`/
+  `diagrams.js`/the static Astro page tree specifically and confirmed
+  genuinely unused by the render command's execution path (fetch/auth
+  tooling, the sqlite backend the command never selects, and
+  `sharp`/`xlsx`, neither of which is imported anywhere under `src/pages`,
+  `src/layout`, `src/components`, `src/libs`, `collect.js`, or
+  `diagrams.js`).
+- Extension VSIX size grew as a direct, expected consequence of the above:
+  bundled `engine.tgz` went from ~82 MB / 594 vendored packages (Phase 2
+  baseline, before Phase 3's own path additions) to 100.21 MB / 27,048
+  vendored dependency files after adding the Astro source tree and
+  `@google/model-viewer`+`three`. `pnpm ext:package`'s own bundled-engine
+  verification (`verifyVsixBundledEngine` in `scripts/package-extension.js`)
+  still passes: the extension's *runtime behavior* is unaffected, since its
+  lite/json SSR path only ever executes the prebuilt `dist/` bundle (already
+  built with the lite alias substituting an empty module for
+  `@google/model-viewer` at `pnpm build` time), never the newly staged Astro
+  source tree or the vendored `@google/model-viewer` package itself. This
+  matches the plan's own risk table entry ("Engine growth regresses
+  extension hydration" -> "reuse staging/package checks and inspect npm
+  tarball plus final VSIX"): growth was anticipated and is acceptable as
+  long as extension behavior doesn't regress, which this verification run
+  confirms it doesn't.
+- End-to-end proof, run twice (once before, once after the two fixes above):
+  `pnpm build` -> `node scripts/stage-engine.js` (full vendor) -> `npm pack`
+  inside `packages/md-render` -> extract the resulting tarball into a clean
+  scratch directory -> real `npm install <tarball>` there (no reuse of this
+  repo's own `node_modules` or the extension's vendored `_modules` shortcut)
+  -> `node node_modules/@microwebstacks/md-render/bin/md-render.js build
+  --workspace <fixture> --out-dir <out>` from that clean directory. First run
+  (before the fixes) failed at the astro-build stage with the
+  `MODULE_NOT_FOUND` bug above; second run (after both fixes, with a fresh
+  `npm pack`/`npm install` cycle) succeeded end to end and produced a
+  complete artifact (`index.html`, `404.html`, one directory per page,
+  `blobs/`, `_astro/` client assets, `favicon.ico`) identical in shape to
+  Phase 2's in-repo proof. Scratch install/output directories deleted after
+  inspection.
+- `pnpm ext:package` (VSIX build + its own internal bundled-engine
+  verification) and `node --test "test/**/*.test.js"` (10/10) both re-run
+  clean after every change in this phase.
+
+### Deviations from the plan
+
+- None. `EXCLUDED_DEPS`/`RUNTIME_PATHS` are `stage-engine.js` implementation
+  details, not part of the accepted OP-001 through OP-009 contract; removing
+  `@google/model-viewer` from the exclusion set is required by OP-008 itself
+  (full profile is documented to enable GLB/model-viewer rendering), not a
+  change to it.
+
+### Commands run
+
+```text
+pnpm build                                                          # SSR + dist/ (prerequisite for staging)
+node scripts/stage-engine.js                                        # full vendor, run twice (before/after fixes)
+npm pack --pack-destination <scratch>                                # inside packages/md-render, run twice
+npm install <tarball>                                                # inside a clean scratch consumer dir, run twice
+node <installed>/bin/md-render.js build --workspace <fixture> --out-dir <out>
+                                                                      # standalone proof; failed pre-fix, passed post-fix
+node scripts/package-extension.js                                   # pnpm ext:package equivalent; VSIX verified twice
+node --test "test/**/*.test.js"                                     # 10/10 pass
+node scripts/check-plans.js                                         # only the pre-existing, unrelated diagram-width-contract flag
+```
+
+### Follow-ups for later phases
+
+- Phase 4's Action should install the published engine with a plain
+  `npm install @microwebstacks/md-render@<pinned-version>` (or equivalent),
+  matching the real-consumer path this phase proved - not the extension's
+  vendored `_modules` shortcut, which is VS Code-specific.
+- Phase 5's VSIX inspection should note the new ~100 MB engine.tgz size
+  explicitly as a baseline, since it is now dominated by
+  `@google/model-viewer`+`three` (needed for the render command) rather than
+  purely lite/json runtime weight.
+- No consumer-facing dependency gap remains from this phase: unlike the
+  draft note this section replaces, `@google/model-viewer` is now vendored
+  unconditionally, so full-profile static builds no longer fail regardless
+  of whether content embeds a 3D model.

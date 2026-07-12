@@ -6,7 +6,8 @@
 // Contract: specification/reusable-render/spec.md. Fixed for this command:
 // output=static, DOCS_BACKEND=json, DOCS_PROFILE=full.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -160,6 +161,21 @@ function assertContentPresent(contentPath) {
   }
 }
 
+// A real `npm install` of the published package hoists its dependencies
+// (e.g. astro) to the *consumer's* top-level node_modules rather than
+// nesting them under the package's own node_modules - only the VS Code
+// extension's vendored/renamed _modules tree happens to keep everything
+// nested. Resolving through Node's own module resolution (starting from
+// this file's location, which walks up every ancestor node_modules) finds
+// astro correctly either way, instead of assuming a fixed nested path.
+const requireFromHere = createRequire(import.meta.url);
+function resolveAstroBin() {
+  const astroPkgPath = requireFromHere.resolve('astro/package.json');
+  const astroPkg = JSON.parse(readFileSync(astroPkgPath, 'utf8'));
+  const binRelPath = typeof astroPkg.bin === 'string' ? astroPkg.bin : astroPkg.bin.astro;
+  return path.join(path.dirname(astroPkgPath), binRelPath);
+}
+
 // The three stages a real build runs, as injectable steps so tests can
 // substitute fast fakes without spawning collect/diagrams/astro for real.
 // Each receives the resolved {engineRoot, env} and throws BuildError on
@@ -182,7 +198,7 @@ const defaultBuildSteps = [
   {
     name: 'astro-build',
     run: ({ engineRoot, env }) => {
-      const astroBin = path.join(engineRoot, 'node_modules', 'astro', 'astro.js');
+      const astroBin = resolveAstroBin();
       // Astro resolves --config as `path.join(root, configFile)`, so this must
       // stay a bare filename (relative to --root), not an absolute path.
       runStreamed(

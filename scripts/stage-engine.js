@@ -35,12 +35,44 @@ const PACKAGE_NAME = '@microwebstacks/md-render';
 // node_modules and then renamed to this name before packing; the extension's
 // installer renames it back after extracting (see extension.js installEngine).
 const VENDOR_DIR_NAME = '_modules';
-// Runtime files the lite engine needs to collect, render, and serve docs.
-const RUNTIME_PATHS = ['config.js', 'server', 'scripts', 'src/libs', 'src/assets', 'dist'];
-// Dependencies that only matter to full-site, fetch/auth, native, or heavy
-// client paths. The VS Code engine runs DOCS_PROFILE=lite + DOCS_BACKEND=json.
+// Runtime files the lite engine needs to collect, render, and serve docs,
+// plus (bin, public, src/pages, src/layout, src/components, the two static
+// astro configs, tsconfig.json) what `md-render build` needs to run a fresh
+// `astro build` against a consumer's own content from the published package
+// (specification/reusable-render/spec.md). astro.config.mjs (the Node-adapter
+// SSR config) is deliberately not staged: the extension only ever runs
+// prebuilt `dist/`, and the render command is fixed to output=static.
+const RUNTIME_PATHS = [
+  'config.js',
+  'server',
+  'scripts',
+  'bin',
+  'src/libs',
+  'src/assets',
+  'src/pages',
+  'src/layout',
+  'src/components',
+  'public',
+  'astro.config.shared.mjs',
+  'astro.config.static.mjs',
+  'tsconfig.json',
+  'dist'
+];
+// Dependencies that only matter to full-site fetch/auth or native paths that
+// neither the extension (DOCS_PROFILE=lite + DOCS_BACKEND=json) nor the
+// render command (DOCS_PROFILE=full + DOCS_BACKEND=json, per OP-008) exercise
+// at collect/diagrams/astro-build time.
+//
+// '@google/model-viewer' is NOT in this set, even though the extension never
+// uses it: Link.astro/Code.astro import ModelViewer(Code).astro
+// unconditionally, so Vite's client-script bundling pulls in
+// '@google/model-viewer' for *every* full-profile static build regardless of
+// whether any actual content embeds a 3D model - it is not an optional,
+// content-gated dependency like the ones below. Its own `three` peer
+// dependency is left out of our declared deps (npm's default peer-dep
+// auto-install resolves a compatible version on demand) rather than pinned
+// here, since our own `three` range is older than what model-viewer expects.
 const EXCLUDED_DEPS = new Set([
-  '@google/model-viewer',
   '@octokit/rest',
   'adm-zip',
   'better-sqlite3',
@@ -165,6 +197,7 @@ async function main() {
     private: false,
     license: rootPkg.license ?? 'UNLICENSED',
     files: stagedFiles,
+    bin: {'md-render': 'bin/md-render.js'},
     dependencies,
     engines: {node: '>=22'},
     // Tells the VS Code extension's installer (extension.js installEngine)

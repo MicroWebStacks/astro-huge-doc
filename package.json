@@ -34,6 +34,7 @@
     "@google/model-viewer": "^4.1.0",
     "@octokit/rest": "^21.0.2",
     "@plantuml/core": "^1.2026.6",
+    "@rollup/plugin-yaml": "^4.1.2",
     "@svgdotjs/svg.js": "^3.2.4",
     "@tanstack/react-table": "^8.13.0",
     "adm-zip": "^0.5.16",
@@ -72,7 +73,6 @@
     "pnpm": ">=8.0.0"
   },
   "devDependencies": {
-    "@rollup/plugin-yaml": "^4.1.2",
     "playwright": "^1.61.1"
   }
 }
