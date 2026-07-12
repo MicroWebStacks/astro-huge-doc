@@ -1,23 +1,53 @@
-# About
-Scale doc up to huge amounts, virtually no more limits. Parses multi markdown repos and manages them as db content for cached rendering.
+# astro-huge-doc
 
-True content based ISR (Incremental Static Regenration) with cache warmup.
+**Markdown in, documentation site out — at any scale, anywhere you need it.**
 
-# Profiles: lite vs full
+`astro-huge-doc` is the MicroWebStacks rendering engine that turns one or many
+Markdown repositories into a polished documentation website: code highlighting,
+Mermaid / PlantUML diagrams, image galleries, sortable tables, math, file-tree
+navigation and per-page TOC — with virtually no limit on content size. Content
+is parsed once into a database and rendered from there, so tens of thousands of
+pages behave like ten.
 
-One codebase serves two profiles without forking, selected at runtime:
+The same engine runs in four very different homes:
 
-- **full** — the standalone website / warehouse. SQLite backend, versioning,
-  blob store, image optimization, GitHub fetch.
-- **lite** — the engine shipped inside the VS Code extension. JSON data backend,
-  no native dependencies, with Mermaid and PlantUML rendered in the browser.
-
-| Switch | full | lite |
+| Where | What you get | Needs a server? |
 |---|---|---|
-| `DOCS_PROFILE` | `full` | `lite` |
-| `DOCS_BACKEND` | `sqlite` | `json` |
+| 🧩 **VS Code extension** | Live preview of your workspace docs, pages rendered on demand as you browse — no Node, Java or Docker install required | No |
+| ⚙️ **GitHub Action** | A static site built in CI, ready to deploy straight to GitHub Pages | No |
+| 🖥️ **Local / self-hosted Node** | An SSR server that renders and streams pages on demand, with multi-level caching and content-aware ETags | Yes |
+| 📦 **Static build** | A fully pre-rendered website you can host anywhere plain files go | No |
 
-## Feature coverage
+```mermaid
+flowchart LR
+    A[Markdown repos<br/>local folders or GitHub] --> B[astro-huge-doc<br/>engine]
+    B --> C[🧩 VS Code extension<br/>on-demand preview]
+    B --> D[⚙️ GitHub Action<br/>static site on Pages]
+    B --> E[🖥️ Node SSR server<br/>render + cache on demand]
+    B --> F[📦 Static export<br/>host anywhere]
+```
+
+## SSR and static — pick per deployment, not per project
+
+- **SSR** renders each page the moment it is requested, then caches it — true
+  content-based ISR (Incremental Static Regeneration) with cache warmup. This
+  is what makes the VS Code extension feel instant even on huge repositories:
+  nothing is built up front, pages are rendered lightweight and on demand.
+- **Static** pre-renders the entire site into plain files. Push them to GitHub
+  Pages (or any static host) and you have a complete documentation website with
+  no dedicated server running anywhere.
+
+## Lite and full — one codebase, two profiles
+
+| Profile | Backend | Built for |
+|---|---|---|
+| **lite** | JSON files | Running inside the VS Code extension: zero native dependencies, Mermaid and PlantUML rendered in the browser |
+| **full** | SQLite | Scaling to huge websites: versioning, blob store, image optimization, GitHub fetch |
+
+Same code, no fork — a runtime switch selects the profile. Everything about
+*rendering* is shared; the full profile adds *generation and storage* on top.
+
+# Feature coverage
 
 | Capability | Full (website) | Lite (extension engine) | Mechanism |
 |---|---|---|---|
@@ -39,7 +69,6 @@ One codebase serves two profiles without forking, selected at runtime:
 **Dropped from both profiles:** Dataset SQL (duckdb) and Plotly charts, plus the
 MUI and Mantine UI kits that rode on them. May return later as full-only features.
 
-Principle: **lite = render what's on disk; full = generate, store, optimize.**
 Anything that is *generation* (collect, xlsx) is full-only; *rendering* is shared.
 The lite build loads no native dependencies: data comes from a `content.json`
 export plus a `blobs/` folder, images use Astro's passthrough image service, and
@@ -328,6 +357,26 @@ pnpm dev
     - `external_storage_kb` : threshold to manage blobs in folders and not in db
     - `inline_compression_kb` : threshold above which db blobs get compressed
 - Run `pnpm collect` to parse the `content` directory Markdown and referenced assets and store them in `dataset/content.db`
+
+## GitHub Action
+
+The repository root doubles as a composite GitHub Action that renders a
+consumer's Markdown workspace into a static site artifact, ready for
+`actions/upload-pages-artifact` + `actions/deploy-pages`:
+
+```yaml
+- name: Render static site
+  uses: MicroWebStacks/astro-huge-doc@<pinned-tag-or-sha>
+  with:
+    engine-version: '<exact @microwebstacks/md-render version>'
+    workspace: '.'
+    out-dir: 'dist'
+    base: '/my-repo/'
+```
+
+See [action.yml](action.yml) for all inputs and
+[.github/workflows/render-example.yml](.github/workflows/render-example.yml)
+for a complete reference workflow including the Pages deploy jobs.
 
 ## VS Code desktop extension
 
