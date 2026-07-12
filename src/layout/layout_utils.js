@@ -1,4 +1,6 @@
 import {getDocuments, getSourceEntries} from '@/libs/structure-db.js';
+import {basePrefix} from '@/libs/blob-files.js';
+import {config} from '../../config.js';
 
 function cloneHeading(heading) {
     const label = (heading.label ?? heading.body_text ?? '').trim();
@@ -77,10 +79,30 @@ function process_toc_list(headings) {
     return {items: tree, visible: true};
 }
 
+// Strips the deployment base prefix so section/active-link resolution always
+// works against the doc-relative path, whether it came from Astro.url.pathname
+// (which includes `base` under a static base-path deployment) or from a link
+// this module built itself with buildDocLink (also base-prefixed).
+function stripBase(pathname) {
+    const trimmedBase = String(config.base ?? '/').replace(/^\/+|\/+$/g, '');
+    if (!trimmedBase) {
+        return pathname;
+    }
+    const prefix = `/${trimmedBase}`;
+    if (pathname === prefix) {
+        return '/';
+    }
+    if (pathname.startsWith(`${prefix}/`)) {
+        return pathname.slice(prefix.length);
+    }
+    return pathname;
+}
+
 function normalizePath(pathname) {
     const raw = typeof pathname === 'string' ? pathname : '/';
     const withLeading = raw.startsWith('/') ? raw : `/${raw}`;
-    const cleaned = withLeading.replace(/\/{2,}/g, '/');
+    const withoutBase = stripBase(withLeading);
+    const cleaned = withoutBase.replace(/\/{2,}/g, '/');
     if (cleaned.length > 1 && cleaned.endsWith('/')) {
         return cleaned.slice(0, -1);
     }
@@ -93,11 +115,8 @@ function docUrlFromPathname(pathname) {
 }
 
 function buildDocLink(url) {
-    if (!url) {
-        return '/';
-    }
-    const cleaned = String(url).replace(/^\/+|\/+$/g, '');
-    return `/${cleaned}`;
+    const cleaned = url ? String(url).replace(/^\/+|\/+$/g, '') : '';
+    return `${basePrefix(config.base)}/${cleaned}`;
 }
 
 function labelFromUrl(url) {
@@ -181,7 +200,7 @@ function buildAppBarMenuFromDocs(docs, pathname) {
     const items = [];
     for (const [section, doc] of sectionMap) {
         const isHome = section === 'home';
-        const link = isHome ? '/' : buildDocLink(doc.url);
+        const link = isHome ? buildDocLink('') : buildDocLink(doc.url);
         items.push({
             label: isHome ? homeLabel(doc) : (doc.title ?? labelFromUrl(doc.url)),
             link,

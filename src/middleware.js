@@ -3,10 +3,9 @@ import {readFile, stat} from 'node:fs/promises';
 import {basename, join} from 'node:path';
 import {config} from '../config.js';
 import {file_mime} from './libs/utils.js';
+import {resolveBlobsSourceDir} from './libs/blob-files.js';
 
-const blobsDir = config.dataBackend === 'json'
-    ? join(config.collect.json_dir, 'blobs')
-    : join(config.collect.outdir, 'blobs');
+const blobsDir = resolveBlobsSourceDir(config);
 
 function safeBlobName(pathname) {
     let name;

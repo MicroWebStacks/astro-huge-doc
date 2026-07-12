@@ -670,7 +670,7 @@ function getAssetUrl(assetUid, versionId = null) {
         return db.prepare(sql).get(...params);
     };
     const row = fetchRow(versionId) ?? (versionId ? fetchRow(null) : null);
-    return blobFileUrl(row?.hash, row?.ext);
+    return blobFileUrl(row?.hash, row?.ext, config.base);
 }
 
 export {

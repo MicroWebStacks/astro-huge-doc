@@ -1,8 +1,18 @@
 ---
 import Layout from "@/layout/Layout.astro"
 import AstroMarkdown from '@/components/markdown/AstroMarkdown.astro'
-import { getEntry} from '@/libs/structure-db.js'
+import { getEntry, getDocuments } from '@/libs/structure-db.js'
 import NotFound from './404.astro'
+
+// Astro only calls this when output is "static" (astro.config.static.mjs);
+// under output "server" (astro.config.mjs) routes stay on-demand and this is
+// never invoked, so SSR behavior is unchanged. url:"" is index.astro's route,
+// not this catch-all's, so it is excluded here to avoid a duplicate route.
+export async function getStaticPaths() {
+    return getDocuments()
+        .filter((doc) => doc.url)
+        .map((doc) => ({params: {url: doc.url}}));
+}
 
 let {url} = Astro.params;
 url = url ?? "";

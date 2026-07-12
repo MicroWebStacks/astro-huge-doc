@@ -1,3 +1,5 @@
+import {join} from 'node:path';
+
 function normalizeBlobExt(ext) {
     const value = String(ext ?? '').trim().toLowerCase();
     if (!value) {
@@ -19,11 +21,26 @@ function blobFileName(hash, ext) {
     return normalized ? `${visibleHash}.${normalized}` : visibleHash;
 }
 
-function blobFileUrl(hash, ext) {
+// `base` is the deployment path prefix (e.g. "/docs/" for a GitHub Pages
+// project site). Root deployments pass '/' or omit it, which is a no-op.
+function basePrefix(base) {
+    const trimmed = String(base ?? '/').replace(/^\/+|\/+$/g, '');
+    return trimmed ? `/${trimmed}` : '';
+}
+
+function blobFileUrl(hash, ext, base = '/') {
     if (!hash) {
         return null;
     }
-    return `/blobs/${blobFileName(hash, ext)}`;
+    return `${basePrefix(base)}/blobs/${blobFileName(hash, ext)}`;
+}
+
+// Source directory for on-disk blobs, shared by the SSR blob middleware and
+// the static build's blob-copy step so both agree on where blobs live.
+function resolveBlobsSourceDir(config) {
+    return config.dataBackend === 'json'
+        ? join(config.collect.json_dir, 'blobs')
+        : join(config.collect.outdir, 'blobs');
 }
 
 export {
@@ -31,5 +48,7 @@ export {
     normalizeBlobExt,
     shortenBlobHash,
     blobFileName,
-    blobFileUrl
+    blobFileUrl,
+    basePrefix,
+    resolveBlobsSourceDir
 };

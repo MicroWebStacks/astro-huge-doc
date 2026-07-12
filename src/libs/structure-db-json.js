@@ -296,7 +296,7 @@ function getAssetUrl(assetUid, versionId = null) {
         ?? indexes.assetInfoByUid.get(assetUid)?.[0]
         ?? null;
     const blob = indexes.blobByUid?.get(String(assetRow.blob_uid));
-    return blobFileUrl(blob?.hash, assetInfo?.ext);
+    return blobFileUrl(blob?.hash, assetInfo?.ext, config.base);
 }
 
 /* Mark each heading whose section directly contains a table, code block, or

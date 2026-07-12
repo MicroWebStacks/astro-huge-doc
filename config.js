@@ -153,6 +153,15 @@ const manifest = await loadManifest(manifestPath);
 // surfaced here too for introspection and so manifest/defaults stay discoverable.
 const docsProfile = (process.env.DOCS_PROFILE ?? 'full').trim().toLowerCase();
 const docsBackend = (process.env.DOCS_BACKEND ?? (docsProfile === 'lite' ? 'json' : 'sqlite')).trim().toLowerCase();
+// DOCS_OUTPUT: 'server' (default, Node-adapter SSR) | 'static' (true Astro
+// static build, no adapter). Selected by astro.config.static.mjs via env so
+// page frontmatter (getStaticPaths gating) and config.js agree without each
+// static/server Astro config duplicating the decision.
+const docsOutput = (process.env.DOCS_OUTPUT ?? 'server').trim().toLowerCase();
+// Static-only deployment path prefix/canonical origin (e.g. a GitHub Pages
+// project site at "/repo-name/"). SSR ignores these; it always serves at root.
+const site = process.env.MICROWEBSTACKS_SITE || undefined;
+const base = process.env.MICROWEBSTACKS_BASE || '/';
 
 const krokiServer = process.env.MICROWEBSTACKS_KROKI_SERVER
     ?? manifest.diagram.renderers.kroki?.server
@@ -187,6 +196,9 @@ const serverProtocol = process.env.MICROWEBSTACKS_PROTOCOL ?? manifest.server.pr
 const config = {
     profile: docsProfile,
     dataBackend: docsBackend,
+    output: docsOutput,
+    site,
+    base,
     rootdir: engineRoot,
     workspaceRoot,
     manifestPath,
