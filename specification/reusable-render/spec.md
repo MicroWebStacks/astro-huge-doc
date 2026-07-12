@@ -126,6 +126,51 @@ shape above matches the provisional design as-written, no changes needed.
   `invalid_configuration` on older runtimes rather than failing obscurely
   partway through a stage.
 
+## GitHub Action contract
+
+Implemented in the repository-root `action.yml` (Phase 4): a thin composite
+Action, colocated with the engine per OP-003 while it remains a wrapper.
+
+```text
+uses: MicroWebStacks/astro-huge-doc@<pinned-tag-or-sha>
+with:
+  engine-version: <exact @microwebstacks/md-render version>   # required, no default
+  node-version: '22'                                          # optional, must be >=22
+  workspace: '.'                                               # optional
+  out-dir: 'dist'                                               # optional
+  manifest: ''                                                  # optional
+  site: ''                                                      # optional
+  base: ''                                                      # optional
+outputs:
+  artifact-path     # absolute path to the artifact md-render build wrote
+  engine-version     # echoes the pinned input, for downstream logging
+```
+
+- `engine-version` has no default. Every published `@microwebstacks/md-render`
+  version before this packet's Phase 3 lacks `bin/md-render.js`; defaulting to
+  one of them would look reasonable and fail obscurely. Consumers pin an exact
+  version; the install step itself fails clearly
+  (`has no bin/md-render.js (engine too old for this Action)`) if a pinned
+  version predates the command.
+- The Action installs the pinned engine with a plain, isolated
+  `npm install --prefix "$RUNNER_TEMP/md-render-engine" @microwebstacks/md-render@<version>`
+  — the same install path a real npm consumer uses (proved in Phase 3), not
+  the VS Code extension's vendored/renamed `_modules` shortcut. It never
+  touches the consumer's own `node_modules` or lockfile.
+- `node-version` must resolve to Node 22+; the Action checks the input's major
+  version itself before installing Node, and fails with a clear
+  `::error::` message on an older or non-numeric value, rather than letting
+  Node/npm fail obscurely partway through the install or build step.
+- The Action calls only the public `md-render build` command (via the
+  installed package's `bin` entry) and exposes `artifact-path`; it holds no
+  `permissions:`, does not check out the consumer's repository, and does not
+  upload or deploy anything. Those steps belong to the consumer's own
+  workflow (see the example below and OP-006).
+- `.github/workflows/render-example.yml` is a `workflow_dispatch`-only
+  reference example (checkout, this Action, `actions/upload-pages-artifact`,
+  `actions/deploy-pages`) showing the intended consumer shape; it is not
+  wired to run automatically and does not deploy this repository's own site.
+
 ## Ownership boundaries
 
 | Surface | Owns | Must not own |

@@ -1,0 +1,118 @@
+name: 'MicroWebStacks md-render'
+description: >-
+  Thin wrapper around the @microwebstacks/md-render engine's public "build"
+  command. Renders a consumer's Markdown workspace into a static site
+  artifact (output=static, backend=json, profile=full). Owns only Node
+  setup, engine install, command invocation, and output exposure -- no
+  rendering, checkout, upload, or Pages deployment logic. See
+  specification/reusable-render/spec.md for the full contract.
+author: 'MicroWebStacks'
+
+inputs:
+  engine-version:
+    description: >-
+      Exact @microwebstacks/md-render version to install (no range). Pin
+      this alongside the Action's own release tag/SHA for reproducible
+      builds; there is no default so a build can never silently pick up an
+      unintended engine version.
+    required: true
+  node-version:
+    description: 'Node.js major version to run the engine with. Must be 22 or later.'
+    required: false
+    default: '22'
+  workspace:
+    description: >-
+      Path to the consumer content workspace, passed through to
+      "md-render build --workspace".
+    required: false
+    default: '.'
+  out-dir:
+    description: >-
+      Path to write the static artifact to, passed through to
+      "md-render build --out-dir".
+    required: false
+    default: 'dist'
+  manifest:
+    description: >-
+      Optional path to a render manifest, passed through to
+      "md-render build --manifest".
+    required: false
+    default: ''
+  site:
+    description: >-
+      Optional absolute canonical site URL, passed through to
+      "md-render build --site".
+    required: false
+    default: ''
+  base:
+    description: >-
+      Optional repository base path (e.g. /my-repo/), passed through to
+      "md-render build --base".
+    required: false
+    default: ''
+
+outputs:
+  artifact-path:
+    description: 'Absolute path to the static artifact produced by md-render build.'
+    value: ${{ steps.build.outputs.artifact-path }}
+  engine-version:
+    description: 'The exact @microwebstacks/md-render version that was installed.'
+    value: ${{ inputs.engine-version }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check requested Node major version
+      shell: bash
+      run: |
+        set -euo pipefail
+        major="${{ inputs.node-version }}"
+        if ! [[ "$major" =~ ^[0-9]+$ ]] || [ "$major" -lt 22 ]; then
+          echo "::error::md-render action requires node-version 22 or later (got '${major}')."
+          exit 1
+        fi
+
+    - name: Set up Node.js ${{ inputs.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Install @microwebstacks/md-render@${{ inputs.engine-version }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        engine_dir="${RUNNER_TEMP}/md-render-engine"
+        mkdir -p "$engine_dir"
+        # No --omit=optional: astro build runs Rollup/esbuild, which resolve
+        # their native binaries through platform-specific optional
+        # dependencies (e.g. @rollup/rollup-<platform>) - omitting optional
+        # deps here breaks the build step with a Rollup MODULE_NOT_FOUND,
+        # unlike the VS Code extension's vendoring, which never runs a real
+        # Vite/Rollup build against the vendored tree.
+        npm install --prefix "$engine_dir" --omit=dev --no-audit --no-fund \
+          "@microwebstacks/md-render@${{ inputs.engine-version }}"
+        engine_bin="$engine_dir/node_modules/@microwebstacks/md-render/bin/md-render.js"
+        if [ ! -f "$engine_bin" ]; then
+          echo "::error::@microwebstacks/md-render@${{ inputs.engine-version }} has no bin/md-render.js (engine too old for this Action)."
+          exit 1
+        fi
+        echo "ENGINE_BIN=$engine_bin" >> "$GITHUB_ENV"
+
+    - name: Print Action and engine versions
+      shell: bash
+      run: |
+        echo "md-render action: engine @microwebstacks/md-render@${{ inputs.engine-version }}, node $(node --version)"
+
+    - name: Run md-render build
+      id: build
+      shell: bash
+      run: |
+        set -euo pipefail
+        args=(build --workspace "${{ inputs.workspace }}" --out-dir "${{ inputs.out-dir }}")
+        if [ -n "${{ inputs.manifest }}" ]; then args+=(--manifest "${{ inputs.manifest }}"); fi
+        if [ -n "${{ inputs.site }}" ]; then args+=(--site "${{ inputs.site }}"); fi
+        if [ -n "${{ inputs.base }}" ]; then args+=(--base "${{ inputs.base }}"); fi
+        node "$ENGINE_BIN" "${args[@]}"
+        mkdir -p "${{ inputs.out-dir }}"
+        out_dir_abs="$(cd "${{ inputs.out-dir }}" && pwd)"
+        echo "artifact-path=$out_dir_abs" >> "$GITHUB_OUTPUT"

@@ -1,0 +1,72 @@
+# Reference example for a consumer repository (see
+# specification/reusable-render/spec.md and
+# plans/2026-07/12-reusable-render-action/plan.md, Phase 4).
+#
+# Manual-only (workflow_dispatch): this file documents the intended
+# integration shape, it is not wired to run on push/PR and does not deploy
+# anything on its own. A real consumer (e.g. vectormind.github.io) copies
+# this shape and:
+#   - replaces `uses: ./` with a pinned remote reference, e.g.
+#     `uses: MicroWebStacks/astro-huge-doc@v0.1.0` or a pinned commit SHA;
+#   - sets `workspace`/`out-dir`/`site`/`base` for its own content and Pages
+#     project (root vs. repository-subpath site);
+#   - pins `engine-version` to an exact @microwebstacks/md-render release.
+#
+# This Action (action.yml) only installs the pinned engine and runs
+# `md-render build`; it does not check out content, upload artifacts, or
+# deploy. Those steps stay in the consumer's own workflow, as shown below.
+name: Render example (reference only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: 'Repository base path for this run, e.g. /astro-huge-doc/'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Render static site
+        id: render
+        uses: ./
+        with:
+          # Pin to an exact published @microwebstacks/md-render version that
+          # includes the "build" command (bin/md-render.js) - versions
+          # published before this packet's Phase 3 do not. There is no
+          # engine-version default in action.yml on purpose (see its
+          # description), so this placeholder must be replaced before the
+          # workflow can actually run.
+          engine-version: 'REPLACE_WITH_PINNED_ENGINE_VERSION'
+          workspace: '.'
+          out-dir: 'dist'
+          base: ${{ inputs.base }}
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ steps.render.outputs.artifact-path }}
+
+  deploy:
+    needs: render
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

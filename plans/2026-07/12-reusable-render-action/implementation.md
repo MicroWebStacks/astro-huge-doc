@@ -3,7 +3,7 @@
 ## Progress
 
 ```text
-[###--] Phase 3/5 - package/extension isolation done; thin Action (Phase 4) next.
+[####-] Phase 4/5 - thin Action done; validation and handoff (Phase 5) next.
 ```
 
 ## Phase 1 - static contract and route proof
@@ -364,3 +364,154 @@ node scripts/check-plans.js                                         # only the p
   draft note this section replaces, `@google/model-viewer` is now vendored
   unconditionally, so full-profile static builds no longer fail regardless
   of whether content embeds a 3D model.
+
+## Phase 4 - thin Action
+
+### Files changed
+
+- `action.yml` (new, repo root) - thin composite Action per OP-003. Inputs:
+  `engine-version` (required, no default - see Implementation facts),
+  `node-version` (default `'22'`), `workspace` (default `'.'`), `out-dir`
+  (default `'dist'`), `manifest`/`site`/`base` (optional). Outputs:
+  `artifact-path`, `engine-version`. Four steps: (1) validate
+  `node-version` is numeric and >=22, failing with `::error::` otherwise;
+  (2) `actions/setup-node@v4` with that version; (3) install the pinned
+  engine into an isolated `"$RUNNER_TEMP/md-render-engine"` prefix and
+  verify `bin/md-render.js` exists post-install; (4) print engine/node
+  versions, then run `md-render build` with the mapped inputs and write
+  `artifact-path` to `$GITHUB_OUTPUT`. No `permissions:`, no checkout, no
+  upload/deploy step.
+- `.github/workflows/render-example.yml` (new) - `workflow_dispatch`-only
+  reference workflow: `actions/checkout@v4` -> this Action (`uses: ./`,
+  `engine-version` left as an explicit `REPLACE_WITH_PINNED_ENGINE_VERSION`
+  placeholder) -> `actions/upload-pages-artifact@v3` (using the Action's
+  `artifact-path` output) -> `actions/deploy-pages@v4` in a second job with
+  `pages`/`id-token` permissions and a `github-pages` environment. Not
+  wired to run on push/PR; does not deploy this repository's own site.
+- `specification/reusable-render/spec.md` - added a "GitHub Action
+  contract" section documenting `action.yml`'s inputs/outputs, the
+  no-default rationale for `engine-version`, the isolated-prefix install
+  path, the Node-version gate, and the ownership split with the example
+  workflow, before this section existed anywhere else.
+
+### Implementation facts
+
+- **`engine-version` has no default, unlike OP-004's provisional phrasing
+  ("defaulted to the version tested with the Action release").** Checked
+  the npm registry directly (`npm view @microwebstacks/md-render versions
+  --json`): versions `0.0.1`-`0.0.9` are already published, all predating
+  this packet's Phase 3 `bin/` addition - none of them contain the `build`
+  command at all. Defaulting to any of them would look reasonable in
+  `action.yml` and fail obscurely the first time anyone actually used the
+  default. Since this phase does not publish, tag, or release anything (a
+  stated non-goal), there is no real "version tested with this Action
+  release" yet to default to. Made `engine-version` `required: true` with
+  no default instead - GitHub Actions itself fails the step immediately
+  with "Input required and not supplied" if a caller omits it, which is a
+  clearer failure than a silently-wrong default. Recorded as a deviation
+  below; a future Action release process can add a default once a real
+  tagged release has a matching validated engine version.
+- **`--omit=optional` breaks the build step - found by actually running the
+  Action's install command, not assumed from Phase 3.** First proof attempt
+  copied the exact flags `scripts/stage-engine.js`'s `vendorDependencies`
+  uses (`--omit=dev --omit=optional`) into `action.yml`'s install step, on
+  the assumption that "install the engine's dependencies" is the same
+  operation in both places. It is not: the extension's vendored tree is
+  only ever used to run prebuilt `dist/` (no Vite/Rollup build ever runs
+  against it), but the render command's `astro-build` step runs a real
+  `astro build`, which invokes Rollup and esbuild - both of which resolve
+  their native binaries (e.g. `@rollup/rollup-win32-x64-msvc`) through
+  npm's optional-dependency mechanism. `npm install --omit=optional`
+  silently produced a 608-package install with no Rollup native binary,
+  and `astro build` failed with `Cannot find module
+  '@rollup/rollup-win32-x64-msvc'` (a recognized npm optional-deps
+  footgun, npm/cli#4828) - reproducing exactly on a packed-tarball install
+  what a real Action run would hit. Fixed by dropping `--omit=optional`
+  from `action.yml` (kept `--omit=dev`, which is inert since the staged
+  package.json has no `devDependencies` but documents intent); a second
+  install of the same tarball added 663 packages (55 more than the broken
+  install) and the subsequent build succeeded.
+- **Composite-action steps were proved by literally running their `run:`
+  bodies, not by re-deriving equivalent commands.** No `act` (nektos/act)
+  binary was available locally, and this phase's non-goals forbid
+  publishing/tagging/pushing to actually trigger a real Actions run.
+  Instead, each `run:` block in `action.yml` was executed locally exactly
+  as written, with only the package spec swapped from
+  `@microwebstacks/md-render@<version>` (registry) to the Phase 3-staged
+  package's own `npm pack` tarball path - a legitimate, interchangeable
+  npm package-spec form, not a different code path. Sequence: `npm pack`
+  inside `packages/md-render` -> `npm install --prefix
+  "<scratch>/md-render-engine" --omit=dev --no-audit --no-fund
+  <tarball>` (the install step's exact command) -> `node
+  "<prefix>/node_modules/@microwebstacks/md-render/bin/md-render.js"
+  build --workspace <fixture> --out-dir <out>` (the build step's exact
+  invocation shape) against a two-page scratch fixture
+  (`content/index.md`, `content/other.md`). Produced `index.html`,
+  `404.html`, one directory per page (`other-page/`,
+  `phase-4-fixture-home/`), `blobs/`, `_astro/` client assets, and
+  `favicon.ico` - the same artifact shape Phase 2 and Phase 3 already
+  proved from the direct command, confirming the Action's install+build
+  steps are not a second, divergent path to the same result.
+- A `--base` proof run (still via the tarball-install engine) showed every
+  link in the output consistently prefixed with the passed base value, but
+  the value itself arrived at Node as `/C:/Program Files/Git/demo-base/`
+  instead of `/demo-base/` - Git Bash's MSYS layer rewrites any
+  leading-slash CLI argument into a Windows path before the child process
+  ever sees it, independent of this repository's code. A follow-up attempt
+  with `MSYS_NO_PATHCONV=1` fixed the argument but then mis-rewrote the
+  engine bin's own already-Windows-style path instead, since that variable
+  disables path conversion for the whole command line, not selectively.
+  Confirmed by reading `src/libs/render-build.js`: `--base` is plumbed
+  straight into `MICROWEBSTACKS_BASE`, the same env var Phase 1 already
+  proved end-to-end (blob links, favicon, nav/section links, active-link
+  highlighting) - the CLI flag is not a separate code path, so Phase 1's
+  proof already covers the logic this run exercised. Recorded as a known
+  Windows-Git-Bash test-harness limitation, not a product gap; a real
+  Actions runner's `bash` has no such argv rewriting.
+- `node --test "test/**/*.test.js"` (10/10) and `node scripts/check-plans.js`
+  (only the pre-existing, unrelated `2026-07-12-diagram-width-contract`
+  flag) both re-run clean after this phase's changes.
+
+### Deviations from the plan
+
+- `engine-version` has no default, where OP-004's provisional text
+  describes one. See Implementation facts: nothing publishable exists yet
+  to default to, and a required input with a clear platform-level failure
+  is safer than a default guaranteed to be wrong today. This does not
+  reopen OP-004 - "install an exact engine version" and "print both
+  versions" are both implemented as accepted; only the specific default
+  value is deferred to a real release process.
+
+### Commands run
+
+```text
+npm view @microwebstacks/md-render versions --json                  # confirmed 0.0.1-0.0.9 published, all pre-bin/
+node scripts/stage-engine.js                                        # reused Phase 3's already-current staging (no source diff)
+npm pack --pack-destination <scratch>                                # inside packages/md-render
+npm install --prefix <scratch>/md-render-engine --omit=dev --omit=optional --no-audit --no-fund <tarball>
+                                                                      # action.yml's original install step; 608 packages
+node <engine>/bin/md-render.js build --workspace <fixture> --out-dir <out> --base /demo-base/
+                                                                      # failed: Rollup native binary MODULE_NOT_FOUND
+npm install --prefix <scratch>/md-render-engine2 --omit=dev --no-audit --no-fund <tarball>
+                                                                      # fixed install step; 663 packages
+node <engine2>/bin/md-render.js build --workspace <fixture> --out-dir <out>
+                                                                      # passed; full artifact produced
+node --test "test/**/*.test.js"                                     # 10/10 pass
+node scripts/check-plans.js                                         # only the pre-existing, unrelated diagram-width-contract flag
+```
+
+Scratch fixture/pack/install/output directories were removed after
+inspection; not committed.
+
+### Follow-ups for later phases
+
+- Phase 5's Action-vs-direct-command comparison should reuse this phase's
+  fixture-and-tarball technique (no `act`, no registry publish) unless a
+  real tagged Action release becomes available by then.
+- Once a real Action release is cut and a matching engine version is
+  published, revisit whether `engine-version` should gain a default
+  pointing at that release's validated engine version (see Deviations).
+- Phase 5's subpath browser check (already flagged as outstanding since
+  Phase 1) should run on Linux or otherwise avoid Windows Git Bash's argv
+  path-rewriting, so `--base`/`--site` values aren't incidentally mangled
+  the way this phase's local proof was.
