@@ -96,25 +96,35 @@ SSR always serves at root; base-path/site support only applies to
   `config.base` away from `/`. Should SSR ever need a non-root base, this
   middleware would need the same treatment `blobFileUrl` already has.
 
-## Command contract (provisional shape, refined during Phase 2)
+## Command contract
 
 ```text
 md-render build --workspace <path> --out-dir <path> \
   [--manifest <path>] [--site <absolute-url>] [--base <path>]
 ```
 
+Implemented in `bin/md-render.js` / `src/libs/render-build.js` (Phase 2); the
+shape above matches the provisional design as-written, no changes needed.
+
 - Arguments are the public API. Environment variables (`MICROWEBSTACKS_*`,
   `DOCS_*`) remain an internal compatibility layer for the existing
   configuration loader; command arguments take precedence over a consumer
-  repository's own `.env`.
+  repository's own `.env` via `MICROWEBSTACKS_DOTENV_OVERRIDE=false`
+  (`src/libs/load-env.js`), which the command always sets.
 - Fixed for this contract: `output=static`, `DOCS_BACKEND=json`,
   `DOCS_PROFILE=full`. The command does not expose `lite` or `server` as
   Action-facing options.
-- Stable failure categories (exact messages/exit codes defined in Phase 2):
-  invalid configuration, missing content, collection failure, diagram-render
-  failure, build/export failure, unsafe output path.
-- Isolated output/store directories; incomplete output is cleaned up on
-  failure without touching consumer source.
+- Stable failure categories, each a `BuildError.category` and printed as
+  `md-render build: <category>: <message>`: `invalid_configuration`,
+  `missing_content`, `collection_failed`, `diagram_failed`, `build_failed`,
+  `unsafe_output_path`.
+- Isolated output/store directories (a fresh `mkdtemp` build root per
+  invocation); incomplete output is cleaned up on failure without touching
+  consumer source. `--out-dir` is only ever written once, at the end, after
+  every stage has already succeeded.
+- Requires Node 22+ (OP-007); the command checks this itself and fails with
+  `invalid_configuration` on older runtimes rather than failing obscurely
+  partway through a stage.
 
 ## Ownership boundaries
 

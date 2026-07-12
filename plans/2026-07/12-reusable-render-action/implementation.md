@@ -3,7 +3,7 @@
 ## Progress
 
 ```text
-[#----] Phase 1/5 - static contract and route proof done; shared command (Phase 2) next.
+[##---] Phase 2/5 - shared command done; package/extension isolation (Phase 3) next.
 ```
 
 ## Phase 1 - static contract and route proof
@@ -113,3 +113,111 @@ after inspection; they are build artifacts, not workflow files.
   HTML-string inspection) to confirm citations, galleries, and diagram
   client islands also resolve correctly under a base path — this phase only
   inspected generated HTML, it did not serve and browse the output.
+
+## Phase 2 - shared command
+
+### Files changed
+
+- `bin/md-render.js` (new) — CLI entry point. Dispatches the `build`
+  subcommand to `runBuildCommand`, prints `category: message` on failure,
+  sets `process.exitCode` (no bare `process.exit`, so pending stdio flushes
+  on Windows aren't cut off).
+- `src/libs/render-build.js` (new) — the command's lifecycle: `parseBuildArgs`,
+  `assertSafeOutDir`, `buildEnv`, `checkNodeVersion`, `probeConfig`,
+  `assertContentPresent`, `defaultBuildSteps`, `resolveEngineRoot`,
+  `runBuildCommand`. Pure/validation pieces are separated from the
+  subprocess-spawning orchestration so the former are cheaply unit-testable.
+- `src/libs/config-probe.js` (new) — standalone runner, spawned as its own
+  process, that imports `config.js` under the command's target env and
+  prints `{ contentPath }` as JSON. Used for a fast, categorized
+  `missing_content` failure before spending time on collect/diagrams/build,
+  without re-implementing config.js's manifest/env merging.
+- `test/render-build.test.js` (new) — `node:test` coverage for argument
+  parsing, output-path safety, env precedence/isolation, the Node-version
+  gate, and (via injectable `steps`) failure-cleanup and success-copy
+  behavior without spawning real collect/diagrams/astro processes.
+- `package.json` — added `"test": "node --test \"test/**/*.test.js\""` and
+  `"engines": {"node": ">=22.0.0", ...}` (OP-007).
+- `scripts/stage-engine.js` — staged package `engines` bumped from `>=18` to
+  `>=22` (OP-007; the actual `bin`/source staging for this command is Phase
+  3's job, tracked below).
+
+### Implementation facts
+
+- The command's three stages (collect, diagrams, astro static build) each
+  run as a **separate subprocess**, not in-process calls. `config.js` reads
+  `process.env` at module-evaluation time via a top-level `await`, and Node
+  caches ES modules by resolved URL — a single process can only observe one
+  env-derived `config.js` per process lifetime. Running collect/diagrams/
+  build in-process sequentially would silently reuse the first stage's
+  config. This mirrors how `pnpm collect && pnpm diagrams && pnpm build`
+  already works today; the command's job is orchestrating the same
+  three independent entry points with a consistent, isolated env, not
+  replacing them.
+- Isolation: every invocation gets its own `mkdtemp`-created build root
+  (`<tmpdir>/md-render-build-*`) holding an isolated `MICROWEBSTACKS_STORE_PATH`,
+  `MICROWEBSTACKS_DB_PATH`, and staging `MICROWEBSTACKS_OUTDIR`. The
+  consumer's `--out-dir` is only ever written once, at the very end, by
+  copying the finished staged output into it — so a mid-build failure never
+  touches `--out-dir` and never touches consumer source. The build root is
+  removed in a `finally`, on both success and failure.
+- Dotenv precedence was already solved by an existing mechanism, not a new
+  one: `src/libs/load-env.js` loads the *workspace's* `.env` with
+  `override: true` by default, but honors
+  `MICROWEBSTACKS_DOTENV_OVERRIDE=false` (added previously for the VS Code
+  extension launcher, for the same reason). `buildEnv()` always sets it to
+  `'false'`, so a consumer workspace's own `.env` can only fill in keys the
+  command deliberately left unset (e.g. `MICROWEBSTACKS_KROKI_SERVER`) and
+  can never clobber the fixed contract axes (`DOCS_BACKEND`, `DOCS_PROFILE`,
+  `DOCS_OUTPUT`) or the isolated paths.
+- `assertSafeOutDir` blocks `--out-dir` if it equals or is an ancestor of
+  the workspace root, the resolved content directory (from the probe), the
+  engine checkout, or a filesystem root — the only ways the final
+  copy-in step (which clears `--out-dir` first) could destroy something
+  that isn't a previous build of its own artifact. Nesting `--out-dir`
+  *inside* the workspace (e.g. `<workspace>/dist`) is allowed and is the
+  common case.
+- Astro CLI gotcha (not previously exercised in Phase 1's `npx astro build`
+  proofs, which passed `--config` unaccompanied by `--root`): Astro resolves
+  `--config` as `path.join(root, configFile)` — an **absolute** `--config`
+  path silently produces a garbled joined path and fails with
+  `[ConfigNotFound]`. The astro-build step now passes `--root <engineRoot>`
+  and the bare filename `astro.config.static.mjs`, not an absolute path.
+- End-to-end proof: ran `node bin/md-render.js build --workspace . --out-dir
+  .tmp/phase2-fixture-out` against this repo's own content as a stand-in
+  local consumer (`.tmp/` is already gitignored). Produced a complete
+  artifact in one command: `index.html`, `404.html`, one directory per
+  catch-all doc, `blobs/` (client + server-rendered diagram sources),
+  `_astro/` assets, `favicon.ico`. Inspected then deleted; not committed.
+
+### Deviations from the plan
+
+- None. The provisional command shape in `specification/reusable-render/spec.md`
+  (`md-render build --workspace <path> --out-dir <path> [--manifest <path>]
+  [--site <url>] [--base <path>]`) was implemented as written.
+
+### Commands run
+
+```text
+node --test "test/**/*.test.js"                                    # 10/10 pass
+node bin/md-render.js build --workspace . --out-dir .tmp/phase2-fixture-out
+                                                                     # local fixture proof (pass)
+```
+
+### Follow-ups for later phases
+
+- Phase 3 must add `bin/` (and, for the command to run `astro build` inside
+  the *published* package rather than this checkout, the Astro source tree —
+  `src/pages`, `src/layout`, `src/components`, `astro.config*.mjs` — none of
+  which are in `stage-engine.js`'s `RUNTIME_PATHS` today) to the staged
+  `@microwebstacks/md-render` package, plus a `bin` field in the generated
+  `package.json`, then prove the packed command runs standalone.
+- Phase 2's fixture proof ran from this repo checkout (`engineRoot` resolves
+  to wherever `render-build.js` physically lives, so this is expected to
+  keep working unchanged once staged — only the staging inputs change).
+- `defaultBuildSteps` currently treats any nonzero collect/diagrams/build
+  exit code as fatal; diagram-render failures for individual assets are
+  already non-fatal inside `diagrams.js` itself (it logs and continues), so
+  `diagram_failed` in practice means the `diagrams.js` process itself
+  crashed (e.g. missing dataset), not a single diagram's render failing.
+  Worth calling out explicitly in Phase 5's error-path validation.

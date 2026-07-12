@@ -166,7 +166,7 @@ async function main() {
     license: rootPkg.license ?? 'UNLICENSED',
     files: stagedFiles,
     dependencies,
-    engines: {node: '>=18'},
+    engines: {node: '>=22'},
     // Tells the VS Code extension's installer (extension.js installEngine)
     // this tarball has its production dependencies vendored under this name
     // and can be installed with a plain HTTPS fetch, no npm required.
