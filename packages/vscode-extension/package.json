@@ -2,7 +2,7 @@
   "name": "markdown-site-preview",
   "displayName": "Markdown Site Preview",
   "description": "Browse your whole Markdown documentation like a website — Mermaid/PlantUML diagrams, tables, file tree and outline navigation.",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "icon": "icon.png",
   "galleryBanner": {
     "color": "#1E1B4B",
@@ -19,7 +19,7 @@
     "site",
     "kroki"
   ],
-  "engineVersion": "0.0.8",
+  "engineVersion": "0.0.9",
   "publisher": "microwebstacks",
   "private": false,
   "license": "MIT",

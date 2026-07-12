@@ -69,6 +69,11 @@ initiated actions — never solicit approval via `ExitPlanMode` or chat question
 
 ## Repo Practices
 
+- When writing or generating Mermaid/PlantUML diagram source (fenced blocks,
+  `.puml`/`.mmd` files), always quote node/participant identifiers that
+  contain spaces, hyphens, or other special characters (e.g.
+  `participant "On-Call" as OnCall`) — unquoted special characters are a
+  recurring cause of diagram parse failures.
 - Respect existing Astro, React, Node, and script patterns before introducing
   new abstractions.
 - Treat fetched or collected documentation inputs as source material. Avoid

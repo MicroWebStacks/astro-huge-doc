@@ -299,7 +299,7 @@ main{
    Standalone paragraphs render as <p>; text that flows around inline links
    stays as loose nodes and inherits the article line-height. */
 .article-slot :global(p){
-	max-width: 80ch;
+	max-width: var(--prose-measure);
 	margin-block: 0 var(--space-4);
 	line-height: var(--leading-body);
 }
@@ -320,7 +320,7 @@ main{
 /* Lists: indent + the same block rhythm as paragraphs. */
 .article-slot :global(ul),
 .article-slot :global(ol){
-	max-width: 80ch;
+	max-width: var(--prose-measure);
 	margin-block: 0 var(--space-4);
 	padding-left: var(--space-6);
 	line-height: var(--leading-body);
@@ -339,7 +339,7 @@ main{
 
 /* Blockquotes: muted text behind an accent rule. */
 .article-slot :global(blockquote){
-	max-width: 80ch;
+	max-width: var(--prose-measure);
 	margin-block: 0 var(--space-4);
 	padding: 0 var(--space-4);
 	color: var(--content-color-muted);

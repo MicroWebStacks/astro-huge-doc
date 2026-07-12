@@ -372,7 +372,9 @@ function setManualCustom(nav, expandedKeys, options = {}){
     state.mode = 'manual';
     state.manualKind = 'custom';
     state.expandedKeys = [...new Set((expandedKeys ?? []).filter(Boolean))];
-    applyExpandedKeyState(nav, state.expandedKeys, {scroll: options.scroll !== false});
+    // keepActive:false — the user's explicit expand/collapse choices win, even
+    // when that hides the branch holding the active heading.
+    applyExpandedKeyState(nav, state.expandedKeys, {keepActive:false});
     state.depth = currentVisibleDepth(nav);
     updateButtons(nav);
     if(options.persist !== false){
@@ -383,7 +385,8 @@ function setManualCustom(nav, expandedKeys, options = {}){
 function restoreManualState(nav, options = {}){
     const state = getState(nav);
     if(state.manualKind === 'custom'){
-        applyExpandedKeyState(nav, state.expandedKeys, {scroll: options.scroll !== false});
+        state.mode = 'manual';
+        applyExpandedKeyState(nav, state.expandedKeys, {keepActive:false});
         state.depth = currentVisibleDepth(nav);
         updateButtons(nav);
         if(options.persist !== false){
@@ -408,7 +411,8 @@ function restoreScroll(nav){
     if(state.scrollTop > 0){
         nav.scrollTop = state.scrollTop;
     }
-    ensureActiveVisible(nav);
+    // No ensureActiveVisible here: the auto/depth paths already reveal the
+    // active entry, and manual-custom must not have its collapses re-expanded.
 }
 
 function syncNavAfterReveal(nav){

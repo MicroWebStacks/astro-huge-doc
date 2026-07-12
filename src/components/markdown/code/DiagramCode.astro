@@ -162,9 +162,13 @@ const languageLabel = language
     width: 100%;
     min-width: min(100%, 20rem);
 }
+/* Fill the available width but never upscale past the diagram's natural
+   size: renderers advertise it as an inline max-width (mermaid does this
+   itself, plantuml-render.js adds it), which caps the 100% width below. */
 .client-diagram-output :global(svg){
     display: block;
-    width: 100%;
+    width: auto;
+    max-width: 100%;
     height: auto;
 }
 .client-diagram-error{
@@ -179,7 +183,13 @@ const languageLabel = language
 .diagram-shell{
     display: flex;
     flex-direction: column;
-    width: min(100%, 80ch);
+    /* Width contract (plans/2026-07/12-diagram-width-contract): the shell
+       keeps the prose measure for small diagrams, grows with the diagram's
+       natural width (published by the renderer as --diagram-natural-width,
+       plus the surface padding and borders around the SVG) up to the full
+       content column. Without JS the var defaults to 0px and the shell
+       behaves exactly like the old min(100%, 80ch). */
+    width: min(100%, max(var(--prose-measure), calc(var(--diagram-natural-width, 0px) + var(--space-3) * 2 + 2px)));
     max-width: 100%;
     margin-top: var(--space-3);
     margin-bottom: var(--space-5);
@@ -314,6 +324,41 @@ const languageLabel = language
 </style>
 
 <script>
+/* Width contract for the static (Kroki) diagram path: read the natural
+   width out of the loaded SVG document and publish it on the shell as
+   --diagram-natural-width (shell growth) plus an inline max-width on the
+   <object> (no upscale past natural size), matching the client renderers.
+   If the SVG exposes neither a pixel width nor a viewBox, the shell simply
+   keeps its prose-measure width. */
+const applyStaticDiagramWidth = (shell: HTMLElement) => {
+    const object = shell.querySelector<HTMLObjectElement>('[data-role="diagram"] object');
+    if (!object) {
+        return;
+    }
+
+    const publish = () => {
+        // The <object> document lives in its own realm, so feature-detect via
+        // tagName instead of a cross-realm instanceof check.
+        const svgRoot = object.contentDocument?.documentElement;
+        if (!svgRoot || svgRoot.tagName.toLowerCase() !== 'svg') {
+            return;
+        }
+        const widthAttr = svgRoot.getAttribute('width') ?? '';
+        let width = widthAttr.endsWith('%') ? NaN : Number.parseFloat(widthAttr);
+        if (!Number.isFinite(width) || width <= 0) {
+            width = (svgRoot as any).viewBox?.baseVal?.width ?? NaN;
+        }
+        if (!Number.isFinite(width) || width <= 0) {
+            return;
+        }
+        shell.style.setProperty('--diagram-natural-width', `${width}px`);
+        object.style.maxWidth = `${width}px`;
+    };
+
+    object.addEventListener('load', publish);
+    publish();
+};
+
 const initDiagramControls = () => {
     const shells = document.querySelectorAll('.diagram-shell[data-uid]');
     shells.forEach(shell => {
@@ -322,6 +367,7 @@ const initDiagramControls = () => {
         }
 
         shell.setAttribute('data-controls-ready', 'true');
+        applyStaticDiagramWidth(shell as HTMLElement);
 
         const diagramDiv = shell.querySelector('[data-role="diagram"]');
         const codeDiv = shell.querySelector('[data-role="code"]');

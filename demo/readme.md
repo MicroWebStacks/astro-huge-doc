@@ -35,6 +35,38 @@ sequenceDiagram
     R-->>U: preview local demo pages
 ```
 
+## Wide diagram width test
+
+This one is intentionally much wider than the panel, to verify that wide
+diagrams shrink to fit the available width:
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant CDN as CDN Edge
+    participant GW as API Gateway
+    participant Auth as Auth Service
+    participant Cat as Catalog Service
+    participant Inv as Inventory Service
+    participant Pay as Payment Service
+    participant Q as Message Queue
+    participant W as Worker
+    participant DB as Database
+    B->>CDN: GET /checkout
+    CDN->>GW: forward request
+    GW->>Auth: validate session token
+    Auth-->>GW: session ok
+    GW->>Cat: fetch cart items
+    Cat->>Inv: reserve stock
+    Inv-->>Cat: reservation id
+    GW->>Pay: charge card
+    Pay->>Q: enqueue receipt job
+    Q->>W: deliver job
+    W->>DB: persist order
+    DB-->>W: order id
+    W-->>B: email receipt sent
+```
+
 ## What to look for
 
 | Page | Purpose |

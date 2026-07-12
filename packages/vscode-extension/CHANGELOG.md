@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.16 - 2026-07-12
+
+- Diagram panels no longer hard-cap at 80 characters: wide Mermaid, PlantUML,
+  and Kroki diagrams now grow the panel up to the content column while never
+  upscaling a diagram past its natural size (engine 0.0.9).
+- Mermaid and PlantUML client rendering now share a single dispatcher, so an
+  unsupported diagram language surfaces a visible error instead of silently
+  staying blank.
+- Fixed the table-of-contents losing manually expanded/collapsed branches
+  when navigating to a heading outside them.
+
 ## 0.0.15 - 2026-07-11
 
 - Fixed a cross-window upgrade race where a VS Code window still running an
