@@ -2,8 +2,10 @@
 
 ## Status
 
-Reviewed; architecture decisions OP-001 through OP-009 are accepted. No
-renderer, package, extension, or workflow implementation has started yet.
+Implemented and validated. Architecture decisions OP-001 through OP-009 are
+accepted; all five implementation phases (static contract, shared command,
+package/extension isolation, thin Action, validation and handoff) are done.
+See `implementation.md` for the full record.
 
 ## Problem summary
 

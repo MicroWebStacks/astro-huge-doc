@@ -170,6 +170,10 @@ outputs:
   reference example (checkout, this Action, `actions/upload-pages-artifact`,
   `actions/deploy-pages`) showing the intended consumer shape; it is not
   wired to run automatically and does not deploy this repository's own site.
+- `vectormind-adoption.md` in this directory documents the exact pinned
+  workflow the first intended external consumer, `vectormind.github.io`,
+  should adopt (a root-deployed variant of the example above), without
+  modifying that repository.
 
 ## Ownership boundaries
 

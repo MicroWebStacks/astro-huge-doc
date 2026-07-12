@@ -3,7 +3,7 @@
 ## Progress
 
 ```text
-[####-] Phase 4/5 - thin Action done; validation and handoff (Phase 5) next.
+[#####] Phase 5/5 - validation and handoff done. All phases complete.
 ```
 
 ## Phase 1 - static contract and route proof
@@ -515,3 +515,143 @@ inspection; not committed.
   Phase 1) should run on Linux or otherwise avoid Windows Git Bash's argv
   path-rewriting, so `--base`/`--site` values aren't incidentally mangled
   the way this phase's local proof was.
+
+## Phase 5 - validation and handoff
+
+### Files changed
+
+- `specification/reusable-render/vectormind-adoption.md` (new) - the pinned
+  workflow the first intended external consumer, `vectormind.github.io`,
+  should adopt: a root-deployed variant of `render-example.yml` (no `base`,
+  `site: https://vectormind.github.io/`), what it owns versus what
+  `action.yml` deliberately doesn't decide, and its verification basis.
+  Documentation only; that repository was not touched.
+- `specification/reusable-render/spec.md` - one cross-reference line in the
+  "GitHub Action contract" section pointing at the new adoption doc.
+- No product code changed in this phase; it is validation and documentation
+  only, as scoped.
+
+### Implementation facts
+
+- **Closed the real-browser-check gap flagged since Phase 1.** Every prior
+  phase's static/base-path proof inspected generated HTML as text. This
+  phase found Playwright with a Chromium build already available locally
+  (`playwright` is a devDependency; `C:\Users\wassi\AppData\Local\
+  ms-playwright\chromium-1228` was already installed) and used it for a real
+  headless-browser check instead: navigate, click deep links, wait for
+  client-rendered islands, and assert on the live DOM and network responses.
+- **Fixture reused this repo's own example content rather than a synthetic
+  one**, per the plan's Dependencies bullet ("a fixture with nested pages,
+  assets, citations, Mermaid, PlantUML"). Assembled from `content/examples/
+  diagrams/readme.md` (+`work-breakout.puml`, mermaid + inline/linked
+  PlantUML + kroki blockdiag), `content/examples/footnotes/readme.md`
+  (citations), and one image from `content/examples/gallery/`, nested under
+  a scratch workspace's own `content/` (required: `manifest.output.content`
+  defaults to `content`, confirmed via `config-probe.js` before building).
+- **Direct-command and Action-equivalent artifacts compared for route/asset
+  equivalence, at both root and a base path.** Re-ran Phase 4's
+  fixture-and-tarball technique (re-staged the engine, `npm pack`, installed
+  into an isolated prefix, ran the packed `bin/md-render.js` - the same
+  proof methodology Phase 4's own follow-ups recommended reusing, since no
+  tagged Action release exists yet). After normalizing Vite's content-hash
+  filenames, `diagrams/index.html`, `citations/index.html`, and `404.html`
+  were byte-identical between the direct-command and Action-equivalent
+  artifacts at both root and `/phase5-base/`; `blobs/` (content-addressed)
+  matched file-for-file. `index.html` differed only in the order of two
+  `<link rel="stylesheet">` tags (Vite's own non-deterministic chunk
+  ordering across separate builds, not a content difference).
+- **Browser checks (13 assertions) passed identically at root, at a
+  `/phase5-base/` base path, and against the Action-equivalent artifact**:
+  home page loads with the content-addressed `<img src="/blobs/...">`
+  actually decoding (`naturalWidth > 0`); deep-link navigation to nested
+  pages; Mermaid rendering to an inline `<svg>`; PlantUML rendering into its
+  `[data-plantuml-output]` panel (both inline and linked-file forms);
+  nav active-link highlighting (`.entry_container.active`) updating after
+  client-side navigation; footnote *references* (`[data-footnote-ref]`)
+  present and correctly numbered; a direct (non-clicked) deep link to a
+  nested page returning HTTP 200; an unknown route returning the served
+  `404.html` with HTTP 404; and no unexpected console/network errors. Wrote
+  a small purpose-built static file server (`.tmp/phase5-static-server.mjs`,
+  gitignored, deleted after use) rather than reaching for an external
+  dependency, since GitHub Pages' own root/subpath-mounting behavior needed
+  exact reproduction (missing paths fall back to `404.html`, everything else
+  served under an optional URL-prefix mount).
+- **Found a real, pre-existing content-rendering gap while writing the
+  footnote-definition assertion, already tracked outside this packet.**
+  Footnote *references* render correctly and are numbered, but footnote
+  *definitions* render as plain, unlabeled `<p>` tags with no `id` at all -
+  `href="#user-content-fn-1"` has no matching anchor anywhere on the page, so
+  the reference-to-definition jump is dead, and the three definitions in the
+  fixture are indistinguishable from each other in the DOM. This is not a
+  regression from static rendering or this packet's work: it reproduces
+  identically regardless of output/backend, and matches an already-recorded
+  gap (`OP-008`, `plans/2026-07/04-features-alignment/plan.md`, memory
+  `content-structure-sibling-repo`) in the `content-structure` sibling
+  package's collect step, which flattens `footnoteDefinition` mdast nodes
+  and loses their identifiers before the app renders them - fixing it
+  belongs in that repository, not here. `content/examples/footnotes/
+  readme.md`, used verbatim in this phase's fixture, is literally the test
+  case that memory names. Recorded as an `INFO` line (not a failing
+  assertion) in the browser-check script so this phase's exit isn't gated on
+  an out-of-scope fix, but flagged here for visibility.
+- **Extension build/package verification re-run clean** (`node scripts/
+  package-extension.js`, the `pnpm ext:package` script): VSIX built at
+  100.27 MB total (`engine.tgz` 100.21 MB / 27,048 vendored dependency
+  files), matching Phase 3's own follow-up note to record this as the new
+  baseline explicitly. The script's own internal `verifyVsixBundledEngine`
+  check passed (2 bundled-engine entries, 12 total VSIX entries). `*.vsix`
+  and `packages/md-render/` are both gitignored; nothing left to clean up
+  beyond re-running `stage-engine.js` once more to leave the staged package
+  at its normal committed-source-derived state.
+- **`vectormind-adoption.md` derives its shape from `render-example.yml`
+  rather than inspecting the real `vectormind.github.io` repository**, per
+  the plan's own Non-goal ("Implement or deploy the `vectormind.github.io`
+  workflow in this packet") and this phase's instruction not to modify that
+  repository. The only structural difference recorded is dropping `base`
+  entirely (a user/org Pages site deploys at its domain root, not a
+  subpath) and filling in `site: https://vectormind.github.io/`.
+- Final regression pass: `node --test "test/**/*.test.js"` (10/10) and
+  `node scripts/check-plans.js` (only the pre-existing, unrelated
+  `2026-07-12-diagram-width-contract` missing-Progress-marker flag, present
+  since before this packet started) both re-run clean.
+
+### Deviations from the plan
+
+- None. All four Phase 5 bullets and the phase's exit criterion ("evidence
+  covers static consumption and extension non-regression") are satisfied by
+  the work above.
+
+### Commands run
+
+```text
+node src/libs/config-probe.js                                       # confirmed fixture content-root resolution
+node bin/md-render.js build --workspace <fixture> --out-dir <out>    # direct-command, root
+node bin/md-render.js build --workspace <fixture> --out-dir <out> --base /phase5-base/ --site <url>
+                                                                      # direct-command, base path (run from PowerShell -
+                                                                      # Git Bash mangles leading-slash argv, same as Phase 4)
+node scripts/stage-engine.js                                        # re-stage before packing
+npm pack --pack-destination <scratch>                                # inside packages/md-render
+npm install --prefix <scratch>/action-engine --omit=dev --no-audit --no-fund <tarball>
+                                                                      # Action-equivalent install; 663 packages (matches Phase 4)
+node <action-engine>/bin/md-render.js build --workspace <fixture> --out-dir <out> [--base ... --site ...]
+                                                                      # Action-equivalent build, root and base path
+diff (hash-normalized)                                               # direct vs Action-equivalent HTML/blobs, root and base
+node .tmp/phase5-static-server.mjs <dir> <port> [basePrefix]         # purpose-built static server; gitignored, deleted after use
+node .tmp/phase5-browser-check.mjs <baseUrl>                         # Playwright/Chromium check; 13/13 pass at root, base path, and Action artifact
+node scripts/package-extension.js                                    # pnpm ext:package equivalent; VSIX 100.27 MB, verified
+node --test "test/**/*.test.js"                                     # 10/10 pass
+node scripts/check-plans.js                                         # only the pre-existing, unrelated diagram-width-contract flag
+```
+
+Scratch fixture/pack/install/output directories and the two `.tmp/phase5-*`
+helper scripts were removed after inspection; not committed.
+
+### Follow-ups
+
+- The `OP-008` footnote-flattening gap (see Implementation facts) remains
+  open in the `content-structure` sibling repository; not actionable here.
+- Once a real `astro-huge-doc` Action release and matching engine version
+  exist, replace the two placeholders in `vectormind-adoption.md`
+  (`engine-version`, the Action ref) with the pinned pair, and reconsider
+  whether `engine-version` should gain a default at that point (Phase 4's
+  own follow-up).
