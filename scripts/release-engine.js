@@ -19,6 +19,8 @@ import os from 'node:os';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..');
 const PACKAGE_NAME = '@microwebstacks/md-render';
+const PUBLISH_VISIBILITY_ATTEMPTS = 5;
+const PUBLISH_VISIBILITY_RETRY_MS = 5000;
 
 function parseArgs(argv) {
   const args = {otp: null, version: null, publishOnly: false};
@@ -54,6 +56,33 @@ function capture(command, cliArgs, options = {}) {
     ...options
   });
   return result.status === 0 ? result.stdout.trim() : null;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// npm can accept a publish before its metadata endpoint serves the new version.
+// Keep the release command alive through that short propagation window so a
+// successful publish is not reported as a failure or accidentally republished.
+async function waitForPublishedVersion(version) {
+  let published = null;
+  for (let attempt = 1; attempt <= PUBLISH_VISIBILITY_ATTEMPTS; attempt += 1) {
+    published = capture('npm', ['view', `${PACKAGE_NAME}@${version}`, 'version']);
+    if (published === version) {
+      return published;
+    }
+
+    if (attempt < PUBLISH_VISIBILITY_ATTEMPTS) {
+      console.log(
+        `Published ${PACKAGE_NAME}@${version}, but npm metadata is not visible yet ` +
+        `(got "${published}"). Retrying in ${PUBLISH_VISIBILITY_RETRY_MS / 1000}s ` +
+        `(${attempt + 1}/${PUBLISH_VISIBILITY_ATTEMPTS})...`
+      );
+      await sleep(PUBLISH_VISIBILITY_RETRY_MS);
+    }
+  }
+  return published;
 }
 
 async function main() {
@@ -99,9 +128,13 @@ async function main() {
     throw error;
   }
 
-  const published = capture('npm', ['view', `${PACKAGE_NAME}@${version}`, 'version']);
+  const published = await waitForPublishedVersion(version);
   if (published !== version) {
-    throw new Error(`published version not visible on npm yet (got "${published}")`);
+    throw new Error(
+      `published version not visible after ${PUBLISH_VISIBILITY_ATTEMPTS} checks ` +
+      `(got "${published}"). npm may still be propagating; verify with ` +
+      `npm view ${PACKAGE_NAME}@${version} version before attempting any republish.`
+    );
   }
   console.log(`\nPublished ${PACKAGE_NAME}@${version}.`);
   console.log('Next: release the extension that pins this engineVersion (node scripts/release-extension.js).');
