@@ -4,7 +4,7 @@ import './tokens.css';
 import 'katex/dist/katex.min.css';
 import AppBar from './AppBar.astro';
 import SideMenu from './SideMenu.astro';
-import { process_toc_list, buildNavigationMenus } from "./layout_utils";
+import { process_toc_list, buildAppBarMenu, buildNavigationMenus } from "./layout_utils";
 
 
 export interface Props {
@@ -18,9 +18,19 @@ const rawTitle = ((Astro.props as any).frontmatter || Astro.props).title;
 // (mirrors homeLabel() used for the nav).
 const title = (!rawTitle || rawTitle === '.') ? 'Home' : rawTitle;
 const toc_menu_items = process_toc_list(headings)
-const navigation = buildNavigationMenus(Astro.url.pathname)
+const liveReload = process.env.MICROWEBSTACKS_EXTENSION_MODE === 'true'
+// In extension mode the article is the critical response. Its pages rail is
+// fetched after first paint and starts as a closed skeleton; static/full
+// deployments keep their complete server-rendered navigation.
+const navigation = liveReload
+	? {appBarMenu: buildAppBarMenu(Astro.url.pathname), sectionMenu: []}
+	: buildNavigationMenus(Astro.url.pathname)
 const pages_menu_items = navigation.sectionMenu ?? []
 const appbar_menu = navigation.appBarMenu ?? []
+// Extension preview only: pages poll the local server's /__lite/version and
+// reload themselves in place when the extension bumps a change stamp. Keeps
+// the current URL across edits (the server never restarts). Purely local —
+// nothing is collected or sent anywhere.
 ---
 <html lang="en">
 	<head>
@@ -100,16 +110,16 @@ const appbar_menu = navigation.appBarMenu ?? []
 	<body >
 		<div class="appbar-nav_content-footer">
 			<header>
-				<AppBar menu={appbar_menu} showLeftToggle={pages_menu_items.length > 0} showRightToggle={toc_menu_items.visible} />
+				<AppBar menu={appbar_menu} showLeftToggle={liveReload || pages_menu_items.length > 0} showRightToggle={toc_menu_items.visible} />
 			</header>
 			<main>
 				<div id="wide-nav" class="scroll">
-					<SideMenu items={pages_menu_items} category="pages_menu" initialOpen={false}/>
+					<SideMenu items={pages_menu_items} category="pages_menu" initialOpen={false} loading={liveReload}/>
 				</div>
 				<div id="resize-left" class="nav-resize active"/>
 				<article class="content scroll">
 					<div id="mobile-nav">
-						<SideMenu items={pages_menu_items} category="pages_menu" initialOpen={false}/>
+						<SideMenu items={pages_menu_items} category="pages_menu" initialOpen={false} loading={liveReload}/>
 					</div>
 					<div class="article-slot">
 						<slot/>
@@ -124,6 +134,32 @@ const appbar_menu = navigation.appBarMenu ?? []
 			</main>
 			<button id="mobile-nav-backdrop" type="button" aria-label="Close navigation menus"></button>
 		</div>
+		{liveReload &&
+			<script is:inline>
+				// Extension live reload: poll the local preview server's change
+				// stamps; reload in place when they move. Local only.
+				(function () {
+					let baseline = null;
+					async function poll() {
+						try {
+							const response = await fetch('/__lite/version', {cache: 'no-store'});
+							if (!response.ok) return;
+							const version = await response.json();
+							const stamp = `${version.reload}:${version.tree}`;
+							if (baseline === null) {
+								baseline = stamp;
+							} else if (stamp !== baseline) {
+								window.location.reload();
+							}
+						} catch (_error) {
+							// server briefly unavailable; keep polling
+						}
+					}
+					setInterval(poll, 1000);
+					poll();
+				})();
+			</script>
+		}
 	</body>
 </html>
 
@@ -357,3 +393,4 @@ main{
 </style>
 
 <script src="./menu_interactions_activation.js" />
+{liveReload && <script src="./lazy_navigation.js" />}

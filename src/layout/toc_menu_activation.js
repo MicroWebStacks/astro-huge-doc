@@ -445,7 +445,8 @@ function scheduleRevealSync(nav){
 
 function initDepthButtons(nav){
     const controls = nav.querySelector('.depth-controls');
-    if(!controls){ return; }
+    if(!controls || controls.dataset.depthBound === 'true'){ return; }
+    controls.dataset.depthBound = 'true';
     controls.addEventListener('click', (e)=>{
         const btn = e.target.closest('[data-action]');
         if(!btn || !controls.contains(btn)){ return; }
@@ -543,24 +544,44 @@ function initMenuState(nav){
     initializedNavs.add(nav);
 }
 
+function bindExpandToggles(nav){
+    const togglers = nav.getElementsByClassName('expand');
+    for(const toggler of togglers){
+        if(toggler.dataset.expandBound === 'true'){ continue; }
+        toggler.dataset.expandBound = 'true';
+        toggler.addEventListener('click', function(e){
+            const entry = this.parentElement;
+            const childList = childListForEntry(entry);
+            if(childList){
+                const expanded = childList.classList.contains('hidden');
+                setEntryExpanded(entry, expanded);
+            }
+            setManualCustom(nav, collectExpandedKeys(nav));
+            e.preventDefault();
+        });
+    }
+}
+
+function initializeNavContent(nav){
+    bindExpandToggles(nav);
+    initDepthButtons(nav);
+    initializedNavs.delete(nav);
+    if(canMeasureNav(nav)){
+        initMenuState(nav);
+    }else{
+        updateButtons(nav);
+    }
+}
+
 function toc_menu_activation(){
     const menus = document.querySelectorAll("nav.toc_menu, nav.pages_menu");
     menus.forEach((toc_menu)=>{
-        const toggler = toc_menu.getElementsByClassName("expand");
-        for (let i = 0; i < toggler.length; i++) {
-            toggler[i].addEventListener("click", function(e) {
-                const entry = this.parentElement;
-                const childList = childListForEntry(entry);
-                if(childList){
-                    const expanded = childList.classList.contains("hidden");
-                    setEntryExpanded(entry, expanded);
-                }
-                setManualCustom(toc_menu, collectExpandedKeys(toc_menu));
-                e.preventDefault();
-            });
-        }
-        initDepthButtons(toc_menu);
+        bindExpandToggles(toc_menu);
         initScrollPersistence(toc_menu);
+        toc_menu.addEventListener('microwebstacks:navigation-ready', ()=>{
+            initializeNavContent(toc_menu);
+            scheduleRevealSync(toc_menu);
+        });
         toc_menu.addEventListener('microwebstacks:nav-visibility', (event)=>{
             if(event.detail?.open){
                 if(!initializedNavs.has(toc_menu) && canMeasureNav(toc_menu)){
@@ -572,11 +593,7 @@ function toc_menu_activation(){
         if(isToc(toc_menu)){
             initScrollSpy(toc_menu);
         }
-        if(canMeasureNav(toc_menu)){
-            initMenuState(toc_menu);
-        }else{
-            updateButtons(toc_menu);
-        }
+        initializeNavContent(toc_menu);
     });
 
     let resizeTick = false;

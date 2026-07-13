@@ -1159,38 +1159,22 @@ function createRuntimeEnv(runtime, port) {
   });
 }
 
-async function runNodeScript(runtime, scriptPath, env) {
-  const runner = await resolveNodeRunner(runtime);
-  return new Promise((resolve, reject) => {
-    log(`Running ${scriptPath}`);
-    log(`Node runtime: ${runner.execPath}`);
-    const child = spawnLogged(runner.execPath, [scriptPath], {
-      cwd: runtime.engineRoot,
-      env: {...env, ...runner.extraEnv},
-      logMode: path.basename(scriptPath) === 'diagrams.js' ? 'diagrams' : 'passthrough'
-    });
-    child.on('error', (error) => {
-      reject(new Error(`Could not run ${scriptPath} (${error.message}).`));
-    });
-    child.on('exit', (code) => {
-      if (code === 0) {
-        if (child.mwsLogMode === 'diagrams') {
-          const {generated, reused, linked, clientRendered} = child.mwsSummary;
-          if (generated || reused || linked || clientRendered) {
-            log(`Diagram summary: generated=${generated}, reused=${reused}, linked=${linked}, client-rendered=${clientRendered}.`);
-          }
-        }
-        resolve();
-        return;
-      }
-      reject(new Error(`${scriptPath} exited with code ${code}`));
-    });
-  });
+// Lazy lite flow: there is no upfront collect/diagrams pass anymore. The
+// server's lazy backend walks the file tree on first request and parses each
+// page on demand (hash-keyed cache). The extension only signals workspace
+// changes by bumping stamp files that the backend and the pages watch.
+function stampDir(state) {
+  return path.join(state.storePath, 'json');
 }
 
-async function collect(runtime, env) {
-  await runNodeScript(runtime, path.join('scripts', 'collect.js'), env);
-  await runNodeScript(runtime, path.join('scripts', 'diagrams.js'), env);
+async function touchStamps(state, {tree}) {
+  const dir = stampDir(state);
+  await fsp.mkdir(dir, {recursive: true});
+  const now = new Date().toISOString();
+  const names = tree ? ['tree.stamp', 'reload.stamp'] : ['reload.stamp'];
+  for (const name of names) {
+    await fsp.writeFile(path.join(dir, name), now);
+  }
 }
 
 async function startServer(runtime, port, env) {
@@ -1253,12 +1237,14 @@ async function ensureServer(context) {
       const runtime = await buildRuntime(context);
       const port = await getFreePort();
       const env = createRuntimeEnv(runtime, port);
-      progress.report({message: 'indexing documentation…'});
-      await collect(runtime, env);
       progress.report({message: 'starting preview server…'});
+      const startedAt = Date.now();
+      // No upfront indexing: the lazy backend walks the tree and parses pages
+      // on demand. Startup cost is server boot + one page, not the whole site.
       await startServer(runtime, port, env);
       const browserUrl = `http://127.0.0.1:${port}/`;
       await waitForServer(browserUrl);
+      log(`Preview ready in ${Date.now() - startedAt} ms (server boot + first page; pages parse on demand).`);
       serverState = {
         ...runtime,
         port,
@@ -1279,32 +1265,36 @@ function ensureWatcher(context, state) {
   }
   const pattern = new vscode.RelativePattern(state.docsRoot, '**/*');
   fileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
-  const onChange = (uri) => {
+  // The server stays alive across all workspace changes (lazy flow). Content
+  // edits only bump reload.stamp: open pages reload themselves and the lazy
+  // backend re-parses just the requested page when its content hash moved.
+  // Add/delete/rename additionally bump tree.stamp so the backend re-walks
+  // the file tree (the only whole-tree work, and it is file-level only).
+  let pendingTreeChange = false;
+  const onChange = (uri, isTreeEvent) => {
     const ext = path.extname(uri.fsPath).toLowerCase();
     if (!WATCHED_EXTENSIONS.has(ext)) {
       return;
     }
+    pendingTreeChange = pendingTreeChange || isTreeEvent;
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
-      enqueue(() => refreshPreviewAfterChange(context)).catch((error) => {
-        vscode.window.showErrorMessage(error.message);
-      });
-    }, 600);
+      const treeChanged = pendingTreeChange;
+      pendingTreeChange = false;
+      const startedAt = Date.now();
+      touchStamps(state, {tree: treeChanged})
+        .then(() => {
+          log(`Workspace change signaled in ${Date.now() - startedAt} ms (tree refresh: ${treeChanged ? 'yes' : 'no'}; server kept alive).`);
+        })
+        .catch((error) => {
+          log(`Failed to signal workspace change: ${error.message}`);
+        });
+    }, 300);
   };
-  fileWatcher.onDidCreate(onChange);
-  fileWatcher.onDidChange(onChange);
-  fileWatcher.onDidDelete(onChange);
+  fileWatcher.onDidCreate((uri) => onChange(uri, true));
+  fileWatcher.onDidChange((uri) => onChange(uri, false));
+  fileWatcher.onDidDelete((uri) => onChange(uri, true));
   context.subscriptions.push(fileWatcher);
-}
-
-async function refreshPreviewAfterChange(context) {
-  if (!serverState) {
-    return;
-  }
-  log('File change detected; rebuilding preview index and restarting server.');
-  await stopDocsPreviewServer(false);
-  const state = await ensureServer(context);
-  updatePreviewPanel(state);
 }
 
 async function previewDocs(context) {
@@ -1352,8 +1342,6 @@ async function stopDocsPreviewServer(showMessage) {
   const hadServer = Boolean(serverProcess);
   serverProcess = null;
   serverState = null;
-  // Also kills any still-running collect/diagrams child from an in-flight
-  // ensureServer() (e.g. the window closed mid-refresh), not just the server.
   killActiveChildren();
   if (hadServer) {
     log('Stopped preview server.');

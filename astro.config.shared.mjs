@@ -30,10 +30,16 @@ export function baseAstroConfig() {
         alias: liteAliases
       },
       ssr: {
-        external: ['better-sqlite3']
+        // Native SQLite and the lazy Markdown parser stay runtime-resolved.
+        // The extension package vendors all three under node_modules; keeping
+        // content-structure external also preserves its first-request dynamic
+        // import boundary instead of making Vite parse/bundle jsdom at build
+        // time (which both breaks the deferred-load contract and trips over
+        // cssstyle's generated source).
+        external: ['better-sqlite3', 'content-structure', 'gray-matter']
       },
       optimizeDeps: {
-        exclude: ['better-sqlite3']
+        exclude: ['better-sqlite3', 'content-structure', 'gray-matter']
       }
     }
   };

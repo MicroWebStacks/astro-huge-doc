@@ -17,7 +17,9 @@ export async function getStaticPaths() {
 let {url} = Astro.params;
 url = url ?? "";
 console.log(`* [...url] > url = ${url}`)
-const {found, title, headings, items, data} = getEntry({url:url})
+// await: the lazy lite backend parses the page on demand (async); the sync
+// backends return a plain value, which await passes through unchanged.
+const {found, title, headings, items, data} = await getEntry({url:url})
 ---
 {found&&
     <Layout title={title} headings={headings} >

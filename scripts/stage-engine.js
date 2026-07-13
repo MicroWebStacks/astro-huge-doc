@@ -83,6 +83,14 @@ const EXCLUDED_DEPS = new Set([
   'three',
   'xlsx'
 ]);
+// content-structure lives in this repo as a private workspace package
+// (packages/content-structure, adopted per
+// plans/2026-07/13-extension-performance OP-003) and is never published, so
+// npm cannot resolve it during vendoring. It is dropped from the staged
+// dependency list, its own runtime dependencies are merged in instead, and
+// the vendor step copies the workspace source into the vendored modules tree.
+const WORKSPACE_LIB_NAME = 'content-structure';
+const WORKSPACE_LIB_DIR = path.join('packages', 'content-structure');
 
 function parseArgs(argv) {
   const args = {out: path.join('packages', 'md-render'), version: null, vendor: true};
@@ -150,6 +158,21 @@ async function hideVendoredModules(outDir) {
   await retryFsOp(() => fsp.rename(nodeModules, vendored));
 }
 
+// Copies the workspace-local content-structure package into the vendored
+// modules tree, where Node resolution finds it after the extension's
+// installer renames _modules back to node_modules. The package's own
+// node_modules (pnpm symlinks) is skipped; its runtime deps are flat in the
+// vendored tree already (merged into the staged dependency list).
+async function vendorWorkspaceLib(outDir) {
+  const from = path.join(repoRoot, WORKSPACE_LIB_DIR);
+  const to = path.join(outDir, VENDOR_DIR_NAME, WORKSPACE_LIB_NAME);
+  await retryFsOp(() => fsp.rm(to, {recursive: true, force: true}));
+  await fsp.cp(from, to, {
+    recursive: true,
+    filter: (src) => !src.split(path.sep).includes('node_modules')
+  });
+}
+
 async function readJson(file) {
   return JSON.parse(await fsp.readFile(file, 'utf8'));
 }
@@ -177,9 +200,18 @@ async function main() {
     await fsp.cp(from, path.join(outDir, rel), {recursive: true});
   }
 
+  const libPkg = await readJson(path.join(repoRoot, WORKSPACE_LIB_DIR, 'package.json'));
   const dependencies = {};
   for (const [name, range] of Object.entries(rootPkg.dependencies ?? {})) {
-    if (EXCLUDED_DEPS.has(name)) {
+    if (EXCLUDED_DEPS.has(name) || name === WORKSPACE_LIB_NAME) {
+      continue;
+    }
+    dependencies[name] = range;
+  }
+  // The workspace lib's runtime deps must be installable from the registry in
+  // its place (its optionalDependencies stay excluded, same as the root's).
+  for (const [name, range] of Object.entries(libPkg.dependencies ?? {})) {
+    if (EXCLUDED_DEPS.has(name) || dependencies[name]) {
       continue;
     }
     dependencies[name] = range;
@@ -228,7 +260,10 @@ async function main() {
   if (args.vendor) {
     vendorDependencies(outDir);
     await hideVendoredModules(outDir);
-    console.log(`Vendored dependencies into ${path.join(outDir, VENDOR_DIR_NAME)}.`);
+    await vendorWorkspaceLib(outDir);
+    console.log(`Vendored dependencies (incl. workspace ${WORKSPACE_LIB_NAME}) into ${path.join(outDir, VENDOR_DIR_NAME)}.`);
+  } else {
+    console.warn(`\nWARNING: --no-vendor output does not include ${WORKSPACE_LIB_NAME}; it is a workspace-local package (${WORKSPACE_LIB_DIR}) not on the registry — provide it manually before installing.`);
   }
 }
 

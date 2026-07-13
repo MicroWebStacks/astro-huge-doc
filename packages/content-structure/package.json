@@ -1,0 +1,29 @@
+{
+  "name": "content-structure",
+  "type": "module",
+  "version": "2.2.4",
+  "private": true,
+  "description": "Markdown collection and parsing layer of the astro-huge-doc engine. Adopted from the former standalone content-structure package; maintained in-repo, never published.",
+  "main": "index.js",
+  "bin": {
+    "content-structure": "cli.js"
+  },
+  "dependencies": {
+    "glob": "^13.0.0",
+    "gray-matter": "^4.0.3",
+    "js-yaml": "^4.1.1",
+    "jsdom": "^27.2.0",
+    "remark": "^15.0.1",
+    "remark-directive": "^4.0.0",
+    "remark-gfm": "^4.0.1",
+    "slugify": "^1.6.6",
+    "unified": "^11.0.5",
+    "unist-util-visit": "^5.0.0"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^12.4.1",
+    "sharp": "^0.33.5"
+  },
+  "author": "wassfila",
+  "license": "MIT"
+}

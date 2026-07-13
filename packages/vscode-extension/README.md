@@ -18,6 +18,15 @@ documentation site, not a single-file preview.
 - **Tables** - Markdown tables become sortable, readable data tables.
 - **Syntax highlighting** - fenced code blocks highlighted with Shiki.
 
+## Free & private by design
+
+Markdown Site Preview is free, MIT-licensed open source, and everything
+renders locally on your machine. **No telemetry, no data collection, no
+accounts** - your Markdown never leaves your computer, and there is nothing
+to opt out of because nothing is collected in the first place. The only
+network endpoint is the optional Kroki diagram server, and you choose it -
+run it locally (see below) and even your diagrams stay home.
+
 ## Requirements
 
 - No system Node.js or npm is required on the normal install path. On first

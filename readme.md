@@ -9,30 +9,43 @@ navigation and per-page TOC — with virtually no limit on content size. Content
 is parsed once into a database and rendered from there, so tens of thousands of
 pages behave like ten.
 
-The same engine runs in four very different homes:
+One engine, exactly three use cases:
 
-| Where | What you get | Needs a server? |
+| Use case | Profile + backend + output | What you get |
 |---|---|---|
-| 🧩 **VS Code extension** | Live preview of your workspace docs, pages rendered on demand as you browse — no Node, Java or Docker install required | No |
-| ⚙️ **GitHub Action** | A static site built in CI, ready to deploy straight to GitHub Pages | No |
-| 🖥️ **Local / self-hosted Node** | An SSR server that renders and streams pages on demand, with multi-level caching and content-aware ETags | Yes |
-| 📦 **Static build** | A fully pre-rendered website you can host anywhere plain files go | No |
+| 🧩 **VS Code extension** | `lite` + JSON + SSR | Live preview of your workspace docs, pages rendered on demand as you browse — no Node, Java or Docker install required |
+| 📦 **Static site (GitHub Pages)** | `full` + JSON + static | A fully pre-rendered website you can host anywhere plain files go; built locally or in CI via the bundled GitHub Action |
+| 🖥️ **Self-hosted Node SSR** | `full` + SQLite + SSR | The reference implementation of full capability: on-demand rendering and streaming, versioning, blob store, multi-level caching, content-aware ETags |
 
 ```mermaid
 flowchart LR
     A[Markdown repos<br/>local folders or GitHub] --> B[astro-huge-doc<br/>engine]
-    B --> C[🧩 VS Code extension<br/>on-demand preview]
-    B --> D[⚙️ GitHub Action<br/>static site on Pages]
-    B --> E[🖥️ Node SSR server<br/>render + cache on demand]
-    B --> F[📦 Static export<br/>host anywhere]
+    B --> C[🧩 VS Code extension<br/>lite + json + SSR preview]
+    B --> D[📦 Static export<br/>full + json + static]
+    D --> D2[⚙️ GitHub Action<br/>deploys it to Pages]
+    B --> E[🖥️ Node SSR server<br/>full + sqlite, render + cache on demand]
 ```
+
+The GitHub Action is not a fourth engine home — it is the static build
+packaged for CI (see `specification/reusable-render/spec.md`). The full
+SQLite SSR server is the reference implementation of the engine's complete
+feature set and is always maintained as such.
+
+## Free, open source, and yours alone
+
+astro-huge-doc is free, MIT-licensed open source — and it runs entirely on
+your machines. **Zero telemetry, zero data collection, zero phone-home**: not
+in the engine, not in the VS Code extension, not in the GitHub Action. Your
+content, your builds, and even your performance logs stay with you; what you
+document is nobody's business but yours. Performance is measured with a local
+benchmark (`pnpm bench:lite`) and local logs — never by watching users.
 
 ## SSR and static — pick per deployment, not per project
 
 - **SSR** renders each page the moment it is requested, then caches it — true
   content-based ISR (Incremental Static Regeneration) with cache warmup. This
-  is what makes the VS Code extension feel instant even on huge repositories:
-  nothing is built up front, pages are rendered lightweight and on demand.
+  is what the VS Code extension uses: pages are rendered lightweight and on
+  demand as you browse.
 - **Static** pre-renders the entire site into plain files. Push them to GitHub
   Pages (or any static host) and you have a complete documentation website with
   no dedicated server running anywhere.
@@ -42,10 +55,13 @@ flowchart LR
 | Profile | Backend | Built for |
 |---|---|---|
 | **lite** | JSON files | Running inside the VS Code extension: zero native dependencies, Mermaid and PlantUML rendered in the browser |
-| **full** | SQLite | Scaling to huge websites: versioning, blob store, image optimization, GitHub fetch |
+| **full** | SQLite (canonical) or JSON (static export) | Scaling to huge websites: versioning, blob store, image optimization, GitHub fetch |
 
 Same code, no fork — a runtime switch selects the profile. Everything about
 *rendering* is shared; the full profile adds *generation and storage* on top.
+Profile, backend, and output are three independent axes; the three use cases
+above are the supported combinations (see
+`specification/engine-profiles/spec.md`).
 
 # Feature coverage
 
@@ -70,10 +86,14 @@ Same code, no fork — a runtime switch selects the profile. Everything about
 MUI and Mantine UI kits that rode on them. May return later as full-only features.
 
 Anything that is *generation* (collect, xlsx) is full-only; *rendering* is shared.
-The lite build loads no native dependencies: data comes from a `content.json`
-export plus a `blobs/` folder, images use Astro's passthrough image service, and
-`model-viewer` is aliased to an empty stub (dropping its ~980 kB chunk — the lite
-`dist/client` is ~634 kB).
+The lite build loads no native dependencies. In the extension it is fully lazy:
+startup walks the file tree only (labels and URLs derive from filenames — see
+`specification/engine-profiles/spec.md`), each page is parsed the first time it
+is viewed and cached by content hash, and an edit re-parses just that page with
+the server kept alive. The static export instead reads a pre-collected
+`content.json` plus a `blobs/` folder. In both, images use Astro's passthrough
+image service, and `model-viewer` is aliased to an empty stub (dropping its
+~980 kB chunk — the lite `dist/client` is ~634 kB).
 
 # Specification
 ## overview

@@ -23,6 +23,9 @@ importers:
       '@plantuml/core':
         specifier: ^1.2026.6
         version: 1.2026.6
+      '@rollup/plugin-yaml':
+        specifier: ^4.1.2
+        version: 4.1.2(rollup@4.62.2)
       '@svgdotjs/svg.js':
         specifier: ^3.2.4
         version: 3.2.5
@@ -39,8 +42,8 @@ importers:
         specifier: ^12.4.1
         version: 12.11.1
       content-structure:
-        specifier: ^2.2.4
-        version: 2.2.4
+        specifier: workspace:*
+        version: link:packages/content-structure
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -120,12 +123,49 @@ importers:
         specifier: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
         version: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
     devDependencies:
-      '@rollup/plugin-yaml':
-        specifier: ^4.1.2
-        version: 4.1.2(rollup@4.62.2)
       playwright:
         specifier: ^1.61.1
         version: 1.61.1
+
+  packages/content-structure:
+    dependencies:
+      glob:
+        specifier: ^13.0.0
+        version: 13.0.6
+      gray-matter:
+        specifier: ^4.0.3
+        version: 4.0.3
+      js-yaml:
+        specifier: ^4.1.1
+        version: 4.3.0
+      jsdom:
+        specifier: ^27.2.0
+        version: 27.4.0
+      remark:
+        specifier: ^15.0.1
+        version: 15.0.1
+      remark-directive:
+        specifier: ^4.0.0
+        version: 4.0.0
+      remark-gfm:
+        specifier: ^4.0.1
+        version: 4.0.1
+      slugify:
+        specifier: ^1.6.6
+        version: 1.6.9
+      unified:
+        specifier: ^11.0.5
+        version: 11.0.5
+      unist-util-visit:
+        specifier: ^5.0.0
+        version: 5.1.0
+    optionalDependencies:
+      better-sqlite3:
+        specifier: ^12.4.1
+        version: 12.11.1
+      sharp:
+        specifier: ^0.33.5
+        version: 0.33.5
 
   packages/md-render:
     dependencies:
@@ -135,6 +175,15 @@ importers:
       '@astrojs/react':
         specifier: ^4.4.2
         version: 4.4.2(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      '@google/model-viewer':
+        specifier: ^4.1.0
+        version: 4.3.1(three@0.172.0)
+      '@plantuml/core':
+        specifier: ^1.2026.6
+        version: 1.2026.6
+      '@rollup/plugin-yaml':
+        specifier: ^4.1.2
+        version: 4.1.2(rollup@4.62.2)
       '@svgdotjs/svg.js':
         specifier: ^3.2.4
         version: 3.2.5

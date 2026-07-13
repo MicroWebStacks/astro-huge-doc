@@ -10,6 +10,11 @@
  *   else derived from DOCS_PROFILE →  'lite' ⇒ json, otherwise sqlite
  *   default                       →  'sqlite'
  *
+ * The json backend has two implementations, split by profile:
+ *   lite ⇒ structure-db-lazy.js  (extension: file-walk tree, per-page parse
+ *                                 on demand, hash-keyed cache; getEntry async)
+ *   full ⇒ structure-db-json.js  (static export: pre-collected content.json)
+ *
  * The full website defaults to sqlite (canonical store). The VS Code "lite"
  * extension sets DOCS_PROFILE=lite (or DOCS_BACKEND=json) so no native deps
  * (better-sqlite3) load. This derivation MUST mirror config.js, and this module
@@ -21,7 +26,9 @@ const backend = (process.env.DOCS_BACKEND ?? (profile === 'lite' ? 'json' : 'sql
 
 const impl =
     backend === 'json'
-        ? await import('./structure-db-json.js')
+        ? (profile === 'lite'
+            ? await import('./structure-db-lazy.js')
+            : await import('./structure-db-json.js'))
         : await import('./structure-db-sqlite.js');
 
 export const {

@@ -68,6 +68,49 @@ if(process.env.ENABLE_AUTH === "true"){
     console.log("\n -- !!! no auth !!! -- Authentication is disabled -- \n")
 }
 
+// Live-reload signal for the extension preview (lite/lazy flow): the extension
+// bumps stamp files in the json dir on workspace changes; pages poll this
+// endpoint (Layout.astro, extension mode only) and reload themselves in place,
+// preserving the current URL. The server never restarts on edits.
+if (config.dataBackend === 'json' && process.env.MICROWEBSTACKS_EXTENSION_MODE === 'true') {
+    const {buildSectionMenuFromSourceEntries} = await import('../src/layout/source_navigation.js');
+    const stampDir = config.collect.json_dir;
+    const stampMtime = async (name) => {
+        try {
+            return Math.trunc((await stat(join(stampDir, name))).mtimeMs);
+        } catch {
+            return 0;
+        }
+    };
+    app.get('/__lite/version', async (req, res) => {
+        res.set('Cache-Control', 'no-store');
+        res.json({
+            reload: await stampMtime('reload.stamp'),
+            tree: await stampMtime('tree.stamp')
+        });
+    });
+    app.get('/__lite/navigation', async (req, res) => {
+        const startedAt = performance.now();
+        const pathname = typeof req.query.pathname === 'string' ? req.query.pathname : '/';
+        let entries;
+        try {
+            const snapshot = JSON.parse(readFileSync(join(stampDir, 'filetree.json'), 'utf8'));
+            entries = snapshot.source_entries ?? [];
+        } catch {
+            // The article request normally writes filetree.json before the
+            // browser asks for navigation. Fall back to the live backend only
+            // when persistence failed or the endpoint was called directly.
+            const {getSourceEntries} = await import('../src/libs/structure-db.js');
+            entries = getSourceEntries();
+        }
+        const items = buildSectionMenuFromSourceEntries(entries, pathname, config.base);
+        const elapsedMs = performance.now() - startedAt;
+        console.log(`[lite] navigation for ${pathname} ready in ${elapsedMs.toFixed(0)} ms (${items.length} roots)`);
+        res.set('Cache-Control', 'no-store');
+        res.json({items, ms: Math.round(elapsedMs)});
+    });
+}
+
 app.use('/blobs', async (req, res, next) => {
     const method = req.method.toUpperCase();
     if (method !== 'GET' && method !== 'HEAD') {

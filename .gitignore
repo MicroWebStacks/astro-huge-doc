@@ -8,3 +8,4 @@ dataset/
 .tmp/
 *.vsix
 packages/md-render/
+.cache/

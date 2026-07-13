@@ -1,6 +1,7 @@
-import {getDocuments, getSourceEntries} from '@/libs/structure-db.js';
-import {basePrefix} from '@/libs/blob-files.js';
+import {getDocuments, getSourceEntries} from '../libs/structure-db.js';
+import {basePrefix} from '../libs/blob-files.js';
 import {config} from '../../config.js';
+import {buildSectionMenuFromSourceEntries as buildSourceEntryMenu} from './source_navigation.js';
 
 function cloneHeading(heading) {
     const label = (heading.label ?? heading.body_text ?? '').trim();
@@ -361,131 +362,8 @@ function buildSectionMenuFromDocs(docs, pathname) {
     return roots;
 }
 
-function sortSourceNodes(a, b) {
-    if (a.entryType !== b.entryType) {
-        return a.entryType === 'dir' ? -1 : 1;
-    }
-    const orderA = a.order ?? 0;
-    const orderB = b.order ?? 0;
-    if (orderA !== orderB) {
-        return orderA - orderB;
-    }
-    return (a.label ?? '').localeCompare(b.label ?? '');
-}
-
-function labelFromSourceEntry(entry) {
-    const documentTitle = String(entry.document_title ?? '').trim();
-    if (documentTitle && documentTitle !== '.') {
-        return documentTitle;
-    }
-    if (entry.entry_type === 'file' && entry.name.toLowerCase().endsWith('.md')) {
-        const stem = entry.name.slice(0, -3);
-        return /^readme$/i.test(stem) ? 'Overview' : labelFromUrl(stem);
-    }
-    return entry.name;
-}
-
-function renderedSourceEntries(sourceEntries) {
-    const byPath = new Map(sourceEntries.map((entry) => [entry.path, entry]));
-    const visiblePaths = new Set();
-
-    for (const entry of sourceEntries) {
-        if (entry.document_url === null || entry.document_url === undefined) {
-            continue;
-        }
-        let current = entry.path;
-        while (current && byPath.has(current)) {
-            visiblePaths.add(current);
-            current = byPath.get(current)?.parent_path;
-        }
-    }
-
-    return sourceEntries.filter((entry) => visiblePaths.has(entry.path));
-}
-
-function activePathForUrl(sourceEntries, activeUrl) {
-    const match = sourceEntries.find((entry) => (entry.document_url ?? null) === activeUrl);
-    return match?.path ?? null;
-}
-
 function buildSectionMenuFromSourceEntries(sourceEntries, pathname) {
-    if (!Array.isArray(sourceEntries) || sourceEntries.length === 0) {
-        return [];
-    }
-
-    const renderedEntries = renderedSourceEntries(sourceEntries);
-    if (renderedEntries.length === 0) {
-        return [];
-    }
-
-    const activeUrl = docUrlFromPathname(pathname);
-    const activePath = activePathForUrl(renderedEntries, activeUrl);
-    const nodes = new Map();
-
-    for (const entry of renderedEntries) {
-        const link = entry.document_url !== null && entry.document_url !== undefined
-            ? buildDocLink(entry.document_url)
-            : null;
-        nodes.set(entry.path, {
-            path: entry.path,
-            nodeKey: entry.path,
-            label: labelFromSourceEntry(entry),
-            entryType: entry.entry_type,
-            order: entry.sort_order ?? 0,
-            active: activePath === entry.path,
-            expanded: true,
-            items: [],
-            ...(link ? {link} : {})
-        });
-    }
-
-    for (const entry of renderedEntries) {
-        const node = nodes.get(entry.path);
-        const parentPath = entry.parent_path ?? '';
-        if (parentPath && nodes.has(parentPath)) {
-            nodes.get(parentPath).items.push(node);
-        }
-    }
-
-    const activeAncestors = new Set();
-    if (activePath) {
-        let current = activePath;
-        while (current) {
-            activeAncestors.add(current);
-            const parent = renderedEntries.find((entry) => entry.path === current)?.parent_path;
-            if (!parent) {
-                break;
-            }
-            current = parent;
-        }
-    }
-
-    const finalize = (node) => {
-        if (node.items.length > 0) {
-            node.items.sort(sortSourceNodes);
-            node.items.forEach(finalize);
-            node.parent = true;
-            node.expanded = activeAncestors.has(node.path);
-        } else {
-            delete node.items;
-            node.parent = false;
-            delete node.expanded;
-        }
-        delete node.entryType;
-        delete node.path;
-        delete node.order;
-    };
-
-    const roots = [];
-    for (const entry of renderedEntries) {
-        if (!entry.parent_path) {
-            roots.push(nodes.get(entry.path));
-        }
-    }
-
-    roots.sort(sortSourceNodes);
-    roots.forEach(finalize);
-    return roots;
+    return buildSourceEntryMenu(sourceEntries, pathname, config.base);
 }
 
 function buildNavigationMenus(pathname) {
@@ -500,7 +378,7 @@ function buildNavigationMenus(pathname) {
 }
 
 function buildAppBarMenu(pathname) {
-    return buildNavigationMenus(pathname).appBarMenu;
+    return buildAppBarMenuFromDocs(getDocuments(), pathname);
 }
 
 function buildSectionMenu(pathname) {
@@ -522,5 +400,6 @@ export {
     buildNavigationMenus,
     buildAppBarMenu, 
     buildSectionMenu, 
+    buildSectionMenuFromSourceEntries,
     section_from_pathname
 };

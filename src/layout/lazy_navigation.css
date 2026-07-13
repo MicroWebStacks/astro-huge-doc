@@ -1,0 +1,156 @@
+/* Client-populated pages tree used only by the extension's lazy navigation.
+ * This stylesheet is intentionally global: the nodes are created after Astro
+ * has rendered, so they cannot carry an Astro component scope attribute. */
+nav.pages_menu .lazy-menu-tree,
+nav.pages_menu .lazy-menu-tree ul {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+nav.pages_menu .lazy-menu-tree ul.nested {
+  padding-left: var(--space-2);
+  border-left: 1px solid var(--menu-border-left-color);
+  margin-left: var(--space-2);
+  overflow: hidden;
+  max-height: 200vh;
+  transition: max-height 0.4s;
+}
+
+nav.pages_menu .lazy-menu-tree ul.nested.hidden {
+  max-height: 0;
+}
+
+nav.pages_menu .lazy-menu-tree li {
+  min-width: 130px;
+}
+
+nav.pages_menu .lazy-menu-tree .entry_container {
+  display: flex;
+  align-items: center;
+  min-height: 2.25rem;
+  color: var(--content-color);
+  font-size: var(--text-sm);
+  user-select: none;
+}
+
+nav.pages_menu .lazy-menu-tree .entry_container.active {
+  background: var(--menu-active-color);
+}
+
+nav.pages_menu .lazy-menu-tree .entry_container > a {
+  flex-grow: 1;
+  text-decoration: none;
+}
+
+nav.pages_menu .lazy-menu-tree .entry_container > a:focus-visible {
+  outline: 2px solid var(--front-blue);
+  outline-offset: -2px;
+}
+
+nav.pages_menu .lazy-menu-tree .icon {
+  flex: 0 0 auto;
+  padding: var(--space-1);
+  cursor: pointer;
+}
+
+nav.pages_menu .lazy-menu-tree .icon:hover,
+nav.pages_menu .lazy-menu-tree .text.href_hover:hover {
+  background: var(--menu-span-hover-color);
+}
+
+nav.pages_menu .lazy-menu-tree .icon svg {
+  width: 10px;
+  height: 10px;
+  rotate: 0deg;
+  transition: rotate 0.4s ease-in-out;
+}
+
+nav.pages_menu .lazy-menu-tree .entry_container.parent.expanded .icon svg {
+  rotate: 90deg;
+}
+
+nav.pages_menu .lazy-menu-tree .text {
+  display: block;
+  flex-grow: 1;
+  padding: var(--space-1) 2px;
+  color: var(--menu-text-color);
+  line-height: 1.35;
+}
+
+nav.pages_menu .lazy-menu-tree .text:not(.parent) {
+  padding-inline: var(--space-3);
+}
+
+nav.pages_menu .lazy-menu-empty,
+nav.pages_menu .lazy-menu-error {
+  margin: 0;
+  padding: var(--space-4) var(--space-3);
+  color: var(--content-color-muted);
+  font-size: var(--text-sm);
+}
+
+nav.pages_menu[data-lazy-navigation] .depth-controls {
+  position: sticky;
+  top: 2.5rem;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: var(--space-1) 0.15rem;
+  background: var(--nav-bg-color);
+  border-block: 1px solid var(--soft-border-color);
+}
+
+nav.pages_menu[data-lazy-navigation] .depth-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 2px;
+  color: var(--content-color);
+  font-size: var(--text-sm);
+  line-height: 1;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+nav.pages_menu[data-lazy-navigation] .depth-btn.auto,
+nav.pages_menu[data-lazy-navigation] .depth-btn.all {
+  width: auto;
+  min-width: 2.75rem;
+  padding-inline: var(--space-1);
+}
+
+nav.pages_menu[data-lazy-navigation] .depth-btn:hover {
+  background: var(--menu-span-hover-color);
+}
+
+nav.pages_menu[data-lazy-navigation] .depth-btn.active {
+  color: var(--content-color);
+  background: var(--menu-active-color);
+  border-color: var(--front-blue);
+}
+
+nav.pages_menu[data-lazy-navigation] .mode-level {
+  min-width: 0.65rem;
+  color: var(--content-color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+nav.pages_menu[data-lazy-navigation] .mode-level.is-hidden {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  nav.pages_menu .lazy-menu-tree ul.nested,
+  nav.pages_menu .lazy-menu-tree .icon svg {
+    transition: none;
+  }
+}

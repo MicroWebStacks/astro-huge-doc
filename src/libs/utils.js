@@ -112,7 +112,7 @@ function file_mime(path){
 }
 
 function log_debug(...args){
-  if(import.meta.env.DEV){
+  if(import.meta.env?.DEV){
     console.log(...args)
   }
 }

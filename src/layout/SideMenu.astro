@@ -8,12 +8,13 @@ export interface Props {
   items: Array<Object>;
   category: string;
   initialOpen?: boolean;
+  loading?: boolean;
 }
 
-let { items, category, initialOpen = true } = Astro.props;
+let { items, category, initialOpen = true, loading = false } = Astro.props;
 
 const open_class = (items.length > 0 && initialOpen)?"open":"closed"
-const data_width = (items.length > 0)?"20vw":"0vw"
+const data_width = (items.length > 0 || loading)?"20vw":"0vw"
 
 function getMaxDepth(entries, level = 1) {
   let max = level;
@@ -59,8 +60,13 @@ const state_scope = createHash('sha1')
   .slice(0, 12);
 const state_key = `microwebstacks:${state_scope}:${category}`;
 ---
-<nav class={`${open_class} ${category}`} data-width={data_width} data-max-level={max_level} data-default-level={default_level} data-state-key={state_key}>
+<nav class={`${open_class} ${category}${loading ? " loading" : ""}`} data-width={data_width} data-max-level={max_level} data-default-level={default_level} data-state-key={state_key} data-lazy-navigation={loading ? "true" : undefined} aria-busy={loading ? "true" : undefined}>
     <div class="menu-title">{category === "toc_menu" ? "On this page" : "Pages"}</div>
+    {loading &&
+      <div class="menu-skeleton" aria-label="Loading pages" role="status">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+    }
     {(items.length > 0 && max_level > 1) &&
       <div class="depth-controls" data-category={category} role="group" aria-label="Tree depth">
         <button type="button" class="depth-btn" data-action="min" title="Show top level" aria-label="Show top level">1</button>
@@ -103,6 +109,30 @@ nav.closed{
 }
 nav.open{
     width:var(--data_width);
+}
+.menu-skeleton{
+  display:flex;
+  flex-direction:column;
+  gap:var(--space-3);
+  padding:var(--space-4) var(--space-3);
+}
+.menu-skeleton span{
+  display:block;
+  width:78%;
+  height:0.8rem;
+  border-radius:var(--radius-sm);
+  background:color-mix(in srgb, var(--content-color-muted) 22%, transparent);
+  animation:menu-skeleton-pulse 1.2s ease-in-out infinite alternate;
+}
+.menu-skeleton span:nth-child(2),
+.menu-skeleton span:nth-child(5){ width:58%; }
+.menu-skeleton span:nth-child(3){ width:88%; }
+@keyframes menu-skeleton-pulse{
+  from{ opacity:0.45; }
+  to{ opacity:0.9; }
+}
+@media (prefers-reduced-motion: reduce){
+  .menu-skeleton span{ animation:none; }
 }
 nav::-webkit-scrollbar {
   width: 1rem;

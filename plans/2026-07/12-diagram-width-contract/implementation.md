@@ -1,5 +1,9 @@
 # Diagram Width Contract — Implementation
 
+## Progress
+
+[#####-] Implemented + verified — awaiting maintainer review before closure.
+
 Decisions applied: D1 = Option B, D2 = all diagram paths, D3 =
 `--prose-measure` token (approved 2026-07-12).
 

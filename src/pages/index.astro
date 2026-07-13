@@ -4,7 +4,7 @@ import AstroMarkdown from '@/components/markdown/AstroMarkdown.astro'
 import {getEntry} from '@/libs/structure-db.js'
 
 console.log(`index> home page`)
-const {found, title, headings, items, data} = getEntry({url:""})
+const {found, title, headings, items, data} = await getEntry({url:""})
 if(!found){
     throw new Error("entry not found for home page")
 }
