@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.17 - 2026-07-13
+
+- Large documentation folders now open without waiting for a full-site
+  collection. The bundled lite engine builds a filename-only tree first, then
+  parses and caches a page only when it is requested (engine 0.0.11).
+- The Pages rail now loads the current top-level section after the article is
+  visible, keeping initial navigation focused and responsive on large trees.
+- Preview startup, page parsing, and navigation timings are logged locally in
+  the extension output channel; no telemetry is sent.
+
 ## 0.0.16 - 2026-07-12
 
 - Diagram panels no longer hard-cap at 80 characters: wide Mermaid, PlantUML,
