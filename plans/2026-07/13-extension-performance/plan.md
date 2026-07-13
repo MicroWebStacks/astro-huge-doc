@@ -88,24 +88,54 @@ exact pipeline the extension runs, using the same env contract
 
 Machine: maintainer's Windows 11 laptop, Node 22, warm filesystem cache.
 
+### Before — eager whole-site startup
+
 | Pages | Bare file walk | collect.js | diagrams.js | content.json | Dataset load | Heap after load | **Total to first page** |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 200 | 5 ms | 2.0 s | 0.11 s | 3.3 MB | 46 ms | 8.7 MB | **2.2 s** |
 | 1000 | 9 ms | 7.5 s | 0.22 s | 16.6 MB | 146 ms | 39 MB | **7.9 s** |
 | 5000 | 92 ms | 46.8 s | 0.67 s | 83.5 MB | 504 ms | 176 MB | **48.0 s** |
 
-Readings:
+### After — lazy startup repeat
 
-- **Total startup is also the cost of every single file edit** (full re-collect
-  + server restart). 48 s per keystroke-save at 5000 pages.
+Repeated after implementation with the same generated 200/1000/5000-page
+sites and warm filesystem cache. `Total to first page` is now the file tree
+plus one requested leaf-page parse; the separate SSR column is a real cold
+HTTP response through the built server.
+
+| Pages | Bare file walk | Tree + filetree | One cold page | Fresh-process cached page | Cold SSR response | Section navigation | Heap (tree + one page) | **Total to first page** |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 200 | 6 ms | 49 ms | 980 ms | 74 ms | 1.44 s | 15 ms | 48.3 MB | **1.03 s** |
+| 1000 | 16 ms | 92 ms | 1.29 s | 129 ms | 1.98 s | 11 ms | 42.7 MB | **1.38 s** |
+| 5000 | 77 ms | 289 ms | 1.29 s | 304 ms | 1.77 s | 25 ms | 32.1 MB | **1.58 s** |
+
+### Before vs after — direct startup comparison
+
+| Pages | **Before: eager total** | **After: lazy total** | Time removed | Reduction | Speedup |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 200 | 2,163 ms | 1,029 ms | 1,134 ms | 52.4% | 2.1× |
+| 1000 | 7,904 ms | 1,376 ms | 6,528 ms | 82.6% | 5.7× |
+| 5000 | 48,000 ms | 1,579 ms | 46,421 ms | 96.7% | 30.4× |
+
+The detailed stage columns intentionally differ: before, the extension parsed
+every page, generated the entire dataset, and ran all diagrams before serving;
+after, it walks filenames and parses only one requested page. The directly
+comparable user-facing measure is the bold total-to-first-page column. Heap is
+also not an exact like-for-like measure because the old figure covered the
+loaded dataset while the new figure includes the one-time parser module chain.
+
+Baseline readings:
+
+- **Total startup was also the cost of every single file edit** (full
+  re-collect + server restart): 48 s per save at 5000 pages.
 - **collect() dominates (> 95 %) and scales superlinearly**: ~7.5 ms/page at
   1000 pages, ~9.4 ms/page at 5000.
-- **The menu-only floor is 3 orders of magnitude cheaper** than what we
-  currently pay before showing anything (92 ms walk vs 48 s pipeline).
-- Serving a single page once loaded is effectively free (getEntry ≈ 1 ms) —
-  the per-request path is not the problem; startup and refresh are.
-- Memory scales with total site size (176 MB heap for 5000 pages) even if the
-  user only ever opens one page.
+- **The menu-only floor was 3 orders of magnitude cheaper** than the old
+  pre-display pipeline (92 ms walk vs 48 s pipeline).
+- Serving a single page after the eager load was effectively free
+  (`getEntry` ≈ 1 ms); startup and refresh were the problem.
+- Memory scaled with total site size (176 MB heap for 5000 pages) even if the
+  user opened only one page.
 
 ## Goal
 

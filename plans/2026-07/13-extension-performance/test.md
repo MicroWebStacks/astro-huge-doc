@@ -96,3 +96,27 @@ expand/depth controls. The built HTTP page, link rewrite, navigation endpoint,
 tree shape, client/server syntax, and production bundle were verified; a real
 VS Code visual smoke remains useful release QA, but implementation is complete
 and the workflow does not keep a packet open for later testing alone.
+
+## Repeated 200/1000/5000-page comparison (2026-07-13)
+
+Commands were run sequentially against the same synthetic sites and final
+production build, with warm filesystem cache:
+
+```powershell
+pnpm bench:lite -- --pages 200
+pnpm bench:lite -- --pages 1000
+pnpm bench:lite -- --pages 5000
+```
+
+Machine-readable after results:
+
+```json
+{"mode":"lazy","pages":200,"fileCount":223,"bareWalkMs":6,"walkMs":49,"sourceMs":0,"coldEntryMs":980,"warmEntryMs":1,"freshProcessMs":74,"ssrFirstPageMs":1442,"ssrFirstPageBytes":87499,"relativeLinkResolved":true,"navigationMs":15,"navigationRoots":1,"heapMB":48.3,"totalMs":1029}
+{"mode":"lazy","pages":1000,"fileCount":1111,"bareWalkMs":16,"walkMs":92,"sourceMs":1,"coldEntryMs":1285,"warmEntryMs":1,"freshProcessMs":129,"ssrFirstPageMs":1980,"ssrFirstPageBytes":88331,"relativeLinkResolved":true,"navigationMs":11,"navigationRoots":1,"heapMB":42.7,"totalMs":1376}
+{"mode":"lazy","pages":5000,"fileCount":5511,"bareWalkMs":77,"walkMs":289,"sourceMs":3,"coldEntryMs":1290,"warmEntryMs":1,"freshProcessMs":304,"ssrFirstPageMs":1765,"ssrFirstPageBytes":88331,"relativeLinkResolved":true,"navigationMs":25,"navigationRoots":1,"heapMB":32.1,"totalMs":1579}
+```
+
+The detailed before and after tables plus the direct startup comparison are
+kept side by side in `plan.md` under **Measurements**. The latest repeat shows
+the intended scaling change: the old total rose from 2.16 s to 48.0 s as the
+site grew 25×, while the lazy total rose only from 1.03 s to 1.58 s.
