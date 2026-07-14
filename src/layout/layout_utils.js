@@ -148,13 +148,21 @@ function segmentCount(url) {
 }
 
 /* The set of top-level names that are real folders (sections of their own).
- * Anything not in this set — the root index and loose root files — belongs to "home".
+ * Anything not in this set — the root index and loose root files — belongs to
+ * "home". A folder counts as a section when it has a folder page anywhere in
+ * its subtree (dir-type doc) OR when it simply contains documents deeper down
+ * (url with 2+ segments): a site whose root folders hold only deep markdown
+ * and no top-level README.md must still surface those folders as sections.
  */
 function topLevelSections(docs) {
     const sections = new Set();
     for (const doc of docs) {
-        if (doc.url_type === 'dir' && doc.url) {
-            sections.add(doc.url.split('/')[0]);
+        if (!doc.url) {
+            continue;
+        }
+        const segments = doc.url.split('/').filter(Boolean);
+        if (doc.url_type === 'dir' || segments.length >= 2) {
+            sections.add(segments[0]);
         }
     }
     return sections;
@@ -198,12 +206,45 @@ function buildAppBarMenuFromDocs(docs, pathname) {
         }
     }
 
+    // A section whose folder has no top-level folder page (no <folder>/README.md
+    // or <folder>/<folder>.md) has no 1-segment doc, so the loop above skipped
+    // it. Without an app-bar entry such a section is unreachable: the closed
+    // menu only lists loose root files, so a site made of deep-only folders
+    // shows nothing but Home. Link the section to its shallowest document.
+    for (const section of sections) {
+        if (sectionMap.has(section)) {
+            continue;
+        }
+        let entryDoc = null;
+        for (const doc of docs) {
+            if (doc.url !== section && !doc.url.startsWith(`${section}/`)) {
+                continue;
+            }
+            if (!entryDoc
+                || (doc.level ?? 0) < (entryDoc.level ?? 0)
+                || ((doc.level ?? 0) === (entryDoc.level ?? 0)
+                    && ((doc.sort_order ?? 0) < (entryDoc.sort_order ?? 0)
+                        || ((doc.sort_order ?? 0) === (entryDoc.sort_order ?? 0)
+                            && String(doc.url).localeCompare(String(entryDoc.url)) < 0)))) {
+                entryDoc = doc;
+            }
+        }
+        if (entryDoc) {
+            sectionMap.set(section, entryDoc);
+        }
+    }
+
     const items = [];
     for (const [section, doc] of sectionMap) {
         const isHome = section === 'home';
         const link = isHome ? buildDocLink('') : buildDocLink(doc.url);
+        // A synthesized entry links to a deep document; its title names that
+        // page, not the folder, so the label derives from the section segment.
+        const label = isHome
+            ? homeLabel(doc)
+            : (segmentCount(doc.url) > 1 ? labelFromUrl(section) : (doc.title ?? labelFromUrl(doc.url)));
         items.push({
-            label: isHome ? homeLabel(doc) : (doc.title ?? labelFromUrl(doc.url)),
+            label,
             link,
             active_class: resolveSection(link, sections) === currentSection ? 'active' : '',
             order: doc.sort_order ?? 0,

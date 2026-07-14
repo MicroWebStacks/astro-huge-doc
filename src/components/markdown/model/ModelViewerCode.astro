@@ -15,13 +15,27 @@ export interface Props {
 
 const { uid, code, model } = Astro.props as Props;
 
-const code_data = yaml.load(code) as object;
 let should_render = true
 let src = ""
 let title = ""
 let poster = ""
 let environment_image = ""
 let error_text = ""
+let code_data: Record<string, any> = {}
+try {
+  const parsed = yaml.load(code)
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    code_data = parsed as Record<string, any>
+  } else {
+    should_render = false
+    error_text += 'ModelViewerCode YAML must be an object; '
+  }
+} catch (error) {
+  should_render = false
+  const err = `ModelViewerCode could not parse YAML: ${error instanceof Error ? error.message : String(error)}; `
+  console.warn(err)
+  error_text += err
+}
 //mandatory params
 if(Object.hasOwn(model,"src")){
   src = getAssetUrl(model.src, config.collect.version_id) ?? ""

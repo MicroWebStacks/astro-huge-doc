@@ -193,9 +193,6 @@ importers:
       astro:
         specifier: ^5.16.0
         version: 5.18.2(rollup@4.62.2)(typescript@5.9.3)
-      content-structure:
-        specifier: ^2.2.4
-        version: 2.2.4
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -223,6 +220,9 @@ importers:
       js-yaml:
         specifier: ^4.1.0
         version: 4.3.0
+      jsdom:
+        specifier: ^27.2.0
+        version: 27.4.0
       katex:
         specifier: 0.16.47
         version: 0.16.47
@@ -250,9 +250,21 @@ importers:
       remark:
         specifier: ^15.0.1
         version: 15.0.1
+      remark-directive:
+        specifier: ^4.0.0
+        version: 4.0.0
+      remark-gfm:
+        specifier: ^4.0.1
+        version: 4.0.1
       shiki:
         specifier: ^3.15.0
         version: 3.23.0
+      slugify:
+        specifier: ^1.6.6
+        version: 1.6.9
+      unified:
+        specifier: ^11.0.5
+        version: 11.0.5
       unist-util-visit:
         specifier: ^5.0.0
         version: 5.1.0
@@ -1664,10 +1676,6 @@ packages:
   content-disposition@0.5.4:
     resolution: {integrity: sha512-FveZTNuGw04cxlAiWbzi6zTAL/lhehaWbTtgluJh4/E95DqMwTmha3KZN1aAWA8cFIhHzMZUvLevkw5Rqk+tSQ==}
     engines: {node: '>= 0.6'}
-
-  content-structure@2.2.4:
-    resolution: {integrity: sha512-AeIbxEpD9n9RC4lB17GYXfJ50rIaIM/zVdx+1JQoxyiXxLFeh2rvpXioNks8A21EFVCpi5gXgDXHsaxo5g+XrQ==}
-    hasBin: true
 
   content-type@1.0.5:
     resolution: {integrity: sha512-nTjqfcBFEipKdXCv4YDQWCfmcLZKm81ldF0pAopTvyrFGVbcR6P/VAAd5G7N+0tTr8QqiU0tFadD6FK4NtJwOA==}
@@ -4853,28 +4861,6 @@ snapshots:
   content-disposition@0.5.4:
     dependencies:
       safe-buffer: 5.2.1
-
-  content-structure@2.2.4:
-    dependencies:
-      glob: 13.0.6
-      gray-matter: 4.0.3
-      js-yaml: 4.3.0
-      jsdom: 27.4.0
-      remark: 15.0.1
-      remark-directive: 4.0.0
-      remark-gfm: 4.0.1
-      slugify: 1.6.9
-      unified: 11.0.5
-      unist-util-visit: 5.1.0
-    optionalDependencies:
-      better-sqlite3: 12.11.1
-      sharp: 0.33.5
-    transitivePeerDependencies:
-      - '@noble/hashes'
-      - bufferutil
-      - canvas
-      - supports-color
-      - utf-8-validate
 
   content-type@1.0.5: {}
 

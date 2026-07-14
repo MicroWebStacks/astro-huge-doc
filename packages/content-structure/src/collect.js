@@ -2,10 +2,10 @@ import {globStream} from 'glob'
 import { relative, resolve, join, sep, basename, dirname, parse, extname } from 'path';
 import { load_text,exists,exists_public, load_yaml } from './utils.js';
 import { title_slug, buildDocumentContent } from './md_utils.js';
-import matter from 'gray-matter';
 import { createHash } from 'crypto';
 import {warn} from './libs/log.js'
 import { getStructureSchema } from './structure_db.js'
+import {parseMarkdownFrontmatter} from './frontmatter.js';
 
 let config = {
     rootdir: process.cwd(),
@@ -156,7 +156,7 @@ function get_url_type(file_path){
 async function createMarkdownDocumentSource(file_path){
     const url_type = get_url_type(file_path)
     const markdownText = await load_text(file_path)
-    const {data, content: bodyContent} = matter(markdownText)
+    const {data, content: bodyContent} = parseMarkdownFrontmatter(markdownText, file_path)
     const knownEntryFields = await getKnownEntryFieldSet()
     const {entryFields, modelFields} = partitionFrontmatter(data ?? {}, knownEntryFields)
 
@@ -226,7 +226,7 @@ async function* collectSingleFolderDocuments(){
         const sections = []
         for(const file_path of bucket.markdown){
             const raw = await load_text(file_path)
-            const {content} = matter(raw)
+            const {content} = parseMarkdownFrontmatter(raw, file_path)
             if(content && content.trim().length > 0){
                 sections.push(content.trim())
             }

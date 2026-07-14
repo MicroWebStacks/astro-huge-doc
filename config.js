@@ -106,7 +106,14 @@ async function loadManifest(manifestPath) {
         return mergeManifest();
     }
     const raw = await fsp.readFile(manifestPath, "utf8");
-    return mergeManifest(yaml.load(raw));
+    try {
+        return mergeManifest(yaml.load(raw));
+    } catch (error) {
+        // Unlike document YAML, the manifest controls where and how the
+        // renderer runs, so it cannot safely be ignored. Name the exact file
+        // and failure plainly so the extension output never looks blank.
+        throw new Error(`Cannot start preview: invalid YAML in manifest '${manifestPath}': ${error.message}`, {cause: error});
+    }
 }
 
 function resolvePath(basePath, targetPath) {

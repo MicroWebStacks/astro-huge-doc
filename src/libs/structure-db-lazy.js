@@ -24,7 +24,7 @@
  * Must NOT import better-sqlite3 or sharp (directly or transitively).
  */
 import {createHash} from 'crypto';
-import {existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync} from 'fs';
+import {existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync} from 'fs';
 import {join, posix} from 'path';
 import {config} from '../../config.js';
 import {basePrefix, blobFileName, blobFileUrl} from './blob-files.js';
@@ -178,6 +178,15 @@ function walkWorkspace() {
     const sourceEntries = [];
     const usedUrls = new Map();
     const orderTracker = new Map();
+    // Diagnostics for the walk summary line: the root composition tells apart
+    // "the walk dropped the folders" from "navigation filtered them out".
+    let rootDirs = 0;
+    let rootFiles = 0;
+    let symlinkedDirsFollowed = 0;
+    let skippedEntries = 0;
+    // Directories reached through a symlink/junction, by real path — entering
+    // one twice would mean a symlink cycle, so the second visit is skipped.
+    const seenRealDirs = new Set();
 
     const visit = (absDir, relDir) => {
         let children;
@@ -199,14 +208,23 @@ function walkWorkspace() {
             }
             const relPath = relDir ? `${relDir}/${child.name}` : child.name;
             const absPath = join(absDir, child.name);
-            const isDirectory = child.isDirectory();
+            let isDirectory = child.isDirectory();
             let stat = null;
             if (!isDirectory) {
                 try {
                     stat = statSync(absPath);
                 } catch {
+                    skippedEntries++;
                     continue;
                 }
+                // A symlinked/junction directory reports isDirectory() false on
+                // the dirent; statSync follows the link, so its subtree is
+                // walked like a plain folder instead of being silently lost.
+                isDirectory = stat.isDirectory();
+            }
+            if (!relDir) {
+                if (isDirectory) rootDirs++;
+                else rootFiles++;
             }
 
             let doc = null;
@@ -256,6 +274,22 @@ function walkWorkspace() {
                 });
             }
             if (isDirectory) {
+                if (!child.isDirectory()) {
+                    // Reached through a symlink: guard against cycles before
+                    // recursing (a link back to an ancestor would never end).
+                    let realDir;
+                    try {
+                        realDir = realpathSync(absPath);
+                    } catch {
+                        skippedEntries++;
+                        continue;
+                    }
+                    if (seenRealDirs.has(realDir)) {
+                        continue;
+                    }
+                    seenRealDirs.add(realDir);
+                    symlinkedDirsFollowed++;
+                }
                 visit(absPath, relPath);
             }
         }
@@ -294,7 +328,11 @@ function walkWorkspace() {
         }
     }
     const walkMs = Date.now() - startedAt;
-    console.log(`[lite] file tree walk: ${documents.length} documents, ${sourceEntries.length} entries in ${walkMs} ms`);
+    const extras = [
+        ...(symlinkedDirsFollowed ? [`${symlinkedDirsFollowed} symlinked dirs followed`] : []),
+        ...(skippedEntries ? [`${skippedEntries} entries skipped`] : [])
+    ];
+    console.log(`[lite] file tree walk: ${documents.length} documents, ${sourceEntries.length} entries in ${walkMs} ms (root: ${rootDirs} dirs, ${rootFiles} files${extras.length ? `; ${extras.join(', ')}` : ''})`);
 
     try {
         mkdirSync(jsonDir(), {recursive: true});

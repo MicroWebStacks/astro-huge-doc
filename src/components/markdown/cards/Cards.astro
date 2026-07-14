@@ -9,7 +9,19 @@ export interface Props {
 
 const { code } = Astro.props as Props;
 
-const cards = yaml.load(code)
+let cards: Array<Record<string, any>> = []
+let yamlError = ''
+try {
+    const parsed = yaml.load(code)
+    if (Array.isArray(parsed)) {
+        cards = parsed
+    } else {
+        yamlError = 'Cards YAML must be a list.'
+    }
+} catch (error) {
+    yamlError = `Could not parse cards YAML: ${error instanceof Error ? error.message : String(error)}`
+    console.warn(yamlError)
+}
 
 const entries = cards.map(entry => getDocument({ uid: entry.uid }));
 const resolvedCards = entries
@@ -26,6 +38,7 @@ const resolvedCards = entries
         ))
     }
 </div>
+{yamlError && <div class="yaml-error" role="alert">{yamlError}</div>}
 
 <style>
 .title{
@@ -48,5 +61,8 @@ const resolvedCards = entries
 }
 .card :global(.paragraph:has(>img)) {
     text-align: center;
+}
+.yaml-error {
+    color: var(--color-error, #b42318);
 }
 </style>
