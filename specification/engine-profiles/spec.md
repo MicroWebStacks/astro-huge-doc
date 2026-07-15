@@ -6,6 +6,10 @@ This contract defines which combinations of feature profile, data backend,
 and output mode the engine supports, what each combination is for, and the
 performance obligations attached to the VS Code extension combination.
 
+The *processes* that serve these combinations (dev server, express wrapper,
+static hosting), endpoint ownership across them, env-var precedence, and port
+selection are governed by `specification/run-modes/spec.md`.
+
 ## Independent axes
 
 Three concerns are deliberately separate and must not become synonyms for one

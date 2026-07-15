@@ -4,8 +4,19 @@ import {basename, join} from 'node:path';
 import {config} from '../config.js';
 import {file_mime} from './libs/utils.js';
 import {resolveBlobsSourceDir} from './libs/blob-files.js';
+import {extensionPreviewEnabled, navigationPayload, runtimePayload, statsPayload, versionPayload} from './libs/extension-preview.js';
 
 const blobsDir = resolveBlobsSourceDir(config);
+
+function jsonResponse(payload) {
+    return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: {
+            'Cache-Control': 'no-store',
+            'Content-Type': 'application/json'
+        }
+    });
+}
 
 function safeBlobName(pathname) {
     let name;
@@ -26,7 +37,28 @@ function buildEtag(fileStat) {
 
 export const onRequest = defineMiddleware(async (context, next) => {
     const method = context.request.method.toUpperCase();
-    const {pathname} = new URL(context.request.url);
+    const url = new URL(context.request.url);
+    const {pathname} = url;
+
+    // Extension-preview endpoints live in the app (middleware), not in the
+    // express wrapper, so every mode that renders pages also answers them —
+    // `astro dev` included. Gate and UI emission share one module; see
+    // src/libs/extension-preview.js and specification/run-modes/spec.md.
+    if (extensionPreviewEnabled() && method === 'GET') {
+        if (pathname === '/__lite/version') {
+            return jsonResponse(await versionPayload());
+        }
+        if (pathname === '/__lite/navigation') {
+            return jsonResponse(await navigationPayload(url.searchParams.get('pathname') ?? '/'));
+        }
+        if (pathname === '/__lite/runtime') {
+            return jsonResponse(runtimePayload({dev: import.meta.env.DEV}));
+        }
+        if (pathname === '/__lite/stats') {
+            return jsonResponse(await statsPayload());
+        }
+    }
+
     if (!pathname.startsWith('/blobs/') || (method !== 'GET' && method !== 'HEAD')) {
         return next();
     }

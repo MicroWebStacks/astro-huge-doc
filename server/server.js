@@ -68,48 +68,11 @@ if(process.env.ENABLE_AUTH === "true"){
     console.log("\n -- !!! no auth !!! -- Authentication is disabled -- \n")
 }
 
-// Live-reload signal for the extension preview (lite/lazy flow): the extension
-// bumps stamp files in the json dir on workspace changes; pages poll this
-// endpoint (Layout.astro, extension mode only) and reload themselves in place,
-// preserving the current URL. The server never restarts on edits.
-if (config.dataBackend === 'json' && process.env.MICROWEBSTACKS_EXTENSION_MODE === 'true') {
-    const {buildSectionMenuFromSourceEntries} = await import('../src/layout/source_navigation.js');
-    const stampDir = config.collect.json_dir;
-    const stampMtime = async (name) => {
-        try {
-            return Math.trunc((await stat(join(stampDir, name))).mtimeMs);
-        } catch {
-            return 0;
-        }
-    };
-    app.get('/__lite/version', async (req, res) => {
-        res.set('Cache-Control', 'no-store');
-        res.json({
-            reload: await stampMtime('reload.stamp'),
-            tree: await stampMtime('tree.stamp')
-        });
-    });
-    app.get('/__lite/navigation', async (req, res) => {
-        const startedAt = performance.now();
-        const pathname = typeof req.query.pathname === 'string' ? req.query.pathname : '/';
-        let entries;
-        try {
-            const snapshot = JSON.parse(readFileSync(join(stampDir, 'filetree.json'), 'utf8'));
-            entries = snapshot.source_entries ?? [];
-        } catch {
-            // The article request normally writes filetree.json before the
-            // browser asks for navigation. Fall back to the live backend only
-            // when persistence failed or the endpoint was called directly.
-            const {getSourceEntries} = await import('../src/libs/structure-db.js');
-            entries = getSourceEntries();
-        }
-        const items = buildSectionMenuFromSourceEntries(entries, pathname, config.base);
-        const elapsedMs = performance.now() - startedAt;
-        console.log(`[lite] navigation for ${pathname} ready in ${elapsedMs.toFixed(0)} ms (${items.length} roots)`);
-        res.set('Cache-Control', 'no-store');
-        res.json({items, ms: Math.round(elapsedMs)});
-    });
-}
+// The extension-preview endpoints (/__lite/version, /__lite/navigation) are
+// deliberately NOT registered here. They belong to the Astro app
+// (src/middleware.js, reached through ssrHandler below) so that every mode
+// that renders pages also answers them — `astro dev` has no express wrapper
+// and previously 404'd them. See specification/run-modes/spec.md.
 
 app.use('/blobs', async (req, res, next) => {
     const method = req.method.toUpperCase();
@@ -164,6 +127,22 @@ app.use((req, res, next) => {
   })
 
   
+// Port contract (specification/run-modes/spec.md): this wrapper binds exactly
+// the configured port and fails fast when it is taken — launchers publish the
+// URL up front, so silently drifting to another port (what `astro dev` does)
+// would leave them pointing at a stale or foreign server.
+function reportListenError(error) {
+    if (error.code === 'EADDRINUSE') {
+        console.error(
+            `Port ${config.server.port} on ${config.server.host} is already in use.\n` +
+            `Stop the other server or pick a different port (MICROWEBSTACKS_PORT in the workspace .env, ` +
+            `or manifest.yaml server.port). This server never auto-selects another port.`
+        );
+        process.exit(1);
+    }
+    throw error;
+}
+
 if(config.server.protocol == "https"){
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
@@ -173,8 +152,10 @@ if(config.server.protocol == "https"){
     httpsServer.listen(config.server.port,config.server.host,()=>{
         console.log(`listening on https://${config.server.host}:${config.server.port}`)
     });
+    httpsServer.on('error', reportListenError);
 }else{
-    app.listen(config.server.port,config.server.host,()=>{
+    const httpServer = app.listen(config.server.port,config.server.host,()=>{
         console.log(`listening on http://${config.server.host}:${config.server.port}`)
     });
+    httpServer.on('error', reportListenError);
 }

@@ -5,6 +5,7 @@ import 'katex/dist/katex.min.css';
 import AppBar from './AppBar.astro';
 import SideMenu from './SideMenu.astro';
 import { process_toc_list, buildAppBarMenu, buildNavigationMenus } from "./layout_utils";
+import { extensionPreviewEnabled } from '@/libs/extension-preview.js';
 
 
 export interface Props {
@@ -18,7 +19,11 @@ const rawTitle = ((Astro.props as any).frontmatter || Astro.props).title;
 // (mirrors homeLabel() used for the nav).
 const title = (!rawTitle || rawTitle === '.') ? 'Home' : rawTitle;
 const toc_menu_items = process_toc_list(headings)
-const liveReload = process.env.MICROWEBSTACKS_EXTENSION_MODE === 'true'
+// Single gate shared with the /__lite/* endpoints (src/middleware.js): the UI
+// this flag emits and the endpoints it relies on must switch together, in
+// every run mode. Never read the env var directly here — see
+// specification/run-modes/spec.md.
+const liveReload = extensionPreviewEnabled()
 // In extension mode the article is the critical response. Its pages rail is
 // fetched after first paint and starts as a closed skeleton; static/full
 // deployments keep their complete server-rendered navigation.
@@ -31,6 +36,11 @@ const appbar_menu = navigation.appBarMenu ?? []
 // reload themselves in place when the extension bumps a change stamp. Keeps
 // the current URL across edits (the server never restarts). Purely local —
 // nothing is collected or sent anywhere.
+// The poller is emitted only when a launcher identity is present: stamps are
+// bumped exclusively by launchers (the VS Code extension), so in a manual
+// `pnpm dev`/`pnpm server` run the 1 s poll could never observe a change and
+// would only flood the request log (specification/run-modes/spec.md).
+const liveReloadPolling = liveReload && Boolean(process.env.MICROWEBSTACKS_LAUNCHER)
 ---
 <html lang="en">
 	<head>
@@ -110,7 +120,7 @@ const appbar_menu = navigation.appBarMenu ?? []
 	<body >
 		<div class="appbar-nav_content-footer">
 			<header>
-				<AppBar menu={appbar_menu} showLeftToggle={liveReload || pages_menu_items.length > 0} showRightToggle={toc_menu_items.visible} />
+				<AppBar menu={appbar_menu} showLeftToggle={liveReload || pages_menu_items.length > 0} showRightToggle={toc_menu_items.visible} showRuntimeInfo={liveReload} />
 			</header>
 			<main>
 				<div id="wide-nav" class="scroll">
@@ -134,7 +144,7 @@ const appbar_menu = navigation.appBarMenu ?? []
 			</main>
 			<button id="mobile-nav-backdrop" type="button" aria-label="Close navigation menus"></button>
 		</div>
-		{liveReload &&
+		{liveReloadPolling &&
 			<script is:inline>
 				// Extension live reload: poll the local preview server's change
 				// stamps; reload in place when they move. Local only.
@@ -394,3 +404,4 @@ main{
 
 <script src="./menu_interactions_activation.js" />
 {liveReload && <script src="./lazy_navigation.js" />}
+{liveReload && <script src="./runtime_info.js" />}

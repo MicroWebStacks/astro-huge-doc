@@ -77,9 +77,19 @@ const indexes = {
     blobByUid: new Map(),
     contentDocBySid: new Map()
 };
-const loadedDocs = new Map(); // sid -> {hash, assetSources}
+const loadedDocs = new Map(); // sid -> {hash, assetSources, parseMs}
 const inflight = new Map(); // sid -> Promise
 const blobCache = new Map();
+
+// Info-surface bookkeeping only (specification/run-modes/spec.md,
+// Observability): both of these just record numbers the lazy pipeline was
+// already computing for its own purposes (parse time from
+// parseDocumentRecord, walk time from walkWorkspace). Nothing here reads a
+// file, parses anything, or walks anything that would not have happened
+// anyway. In-memory only; resets on server restart, never persisted.
+let lastPageLoad = null; // {path, url, hit: 'memory'|'disk'|'parsed', ms, at}
+const WALK_HISTORY_LIMIT = 20;
+const walkHistory = [];
 
 function assetBlobKey(assetUid, blobUid) {
     return `${assetUid}${ASSET_KEY_SEPARATOR}${blobUid}`;
@@ -334,6 +344,11 @@ function walkWorkspace() {
     ];
     console.log(`[lite] file tree walk: ${documents.length} documents, ${sourceEntries.length} entries in ${walkMs} ms (root: ${rootDirs} dirs, ${rootFiles} files${extras.length ? `; ${extras.join(', ')}` : ''})`);
 
+    walkHistory.push({at: new Date().toISOString(), ms: walkMs, documents: documents.length, entries: sourceEntries.length});
+    if (walkHistory.length > WALK_HISTORY_LIMIT) {
+        walkHistory.shift();
+    }
+
     try {
         mkdirSync(jsonDir(), {recursive: true});
         writeFileSync(fileTreePath(), JSON.stringify({
@@ -415,7 +430,7 @@ function mergeRecord(doc, record) {
             indexes.blobByUid.set(String(row.blob_uid), row);
         }
     }
-    loadedDocs.set(doc.sid, {hash: record.hash, assetSources: record.asset_sources ?? []});
+    loadedDocs.set(doc.sid, {hash: record.hash, assetSources: record.asset_sources ?? [], parseMs: record.parse_ms ?? null});
 }
 
 async function parseDocumentRecord(doc, rawText, hash) {
@@ -600,6 +615,7 @@ async function loadOrParseDocument(doc) {
     const hash = contentHash(raw);
     const loaded = loadedDocs.get(doc.sid);
     if (loaded && loaded.hash === hash && assetSourcesFresh(loaded.assetSources)) {
+        lastPageLoad = {path: doc.path, url: doc.url, hit: 'memory', ms: loaded.parseMs ?? null, at: new Date().toISOString()};
         return true;
     }
 
@@ -610,6 +626,7 @@ async function loadOrParseDocument(doc) {
             if (record?.hash === hash && assetSourcesFresh(record.asset_sources)) {
                 mergeRecord(doc, record);
                 log_debug(`  - getEntry[lazy]> cache hit ${doc.path}`);
+                lastPageLoad = {path: doc.path, url: doc.url, hit: 'disk', ms: record.parse_ms ?? null, at: new Date().toISOString()};
                 return true;
             }
         } catch {
@@ -628,6 +645,7 @@ async function loadOrParseDocument(doc) {
         console.warn(`[lite] could not persist page record for ${doc.path}: ${error.message}`);
     }
     mergeRecord(doc, record);
+    lastPageLoad = {path: doc.path, url: doc.url, hit: 'parsed', ms: record.parse_ms ?? null, at: new Date().toISOString()};
     return true;
 }
 
@@ -954,6 +972,14 @@ async function getEntry(match) {
     return {found: true, title: document.title, headings, items, data};
 }
 
+function getLastPageLoad() {
+    return lastPageLoad;
+}
+
+function getWalkHistory() {
+    return walkHistory.slice();
+}
+
 export {
     getEntry,
     getFirstDocument,
@@ -968,5 +994,7 @@ export {
     parseAssetLink,
     getImageInfo,
     getAssetBlob,
-    getAssetUrl
+    getAssetUrl,
+    getLastPageLoad,
+    getWalkHistory
 };

@@ -1147,6 +1147,9 @@ function createRuntimeEnv(runtime, port) {
     DOCS_BACKEND: 'json',
     MICROWEBSTACKS_ENGINE_ROOT: runtime.engineRoot,
     MICROWEBSTACKS_EXTENSION_MODE: 'true',
+    // Launcher identity shown by the viewer's runtime info surface
+    // (/__lite/runtime), so the extension<->engine pair is visible in-page.
+    MICROWEBSTACKS_LAUNCHER: `vscode-extension@${extensionPackage.version ?? 'unknown'}`,
     MICROWEBSTACKS_WORKSPACE_ROOT: runtime.workspaceRoot,
     MICROWEBSTACKS_DB_PATH: runtime.dbPath,
     MICROWEBSTACKS_STORE_PATH: runtime.storePath,

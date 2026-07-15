@@ -14,9 +14,10 @@ export interface Props {
     }>;
     showLeftToggle?: boolean;
     showRightToggle?: boolean;
+    showRuntimeInfo?: boolean;
 }
 
-const { menu: providedMenu = [], showLeftToggle = false, showRightToggle = false } = Astro.props as Props;
+const { menu: providedMenu = [], showLeftToggle = false, showRightToggle = false, showRuntimeInfo = false } = Astro.props as Props;
 const menu = providedMenu.length ? providedMenu : buildAppBarMenu(Astro.url.pathname);
 const left_side  = menu.filter((item)=>(!Object.hasOwn(item,"align") || !(item.align=="right")))
 const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.align=="right")))
@@ -53,6 +54,18 @@ const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.ali
                 </a>
             </li>
         ))}
+        {showRuntimeInfo &&
+            <li class="nav-toggle-item">
+                <button id="runtime-info-toggle" type="button" class="nav-toggle"
+                    title="Preview runtime info" aria-label="Preview runtime info" aria-expanded="false">
+                    <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+                        <circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.3"></circle>
+                        <circle cx="8" cy="5" r="0.9" fill="currentColor"></circle>
+                        <line x1="8" y1="7.4" x2="8" y2="11.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></line>
+                    </svg>
+                </button>
+            </li>
+        }
         <li class="theme-toggle-item">
             <ThemeToggle />
         </li>

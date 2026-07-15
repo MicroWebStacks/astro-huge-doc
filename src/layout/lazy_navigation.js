@@ -106,7 +106,7 @@ function showError(nav) {
     nav.classList.remove('loading');
     const message = document.createElement('p');
     message.className = 'lazy-menu-error';
-    message.textContent = 'Pages could not be loaded.';
+    message.textContent = 'Pages could not be loaded — the ⓘ icon in the top bar has diagnostics.';
     nav.append(message);
 }
 
@@ -122,10 +122,20 @@ async function loadNavigation() {
         if (!response.ok) {
             throw new Error(`navigation request returned ${response.status}`);
         }
+        const contentType = response.headers.get('content-type') ?? '';
+        if (!contentType.includes('application/json')) {
+            // A non-JSON answer means the request fell through to a page
+            // route: the server is not serving the extension-preview surface
+            // this page was rendered for (specification/run-modes/spec.md).
+            throw new Error(`navigation request answered with '${contentType || 'no content type'}' instead of JSON - run-mode mismatch`);
+        }
         const payload = await response.json();
         const items = Array.isArray(payload.items) ? payload.items : [];
+        // Last-result record for the runtime info surface (runtime_info.js).
+        window.__mwsNavigationStatus = {ok: true, ms: payload.ms ?? null, at: new Date().toISOString()};
         menus.forEach((nav) => populate(nav, items));
     } catch (error) {
+        window.__mwsNavigationStatus = {ok: false, error: error.message, at: new Date().toISOString()};
         console.warn(`[lite] navigation unavailable: ${error.message}`);
         menus.forEach(showError);
     }

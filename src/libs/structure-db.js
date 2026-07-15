@@ -45,5 +45,10 @@ export const {
     parseAssetLink,
     getImageInfo,
     getAssetBlob,
-    getAssetUrl
+    getAssetUrl,
+    // Lazy-backend-only introspection for the info surface (undefined on the
+    // json/sqlite full backends, which don't do per-page hit/miss caching the
+    // same way; callers must guard with typeof === 'function').
+    getLastPageLoad,
+    getWalkHistory
 } = impl;

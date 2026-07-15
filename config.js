@@ -56,7 +56,9 @@ const DEFAULT_MANIFEST = {
         }
     },
     html_cache: {
-        exclude_paths: ['/blobs/', '.well-known/']
+        // /__lite/ answers are live extension-preview state (change stamps,
+        // navigation); caching them would freeze reload detection.
+        exclude_paths: ['/blobs/', '.well-known/', '/__lite/']
     }
 };
 

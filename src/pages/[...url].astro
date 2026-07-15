@@ -20,6 +20,13 @@ console.log(`* [...url] > url = ${url}`)
 // await: the lazy lite backend parses the page on demand (async); the sync
 // backends return a plain value, which await passes through unchanged.
 const {found, title, headings, items, data} = await getEntry({url:url})
+// Honest status contract (specification/run-modes/spec.md): an unknown URL
+// answers 404, not a 200 not-found page — clients (including the lazy menu's
+// fetch) rely on response.ok meaning the resource exists. Static builds never
+// render this branch (getStaticPaths enumerates only existing documents).
+if (!found) {
+    Astro.response.status = 404;
+}
 ---
 {found&&
     <Layout title={title} headings={headings} >

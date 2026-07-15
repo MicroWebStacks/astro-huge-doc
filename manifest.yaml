@@ -52,3 +52,4 @@ html_cache:
   exclude_paths:
     - /blobs/
     - .well-known/
+    - /__lite/

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.18 - 2026-07-15
+
+- New: a preview diagnostics panel, opened from a new ⓘ icon in the app bar.
+  Shows engine version and commit, which server mode is running, workspace
+  and docs paths, file/page counts, how many pages the lazy cache has parsed
+  so far, live-reload/navigation endpoint health, and — per page — which
+  diagrams render locally versus through a Kroki server (engine 0.0.12).
+- Live-reload polling now only starts when something can actually signal a
+  change, instead of polling on a fixed interval regardless.
+
 ## 0.0.17 - 2026-07-13
 
 - Large documentation folders now open without waiting for a full-site
