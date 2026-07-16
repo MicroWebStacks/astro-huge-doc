@@ -9,7 +9,8 @@ const PLANTUML_PANEL_ELEMENTS = [
     'ActivityDiamond', 'Partition', 'State', 'Class', 'Object', 'Component',
     'Interface', 'Usecase', 'Rectangle', 'Database', 'Queue', 'Node', 'Package',
     'Frame', 'Folder', 'Cloud', 'Card', 'Agent', 'Boundary', 'Control', 'Entity',
-    'Collections', 'Legend'
+    'Collections', 'Legend', 'Storage', 'Artifact', 'File', 'Stack', 'Hexagon',
+    'Person'
 ];
 
 function buildPlantumlThemeHeader({surface, ink, line, panel, note}) {
@@ -25,12 +26,18 @@ function buildPlantumlThemeHeader({surface, ink, line, panel, note}) {
         `skinparam SequenceDividerBorderColor ${line}`,
         `skinparam NoteBackgroundColor ${note}`,
         `skinparam NoteBorderColor ${line}`,
-        `skinparam NoteFontColor ${ink}`
+        /* "automatic" resolves to black or white against the box the text
+         * actually sits on, so authors' explicit element colors (e.g.
+         * `rectangle Foo #LightBlue`) stay readable in both themes instead
+         * of inheriting a fixed ink that only suits the themed panel. */
+        'skinparam NoteFontColor automatic',
+        'skinparam ClassAttributeFontColor automatic',
+        'skinparam ObjectAttributeFontColor automatic'
     ];
     for (const element of PLANTUML_PANEL_ELEMENTS) {
         lines.push(`skinparam ${element}BackgroundColor ${panel}`);
         lines.push(`skinparam ${element}BorderColor ${line}`);
-        lines.push(`skinparam ${element}FontColor ${ink}`);
+        lines.push(`skinparam ${element}FontColor automatic`);
     }
     return lines.join('\n');
 }

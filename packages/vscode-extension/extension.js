@@ -1198,9 +1198,11 @@ async function startServer(runtime, port, env) {
   serverProcess = child;
 }
 
-async function waitForServer(url, timeoutMs = 30000) {
-  const deadline = Date.now() + timeoutMs;
+async function waitForServer(url, {timeoutMs = 120000, progress} = {}) {
+  const startedAt = Date.now();
+  const deadline = startedAt + timeoutMs;
   let lastError = null;
+  let lastReportedAt = 0;
   while (Date.now() < deadline) {
     if (!serverProcess) {
       throw new Error('Preview server exited before it became reachable. Check the MicroWebStacks Docs output channel.');
@@ -1210,19 +1212,57 @@ async function waitForServer(url, timeoutMs = 30000) {
       return;
     } catch (error) {
       lastError = error;
+      const elapsed = Date.now() - startedAt;
+      // A cold first run (engine hydration, antivirus scanning node_modules)
+      // can take a while to boot; keep the user informed instead of silent.
+      if (progress && elapsed - lastReportedAt >= 5000) {
+        lastReportedAt = elapsed;
+        progress.report({message: `waiting for preview server… (${Math.round(elapsed / 1000)}s)`});
+      }
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
   }
   throw new Error(`Preview server did not become reachable at ${url}: ${lastError?.message ?? 'timeout'}`);
 }
 
-function requestUrl(url) {
+// Non-fatal warm-up of the first page. Rendering `/` on a large cold
+// workspace triggers the full tree walk plus the first parse and can take
+// far longer than any reasonable startup gate, so this never blocks startup
+// beyond a short grace period and never fails it: past the grace the render
+// keeps going in the background and the opened preview shows the browser's
+// own loading state until the server answers.
+const FIRST_PAGE_GRACE_MS = 5000;
+const FIRST_PAGE_TIMEOUT_MS = 10 * 60 * 1000;
+
+function warmFirstPage(url) {
+  const startedAt = Date.now();
+  const warm = requestUrl(url, FIRST_PAGE_TIMEOUT_MS)
+    .then(() => {
+      log(`First page rendered in ${Date.now() - startedAt} ms.`);
+      return 'rendered';
+    })
+    .catch((error) => {
+      log(`First page warm-up did not complete (${error.message}); the preview renders it on demand instead.`);
+      return 'failed';
+    });
+  const grace = new Promise((resolve) => setTimeout(resolve, FIRST_PAGE_GRACE_MS, 'grace'));
+  return Promise.race([warm, grace]).then((outcome) => {
+    if (outcome === 'grace') {
+      log('First page is still rendering (large site or cold caches); opening the preview now, it will display once ready.');
+      vscode.window.showInformationMessage(
+        'MicroWebStacks Docs: indexing this site for the first time — the preview opens now and will display as soon as the first page is ready.'
+      );
+    }
+  });
+}
+
+function requestUrl(url, timeoutMs = 2000) {
   return new Promise((resolve, reject) => {
     const request = http.get(url, (response) => {
       response.resume();
       response.on('end', resolve);
     });
-    request.setTimeout(2000, () => {
+    request.setTimeout(timeoutMs, () => {
       request.destroy(new Error('request timed out'));
     });
     request.on('error', reject);
@@ -1246,8 +1286,14 @@ async function ensureServer(context) {
       // on demand. Startup cost is server boot + one page, not the whole site.
       await startServer(runtime, port, env);
       const browserUrl = `http://127.0.0.1:${port}/`;
-      await waitForServer(browserUrl);
-      log(`Preview ready in ${Date.now() - startedAt} ms (server boot + first page; pages parse on demand).`);
+      // Readiness means "the server answers HTTP", probed on a cheap
+      // middleware endpoint. Never gate startup on rendering `/`: on a large
+      // cold workspace that first render exceeds any reasonable probe budget
+      // (this failed as a hard timeout on big first runs).
+      await waitForServer(`${browserUrl}__lite/runtime`, {progress});
+      log(`Preview server reachable in ${Date.now() - startedAt} ms (pages parse on demand).`);
+      progress.report({message: 'rendering first page…'});
+      await warmFirstPage(browserUrl);
       serverState = {
         ...runtime,
         port,

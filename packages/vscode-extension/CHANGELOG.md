@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.0.19 - 2026-07-16
+
+- Fixed unreadable text in PlantUML diagrams that use explicit element colors
+  (e.g. `rectangle Foo #LightBlue`): element text now picks black or white
+  automatically against the box it sits on, in both light and dark themes,
+  instead of always using the theme ink. Colored notes and class/object
+  members are covered too, and more deployment elements (storage, artifact,
+  file, stack, hexagon, person) are themed on the Kroki server path
+  (engine 0.0.13).
+- Preview startup no longer times out on large cold workspaces: readiness is
+  probed on a cheap endpoint instead of waiting for the first full page
+  render, the progress notification reports elapsed wait time, and the first
+  page warms up in the background — past a short grace period the preview
+  opens and displays as soon as the page is ready.
+
 ## 0.0.18 - 2026-07-15
 
 - New: a preview diagnostics panel, opened from a new ⓘ icon in the app bar.

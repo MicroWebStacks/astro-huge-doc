@@ -72,6 +72,36 @@ avoid a glare/flash. They use dedicated tokens
 (`--diagram-surface-bg`, `--model-viewer-bg`, `--lightbox-*`) and must never be
 left as literal `#fff` in a component.
 
+### Diagram text contrast
+
+PlantUML diagrams are re-rendered per resolved theme with an injected
+`skinparam` header (`src/libs/plantuml-theme.js`, shared by the client engine
+and the Kroki path; its colors mirror `colors.css` because the render engines
+cannot read CSS variables). The header themes element boxes to the palette's
+panel color, which creates a contrast obligation:
+
+- **Text drawn on the page background** (titles, arrow labels, the default
+  font) uses the theme's fixed ink color.
+- **Text drawn inside an element box** (participants, rectangles, classes and
+  their members, notes, and every other themed element) MUST use PlantUML's
+  `FontColor automatic`, which resolves to black or white against the box the
+  text actually sits on — **never** the fixed theme ink.
+
+The rule exists because authors may color elements explicitly (e.g.
+`rectangle Foo #LightBlue`, `note ... #LightYellow`): a fixed light ink on
+such a box is unreadable in dark mode, and a fixed dark ink has the mirror
+problem in light mode. With `automatic`, themed panels keep the expected
+palette ink while author-colored boxes stay readable in both themes, without
+parsing or rewriting the author's source.
+
+`test/plantuml-theme.test.js` guards this split: every element-level
+`*FontColor` in the generated header must be `automatic`, and the page-level
+ones must not be.
+
+Mermaid handles the same concern internally: the client renderer passes the
+resolved theme to mermaid's own `dark`/`default` theme, which computes its
+node text colors together with node backgrounds.
+
 ## Toggle Control
 
 A single toggle (`ThemeToggle.astro`, mounted in the AppBar) cycles the

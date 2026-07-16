@@ -134,6 +134,27 @@ Worker --> Browser : email receipt sent
 @enduml
 ```
 
+## Author-Colored Elements
+
+Elements with explicit colors keep readable text in both themes: the theme
+header uses `FontColor automatic`, so light boxes get dark text and dark
+boxes get light text regardless of the active theme.
+
+```plantuml
+@startuml
+rectangle "Explicit LightBlue" as R1 #LightBlue
+rectangle "PlantUML default" as R2 #FEFECE
+rectangle "Explicit Navy" as R3 #Navy
+rectangle "Themed panel" as R4
+note right of R4 #LightYellow
+  a light note
+end note
+R1 --> R2
+R2 --> R3
+R3 --> R4
+@enduml
+```
+
 ## Linked PlantUML
 
 The [linked PlantUML fixture](./linked-client-render.puml) uses the same client
