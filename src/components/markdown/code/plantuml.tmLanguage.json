@@ -1,0 +1,86 @@
+{
+  "scopeName": "source.plantuml",
+  "patterns": [
+    { "include": "#blockComments" },
+    { "include": "#lineComments" },
+    { "include": "#tags" },
+    { "include": "#preprocessor" },
+    { "include": "#preprocessorVariables" },
+    { "include": "#strings" },
+    { "include": "#stereotypes" },
+    { "include": "#arrows" },
+    { "include": "#keywords" },
+    { "include": "#colors" },
+    { "include": "#numbers" },
+    { "include": "#variables" }
+  ],
+  "repository": {
+    "blockComments": {
+      "name": "comment.block.plantuml",
+      "begin": "/'",
+      "end": "'/"
+    },
+    "lineComments": {
+      "name": "comment.line.apostrophe.plantuml",
+      "match": "^\\s*'.*$"
+    },
+    "tags": {
+      "name": "keyword.control.tag.plantuml",
+      "match": "^\\s*@(?:start|end)\\w+"
+    },
+    "preprocessor": {
+      "name": "meta.preprocessor.plantuml",
+      "match": "^\\s*!\\w+"
+    },
+    "preprocessorVariables": {
+      "name": "variable.parameter.plantuml",
+      "match": "[$%]\\w+"
+    },
+    "strings": {
+      "name": "string.quoted.double.plantuml",
+      "match": "\"[^\"\\r\\n]*\""
+    },
+    "stereotypes": {
+      "name": "entity.name.type.stereotype.plantuml",
+      "match": "<<[^<>\\r\\n]+>>"
+    },
+    "arrows": {
+      "patterns": [
+        {
+          "name": "keyword.control.arrow.plantuml",
+          "match": "(?:<\\|?|[*ox+#])?-+(?:up|down|left|right|u|d|l|r)-+(?:\\|?>|[*ox+#](?!\\w))?"
+        },
+        {
+          "name": "keyword.control.arrow.plantuml",
+          "match": "(?:<\\|?|[*ox+#])(?:-+|\\.+)(?:\\[[^\\]\\r\\n]*\\])?(?:-+|\\.+)?(?:\\|?>|[*ox+#](?!\\w))?"
+        },
+        {
+          "name": "keyword.control.arrow.plantuml",
+          "match": "(?:-+|\\.+)(?:\\[[^\\]\\r\\n]*\\])?(?:-+|\\.+)?(?:\\|?>|[*ox+#](?!\\w))"
+        },
+        {
+          "name": "keyword.control.arrow.plantuml",
+          "match": "-{2,}|\\.{2,}|={2,}|~{2,}"
+        }
+      ]
+    },
+    "keywords": {
+      "name": "keyword.control.plantuml",
+      "match": "\\b(abstract|activate|actor|agent|allowmixing|also|alt|annotation|artifact|as|autoactivate|autonumber|boundary|bottom|box|break|caption|card|circle|class|cloud|collections|component|control|create|critical|database|deactivate|destroy|detach|diamond|down|else|elseif|end|endif|endwhile|entity|enum|exception|extends|file|folder|footer|fork|frame|group|header|hide|hnote|if|implements|interface|json|kill|label|left|legend|link|loop|mainframe|map|namespace|newpage|node|note|object|of|on|opt|order|over|package|page|par|participant|person|protocol|queue|rectangle|ref|remove|repeat|restore|return|right|rnote|scale|show|skin|skinparam|split|sprite|start|state|static|stereotype|stop|storage|struct|style|then|title|together|top|up|usecase|while)\\b"
+    },
+    "colors": {
+      "name": "constant.numeric.color.plantuml",
+      "match": "#[0-9A-Za-z]+(?:[|/\\\\][0-9A-Za-z]+)?"
+    },
+    "numbers": {
+      "name": "constant.numeric.plantuml",
+      "match": "\\b\\d+(?:\\.\\d+)?\\b"
+    },
+    "variables": {
+      "name": "variable.other.plantuml",
+      "match": "\\b[A-Za-z][\\w]*\\b"
+    }
+  },
+  "fileTypes": ["puml", "plantuml", "iuml", "pu"],
+  "uuid": "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d"
+}

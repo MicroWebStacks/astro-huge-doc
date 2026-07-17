@@ -2,6 +2,7 @@ import {config} from '@/config.js'
 import { log_debug } from '@/libs/utils';
 import {bundledLanguages, createHighlighter} from 'shiki';
 import mermaidGrammarJson from './mermaid.tmLanguage.json?raw';
+import plantumlGrammarJson from './plantuml.tmLanguage.json?raw';
 
 // Dual-theme highlighting: Shiki emits both light and dark token colors as
 // CSS variables (--shiki-light / --shiki-dark). The active palette is picked
@@ -17,9 +18,18 @@ const mermaidLanguage = {
     name: 'mermaid',
     ...mermaidGrammar
 }
+const plantumlGrammar = JSON.parse(plantumlGrammarJson)
+const plantumlLanguage = {
+    name: 'plantuml',
+    ...plantumlGrammar
+}
+// plantuml stays out of the eager createHighlighter langs below: pages
+// without PlantUML never pay for the grammar, codeToHtml lazy-loads it.
 const customLanguages = new Map([
     ['mermaid', mermaidLanguage],
-    ['mmd', mermaidLanguage]
+    ['mmd', mermaidLanguage],
+    ['plantuml', plantumlLanguage],
+    ['puml', plantumlLanguage]
 ])
 const configuredLangs = (config.highlighter.langs ?? [])
     .filter((lang) => !customLanguages.has(lang))
@@ -28,7 +38,8 @@ const highlighter = await createHighlighter({
     themes: themeList,
     langs: [...configuredLangs, mermaidLanguage],
     langAlias: {
-        mmd: 'mermaid'
+        mmd: 'mermaid',
+        puml: 'plantuml'
     }
 })
 for (const theme of themeList) {

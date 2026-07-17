@@ -85,21 +85,18 @@ const isImg = !isSvg
   border-top: 4px solid transparent;
   position: relative;
 }
+/* The open button stays in flow and only toggles visibility, so hovering
+   never changes the container height. The header replaces the top padding. */
 .container.with-open-button{
-  padding-top:var(--space-5);
+  padding-top:0px;
 }
 /* `center` option on an inline image directive */
 .container.center{
   margin-inline: auto;
 }
-.container.with-open-button:hover{
-  border: 0px solid transparent;
-  border-color: transparent;
-  padding-left:var(--space-3);
-  padding-top:0px;
-}
 .header{
-  display:none;
+  display:flex;
+  visibility:hidden;
   flex-direction: row;
   justify-content: center;
   background:var(--surface-2-bg);
@@ -114,7 +111,7 @@ const isImg = !isSvg
 }
 
 .container.with-open-button:hover .header {
-  display: flex; /* Show the header on hover */
+  visibility: visible; /* Show the header on hover */
 }
 
 .figure{

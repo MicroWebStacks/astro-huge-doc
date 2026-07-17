@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.0.20 - 2026-07-17
+
+- PlantUML code blocks now get real syntax highlighting in the code view
+  (toolbar "Show code" toggle and standalone blocks): comments, `@startuml`
+  tags, preprocessor directives, keywords, arrows, strings, stereotypes, and
+  color literals are colored in both light and dark themes via a dedicated
+  grammar, matching what Mermaid blocks already had (engine 0.0.14).
+- The outline menu now marks sections that contain an image with a small
+  picture icon, alongside the existing table/code/diagram indicators
+  (engine 0.0.14).
+- Fixed a small vertical layout shift when hovering an image: the
+  open-full-view button now always reserves its space and only fades in,
+  instead of pushing the image down on hover.
+
 ## 0.0.19 - 2026-07-16
 
 - Fixed unreadable text in PlantUML diagrams that use explicit element colors

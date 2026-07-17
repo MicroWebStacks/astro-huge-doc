@@ -14,7 +14,8 @@ function cloneHeading(heading) {
         nodeKey: heading.nodeKey ?? heading.uid ?? heading.slug ?? heading.link ?? label,
         hasTable: Boolean(heading.hasTable),
         hasCode: Boolean(heading.hasCode),
-        hasDiagram: Boolean(heading.hasDiagram)
+        hasDiagram: Boolean(heading.hasDiagram),
+        hasImage: Boolean(heading.hasImage)
     };
 }
 

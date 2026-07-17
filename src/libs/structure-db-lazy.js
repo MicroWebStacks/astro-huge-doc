@@ -883,6 +883,8 @@ function annotateHeadingSections(items) {
         }
         if (item.type === 'table') {
             current.hasTable = true;
+        } else if (item.type === 'image') {
+            current.hasImage = true;
         } else if (item.type === 'code') {
             const lang = normalizeLang(extByUid.get(item.asset_uid));
             if (diagramLanguages[lang]) {
