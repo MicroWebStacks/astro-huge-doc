@@ -156,7 +156,11 @@ function get_url_type(file_path){
 async function createMarkdownDocumentSource(file_path){
     const url_type = get_url_type(file_path)
     const markdownText = await load_text(file_path)
-    const {data, content: bodyContent} = parseMarkdownFrontmatter(markdownText, file_path)
+    const parsed = parseMarkdownFrontmatter(markdownText, file_path)
+    if(!parsed){
+        return null
+    }
+    const {data, content: bodyContent} = parsed
     const knownEntryFields = await getKnownEntryFieldSet()
     const {entryFields, modelFields} = partitionFrontmatter(data ?? {}, knownEntryFields)
 
@@ -224,15 +228,23 @@ async function* collectSingleFolderDocuments(){
         }
         bucket.markdown.sort()
         const sections = []
+        let primaryPath = null
         for(const file_path of bucket.markdown){
             const raw = await load_text(file_path)
-            const {content} = parseMarkdownFrontmatter(raw, file_path)
+            const parsed = parseMarkdownFrontmatter(raw, file_path)
+            if(!parsed){
+                continue
+            }
+            primaryPath ??= file_path
+            const {content} = parsed
             if(content && content.trim().length > 0){
                 sections.push(content.trim())
             }
         }
+        if(!primaryPath){
+            continue
+        }
         const markdownText = sections.join('\n\n')
-        const primaryPath = bucket.markdown[0]
         const url_type = 'dir'
         const slug = get_slug({},primaryPath,url_type)
         const url = entry_to_url(url_type,primaryPath,slug)

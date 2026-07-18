@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.21 - 2026-07-18
+
+- Fixed a crash where a single document with malformed YAML front matter
+  (e.g. an invalid alias) could abort collection or blank the whole preview.
+  The offending document is now skipped and every other page still renders
+  (engine 0.0.15).
+
 ## 0.0.20 - 2026-07-17
 
 - PlantUML code blocks now get real syntax highlighting in the code view
