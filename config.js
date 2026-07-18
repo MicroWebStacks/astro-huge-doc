@@ -7,6 +7,7 @@ import {existsSync} from 'node:fs';
 // NOTE: better-sqlite3 is imported lazily inside resolveLatestVersion (sqlite
 // backend only) so the json/lite profile can import this config without the
 // native dependency being present.
+const SQLITE_MODULE_SPECIFIER = 'better-sqlite3';
 
 const DEFAULT_MANIFEST = {
     output: {
@@ -136,7 +137,10 @@ async function resolveLatestVersion(structurePath) {
     }
     let db;
     try {
-        const {default: Database} = await import('better-sqlite3');
+        // Keep the native module runtime-only. A literal dynamic import is
+        // still resolved by Vite while bundling a json/static build, even
+        // though this sqlite-only branch never executes in that deployment.
+        const {default: Database} = await import(/* @vite-ignore */ SQLITE_MODULE_SPECIFIER);
         db = new Database(structurePath, {readonly: true, fileMustExist: true});
         const row = db.prepare('SELECT version_id FROM versions ORDER BY version_id DESC LIMIT 1').get();
         return row?.version_id ?? null;

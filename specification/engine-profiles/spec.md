@@ -41,6 +41,9 @@ Rules that follow:
 - The static deployment uses the `json` backend, not SQLite: a static build
   needs no canonical store at serve time, and CI must not require native
   dependencies beyond what the build itself uses.
+- Native SQLite imports must remain behind the backend runtime gate and opaque
+  to the static bundler. A `full` + `json` + `static` build must succeed when
+  `better-sqlite3` is absent from the installed engine dependency tree.
 - The `lite` profile exists only for the extension; it must never gain a
   native dependency (see the vscode-lite packet history).
 - The markdown parsing layer (`content-structure`) is maintained inside this

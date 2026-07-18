@@ -3,6 +3,18 @@
 Release notes for the `@microwebstacks/md-render` npm package. The VS Code
 extension has a separate changelog at `packages/vscode-extension/CHANGELOG.md`.
 
+## 0.0.17 - 2026-07-18
+
+### Fixed
+
+- Fixed GitHub Pages and other `full` + `json` + `static` builds failing when
+  Vite attempted to resolve the absent native `better-sqlite3` package.
+- Kept SQLite loading runtime-only and restricted to SQLite-backed deployments;
+  JSON/static rendering no longer requires the native dependency to be
+  installed.
+- Added regression coverage preventing native SQLite imports from becoming
+  statically resolvable in the JSON/static configuration graph.
+
 ## 0.0.16 - 2026-07-18
 
 ### Fixed
