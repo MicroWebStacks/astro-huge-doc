@@ -16,7 +16,7 @@ import {readFileSync, readdirSync, statSync} from 'node:fs';
 import {stat} from 'node:fs/promises';
 import {join} from 'node:path';
 import {config} from '../../config.js';
-import {buildSectionMenuFromSourceEntries} from '../layout/source_navigation.js';
+import {buildSectionMenuFromSourceEntries, firstDocumentUrl} from '../layout/source_navigation.js';
 
 function extensionPreviewEnabled() {
     return process.env.MICROWEBSTACKS_EXTENSION_MODE === 'true';
@@ -209,18 +209,21 @@ async function statsPayload() {
 async function navigationPayload(pathname) {
     const startedAt = performance.now();
     let entries;
+    let documents;
     try {
         const snapshot = JSON.parse(readFileSync(join(config.collect.json_dir, 'filetree.json'), 'utf8'));
         entries = snapshot.source_entries ?? [];
+        documents = snapshot.documents ?? [];
     } catch {
         // The article request normally writes filetree.json before the browser
         // asks for navigation. Fall back to the live backend when persistence
         // failed, the payload was requested directly, or the active backend
         // never writes the snapshot (any non-lazy backend under `astro dev`).
-        const {getSourceEntries} = await import('./structure-db.js');
+        const {getSourceEntries, getDocuments} = await import('./structure-db.js');
         entries = getSourceEntries();
+        documents = getDocuments();
     }
-    const items = buildSectionMenuFromSourceEntries(entries, pathname, config.base);
+    const items = buildSectionMenuFromSourceEntries(entries, pathname, config.base, firstDocumentUrl(documents));
     const ms = Math.round(performance.now() - startedAt);
     console.log(`[lite] navigation for ${pathname} ready in ${ms} ms (${items.length} roots)`);
     return {items, ms};

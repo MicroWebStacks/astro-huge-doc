@@ -7,6 +7,7 @@ export interface Props {
   data: {
     title: string;
     url: string;
+    uid?: string;
     image?: string;
     features?: string[];
     tags?: string[];};
@@ -19,6 +20,12 @@ let isImg = false
 let asseturl = ""
 if(data.image){
     asseturl = getAssetUrl(data.image, config.collect.version_id) ?? ""
+    if(!asseturl && data.uid){
+        // Frontmatter `image:` values are file paths, not asset uids; the
+        // collector registers them under <doc-uid>.image-<filename>.
+        const fileName = String(data.image).split('/').pop()
+        asseturl = getAssetUrl(`${data.uid}.image-${fileName}`, config.collect.version_id) ?? ""
+    }
     isSvg = Boolean(asseturl) && data.image.endsWith(".svg")
     isImg = Boolean(asseturl) && !isSvg
 }

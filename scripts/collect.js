@@ -1,7 +1,22 @@
 import fsp from 'node:fs/promises';
 import {join} from 'node:path';
 import { config } from '../config.js';
-import { collect } from 'content-structure';
+
+async function loadCollector() {
+  try {
+    return (await import('content-structure')).collect;
+  } catch (error) {
+    const missingPrivatePackage = error?.code === 'ERR_MODULE_NOT_FOUND'
+      && String(error?.message ?? '').includes("package 'content-structure'");
+    if (!missingPrivatePackage) {
+      throw error;
+    }
+
+    // Published engines carry this private workspace package in _modules;
+    // source workspaces resolve the normal package import above instead.
+    return (await import('../_modules/content-structure/index.js')).collect;
+  }
+}
 
 async function clearHtmlCache(dbPath) {
   // better-sqlite3 is imported lazily so the json/lite collect never loads it.
@@ -34,6 +49,7 @@ async function updateJsonSourceTree(jsonDir, contentRoot) {
 
 async function main() {
   const collectConfig = config.collect;
+  const collect = await loadCollector();
 
   console.log(`content-structure: starting collect() [format: ${collectConfig.format ?? 'sqlite'}]`);
   collectConfig.version_id = await collect(collectConfig);

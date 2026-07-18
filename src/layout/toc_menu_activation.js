@@ -155,6 +155,12 @@ function ensureActiveVisible(nav, options = {}){
     }
 }
 
+function scrollActiveIfVisible(nav){
+    const active = activeMenuElement(nav);
+    if(!active || active.closest('ul.hidden')){ return; }
+    scrollElementIntoViewIfNeeded(nav, active);
+}
+
 function collapseAll(nav){
     nav.querySelectorAll('ul[data-level]').forEach((ul)=>{
         const level = parseInt(ul.getAttribute('data-level')||'1',10);
@@ -360,7 +366,11 @@ function setManual(nav, depth, options = {}){
     state.manualKind = 'depth';
     state.depth = Math.min(Math.max(1, depth), max);
     state.manualDepth = state.depth;
-    applyDepth(nav, state.depth);
+    // keepActive:false — an explicit depth choice wins over revealing the
+    // active branch (same contract as manual-custom): "1" closes every branch,
+    // including the one holding the current page/heading.
+    applyDepth(nav, state.depth, {keepActive:false});
+    scrollActiveIfVisible(nav);
     updateButtons(nav);
     if(options.persist !== false){
         safeWriteState(nav);

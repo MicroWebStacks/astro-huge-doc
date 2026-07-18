@@ -154,9 +154,13 @@ outputs:
   version predates the command.
 - The Action installs the pinned engine with a plain, isolated
   `npm install --prefix "$RUNNER_TEMP/md-render-engine" @microwebstacks/md-render@<version>`
-  — the same install path a real npm consumer uses (proved in Phase 3), not
-  the VS Code extension's vendored/renamed `_modules` shortcut. It never
-  touches the consumer's own `node_modules` or lockfile.
+  — the same install path a real npm consumer uses. Because
+  `content-structure` is a private in-repo package, the Action then
+  materializes only that package from the engine's declared vendored-module
+  directory into the isolated install's `node_modules`. Registry-installed
+  dependencies remain authoritative, including platform-specific optional
+  packages needed by Rollup and esbuild. The Action never touches the
+  consumer's own `node_modules` or lockfile.
 - `node-version` must resolve to Node 22+; the Action checks the input's major
   version itself before installing Node, and fails with a clear
   `::error::` message on an older or non-numeric value, rather than letting

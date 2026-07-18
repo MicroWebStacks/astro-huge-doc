@@ -1,5 +1,10 @@
+render:
+  folder: content
+  highlighter:
+    theme: dark-plus
+    langs: ['javascript','js','python','yaml', 'markdown', 'mermaid', 'text']
 fetch:
-  select: MicroWebStacks/astro-big-doc
+  select: HomeSmartMesh/homesmartmesh.github.io
   github:
     - repo: MicroWebStacks/astro-big-doc
       branch: main
@@ -13,6 +18,7 @@ fetch:
       dest: content
     - repo: HomeSmartMesh/homesmartmesh.github.io
       branch: main
+      folders: [content]
       dest: content
 output:
   ssr: dist
@@ -43,11 +49,6 @@ collect:
   file_compress_ext: ['txt','md','json','csv','tsv','yaml','yml','mermaid','mmd']
   external_storage_kb: 512
   inline_compression_kb: 32
-render:
-  folder: demo
-  highlighter:
-    theme: dark-plus
-    langs: ['javascript','js','python','yaml', 'markdown', 'mermaid', 'text']
 html_cache:
   exclude_paths:
     - /blobs/

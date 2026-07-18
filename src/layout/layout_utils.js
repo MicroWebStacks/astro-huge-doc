@@ -1,7 +1,7 @@
 import {getDocuments, getSourceEntries} from '../libs/structure-db.js';
 import {basePrefix} from '../libs/blob-files.js';
 import {config} from '../../config.js';
-import {buildSectionMenuFromSourceEntries as buildSourceEntryMenu} from './source_navigation.js';
+import {buildSectionMenuFromSourceEntries as buildSourceEntryMenu, firstDocumentUrl} from './source_navigation.js';
 
 function cloneHeading(heading) {
     const label = (heading.label ?? heading.body_text ?? '').trim();
@@ -404,8 +404,8 @@ function buildSectionMenuFromDocs(docs, pathname) {
     return roots;
 }
 
-function buildSectionMenuFromSourceEntries(sourceEntries, pathname) {
-    return buildSourceEntryMenu(sourceEntries, pathname, config.base);
+function buildSectionMenuFromSourceEntries(sourceEntries, pathname, docs = null) {
+    return buildSourceEntryMenu(sourceEntries, pathname, config.base, firstDocumentUrl(docs ?? getDocuments()));
 }
 
 function buildNavigationMenus(pathname) {
@@ -414,7 +414,7 @@ function buildNavigationMenus(pathname) {
     return {
         appBarMenu: buildAppBarMenuFromDocs(docs, pathname),
         sectionMenu: sourceEntries.length
-            ? buildSectionMenuFromSourceEntries(sourceEntries, pathname)
+            ? buildSectionMenuFromSourceEntries(sourceEntries, pathname, docs)
             : buildSectionMenuFromDocs(docs, pathname)
     };
 }

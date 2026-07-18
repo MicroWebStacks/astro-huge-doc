@@ -23,7 +23,17 @@ try {
     console.warn(yamlError)
 }
 
-const entries = cards.map(entry => getDocument({ uid: entry.uid }));
+// The lazy backend parses pages on demand: a card target that was never
+// visited has no meta_data (frontmatter image, description, ...) yet, so
+// force-load it through getEntry before reading the document row. Plain
+// values come back unchanged from the sync backends, so the await is safe.
+const entries = await Promise.all(cards.map(async (card) => {
+    if (!card?.uid || !getDocument({uid: card.uid})) {
+        return null;
+    }
+    await getEntry({uid: card.uid});
+    return getDocument({uid: card.uid});
+}));
 const resolvedCards = entries
   .map((entry, index) => ({entry, config: cards[index]}))
   .filter(({entry}) => entry);
@@ -33,7 +43,9 @@ const resolvedCards = entries
     {
         resolvedCards.map(({entry,config})=>(
             <div class="card" style={`width:${config.width_rem}rem`}>
-                <CardMeta data={entry.meta_data} />
+                {/* title/url/tags are document columns, never meta_data
+                    fields; merge them so the card has its heading and link. */}
+                <CardMeta data={{title: entry.title, url: entry.url, tags: entry.tags, uid: entry.uid, ...entry.meta_data}} />
             </div>
         ))
     }

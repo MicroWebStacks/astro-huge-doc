@@ -78,14 +78,45 @@ function activePathForUrl(sourceEntries, activeUrl) {
     return sourceEntries.find((entry) => (entry.document_url ?? null) === activeUrl)?.path ?? null;
 }
 
-function buildSectionMenuFromSourceEntries(sourceEntries, pathname, base = '/') {
+/* Mirrors the structure-db backends' getFirstDocument() ranking, so callers
+   can scope the root menu to the document the '/' route actually serves when
+   the content has no root-level document (no root README.md). */
+function firstDocumentUrl(documents) {
+    const rank = (url) => (url === '' ? 0 : url === 'home' ? 1 : 2);
+    let best = null;
+    for (const doc of documents ?? []) {
+        const candidate = {
+            url: String(doc.url ?? ''),
+            rank: rank(doc.url ?? ''),
+            level: doc.level ?? 0,
+            order: doc.order ?? doc.sort_order ?? 0
+        };
+        const wins = !best
+            || candidate.rank < best.rank
+            || (candidate.rank === best.rank && (candidate.level < best.level
+                || (candidate.level === best.level && (candidate.order < best.order
+                    || (candidate.order === best.order && candidate.url.localeCompare(best.url) < 0)))));
+        if (wins) {
+            best = candidate;
+        }
+    }
+    return best?.url || null;
+}
+
+function buildSectionMenuFromSourceEntries(sourceEntries, pathname, base = '/', rootFallbackUrl = null) {
     if (!Array.isArray(sourceEntries) || sourceEntries.length === 0) {
         return [];
     }
 
     const allRenderedEntries = renderedSourceEntries(sourceEntries);
-    const activeUrl = docUrlFromPathname(pathname, base);
-    const activePath = activePathForUrl(allRenderedEntries, activeUrl);
+    let activeUrl = docUrlFromPathname(pathname, base);
+    let activePath = activePathForUrl(allRenderedEntries, activeUrl);
+    if (activeUrl === '' && !activePath && rootFallbackUrl) {
+        // '/' serves the first document when no root README exists; scope the
+        // menu to that document's section instead of an empty root listing.
+        activeUrl = rootFallbackUrl;
+        activePath = activePathForUrl(allRenderedEntries, activeUrl);
+    }
     const activeTopLevel = activePath?.split('/').filter(Boolean)[0] ?? null;
     const inSection = Boolean(activeTopLevel && activePath?.includes('/'))
         || allRenderedEntries.some((entry) => (
@@ -174,4 +205,4 @@ function buildSectionMenuFromSourceEntries(sourceEntries, pathname, base = '/') 
     return roots;
 }
 
-export {buildSectionMenuFromSourceEntries};
+export {buildSectionMenuFromSourceEntries, firstDocumentUrl};

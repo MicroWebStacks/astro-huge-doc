@@ -55,6 +55,13 @@ function loadParseDeps() {
 const IGNORED_NAMES = new Set(['.git', 'node_modules']);
 const LAZY_VERSION_ID = 'lazy';
 const ASSET_KEY_SEPARATOR = '::';
+// Bump when the page-record shape or its derivation changes (e.g. frontmatter
+// meta_data capture): cached records from older code must re-parse even though
+// the markdown hash still matches.
+const RECORD_VERSION = 2;
+// Alt text marking the synthetic image appended for a frontmatter `image:`
+// path; the item is dropped after collection, only its asset/blob remain.
+const META_IMAGE_ALT = 'mws-meta-image';
 
 const jsonDir = () => config.collect.json_dir;
 const contentDir = () => config.collect.contentdir;
@@ -437,10 +444,28 @@ async function parseDocumentRecord(doc, rawText, hash) {
     const startedAt = Date.now();
     const {collectDocument, getStructureSchema, buildDocumentRow, writeBlobFiles, matter} = await loadParseDeps();
     let body = rawText;
+    let frontmatter = null;
     try {
-        body = matter(rawText).content ?? rawText;
+        const parsed = matter(rawText);
+        body = parsed.content ?? rawText;
+        frontmatter = (parsed.data && typeof parsed.data === 'object') ? parsed.data : null;
     } catch {
         // malformed frontmatter: render the file as-is
+    }
+
+    // A frontmatter `image:` (card thumbnail) never appears in the body, so
+    // the parse would not collect it. Append it as a sentinel image and let
+    // collectDocument produce the asset/blob/dimensions exactly like a body
+    // image; the sentinel item itself is removed after collection. Absolute
+    // and external paths are skipped (they point outside the content tree).
+    let metaImageAppended = false;
+    const metaImage = typeof frontmatter?.image === 'string' ? frontmatter.image.trim() : '';
+    if (metaImage && !metaImage.startsWith('/') && !/^[a-z][a-z\d+.-]*:/i.test(metaImage)) {
+        const metaImageAbs = join(contentDir(), posix.dirname(doc.path), metaImage);
+        if (existsSync(metaImageAbs)) {
+            body = `${body}\n\n![${META_IMAGE_ALT}](${metaImage})\n`;
+            metaImageAppended = true;
+        }
     }
     const entry = {
         sid: doc.sid,
@@ -486,11 +511,35 @@ async function parseDocumentRecord(doc, rawText, hash) {
 
     const schema = await getStructureSchema();
     const documentsSchema = schema.tables.get('documents');
+    // Lite identity stays filename-derived (never frontmatter), but
+    // frontmatter fields that are not documents columns (image, description,
+    // features, ...) still land in meta_data so meta consumers such as cards
+    // work in the lite profile too.
+    if (frontmatter) {
+        const knownColumns = new Set(documentsSchema.columns.map((column) => column.name));
+        const metaFields = {};
+        for (const [key, value] of Object.entries(frontmatter)) {
+            if (!knownColumns.has(key) && value !== undefined) {
+                metaFields[key] = value;
+            }
+        }
+        if (Object.keys(metaFields).length > 0) {
+            result.entry.meta_data = JSON.stringify(metaFields);
+        }
+    }
     const payload = buildDocumentRow(result.entry, result.content, documentsSchema, {
         versionId: LAZY_VERSION_ID,
         tree: result.tree,
         assets: result.assets
     });
+    if (metaImageAppended) {
+        const sentinelIndex = payload.items.findLastIndex(
+            (item) => item?.type === 'image' && item.body_text === META_IMAGE_ALT
+        );
+        if (sentinelIndex !== -1) {
+            payload.items.splice(sentinelIndex, 1);
+        }
+    }
 
     // A browser resolves ../README.md against the extension-less lite URL,
     // which would request a non-existent *.md route. Resolve Markdown links
@@ -589,6 +638,7 @@ async function parseDocumentRecord(doc, rawText, hash) {
 
     const parseMs = Date.now() - startedAt;
     const record = {
+        record_version: RECORD_VERSION,
         hash,
         parsed_at: new Date().toISOString(),
         parse_ms: parseMs,
@@ -623,7 +673,8 @@ async function loadOrParseDocument(doc) {
     if (existsSync(recordPath)) {
         try {
             const record = JSON.parse(readFileSync(recordPath, 'utf-8'));
-            if (record?.hash === hash && assetSourcesFresh(record.asset_sources)) {
+            if (record?.hash === hash && record?.record_version === RECORD_VERSION
+                && assetSourcesFresh(record.asset_sources)) {
                 mergeRecord(doc, record);
                 log_debug(`  - getEntry[lazy]> cache hit ${doc.path}`);
                 lastPageLoad = {path: doc.path, url: doc.url, hit: 'disk', ms: record.parse_ms ?? null, at: new Date().toISOString()};

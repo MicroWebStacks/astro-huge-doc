@@ -73,7 +73,7 @@ runs:
         fi
 
     - name: Set up Node.js ${{ inputs.node-version }}
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
         node-version: ${{ inputs.node-version }}
 
@@ -91,10 +91,38 @@ runs:
         # Vite/Rollup build against the vendored tree.
         npm install --prefix "$engine_dir" --omit=dev --no-audit --no-fund \
           "@microwebstacks/md-render@${{ inputs.engine-version }}"
-        engine_bin="$engine_dir/node_modules/@microwebstacks/md-render/bin/md-render.js"
+        engine_package_dir="$engine_dir/node_modules/@microwebstacks/md-render"
+        engine_bin="$engine_package_dir/bin/md-render.js"
         if [ ! -f "$engine_bin" ]; then
           echo "::error::@microwebstacks/md-render@${{ inputs.engine-version }} has no bin/md-render.js (engine too old for this Action)."
           exit 1
+        fi
+
+        # content-structure is an in-repo private package and cannot be fetched
+        # from npm. Engine 0.0.15 ships it inside the declared vendored module
+        # directory, so expose only that package to Node's normal resolver. Do
+        # not expose the complete vendored dependency tree: the registry install
+        # above must remain authoritative for platform-specific optional deps.
+        content_structure_dir="$engine_dir/node_modules/content-structure"
+        if [ ! -f "$content_structure_dir/package.json" ]; then
+          package_json="$engine_package_dir/package.json"
+          vendored_modules_dir="$(node -e '
+            const fs = require("node:fs");
+            const pkg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            process.stdout.write(pkg.vendoredModulesDir || "");
+          ' "$package_json")"
+          vendored_content_structure="$engine_package_dir/$vendored_modules_dir/content-structure"
+
+          if [ -z "$vendored_modules_dir" ] || [ ! -f "$vendored_content_structure/package.json" ]; then
+            echo "::error::@microwebstacks/md-render@${{ inputs.engine-version }} does not contain its private content-structure package."
+            exit 1
+          fi
+          if [ -e "$content_structure_dir" ]; then
+            echo "::error::The isolated engine install contains an incomplete content-structure package."
+            exit 1
+          fi
+
+          cp -R "$vendored_content_structure" "$content_structure_dir"
         fi
         echo "ENGINE_BIN=$engine_bin" >> "$GITHUB_ENV"
 
