@@ -137,7 +137,7 @@ async function main() {
     );
   }
   console.log(`\nPublished ${PACKAGE_NAME}@${version}.`);
-  console.log('Next: release the extension that pins this engineVersion (node scripts/release-extension.js).');
+  console.log('Optional: release the extension when Marketplace users should receive this engine in the bundled fallback.');
 }
 
 main().catch((error) => {

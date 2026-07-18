@@ -99,10 +99,11 @@ runs:
         fi
 
         # content-structure is an in-repo private package and cannot be fetched
-        # from npm. Engine 0.0.15 ships it inside the declared vendored module
-        # directory, so expose only that package to Node's normal resolver. Do
-        # not expose the complete vendored dependency tree: the registry install
-        # above must remain authoritative for platform-specific optional deps.
+        # from npm. Published engines ship it inside the declared vendored
+        # module directory, so expose only that package to Node's normal
+        # resolver. Do not expose the complete vendored dependency tree: the
+        # registry install above must remain authoritative for platform-specific
+        # optional deps.
         content_structure_dir="$engine_dir/node_modules/content-structure"
         if [ ! -f "$content_structure_dir/package.json" ]; then
           package_json="$engine_package_dir/package.json"

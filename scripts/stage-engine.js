@@ -43,6 +43,7 @@ const VENDOR_DIR_NAME = '_modules';
 // SSR config) is deliberately not staged: the extension only ever runs
 // prebuilt `dist/`, and the render command is fixed to output=static.
 const RUNTIME_PATHS = [
+  'CHANGELOG.md',
   'config.js',
   'server',
   'scripts',
@@ -224,7 +225,7 @@ async function main() {
   const enginePkg = {
     name: PACKAGE_NAME,
     version,
-    description: 'Markdown documentation rendering engine for the MicroWebStacks Docs Preview extension.',
+    description: 'Markdown documentation rendering engine for MicroWebStacks sites and Docs Preview.',
     type: 'module',
     private: false,
     license: rootPkg.license ?? 'UNLICENSED',

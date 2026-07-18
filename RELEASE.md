@@ -16,8 +16,11 @@ records that too.
 ### Engine (only when `src/`, `server/`, `scripts/`, or `config.js` changed)
 
 1. Bump `engineVersion` in `packages/vscode-extension/package.json` (never reuse a number).
-2. Commit the release changes locally so the stamped commit hash points at a real commit.
-3. Publish (OTP = fresh code from your npm authenticator; `npm login` first if logged out):
+2. Add the release entry to the root `CHANGELOG.md`. This is the engine
+   changelog and is included in the npm tarball; the extension has its own
+   changelog under `packages/vscode-extension/`.
+3. Commit the release changes locally so the stamped commit hash points at a real commit.
+4. Publish (OTP = fresh code from your npm authenticator; `npm login` first if logged out):
 
 ```powershell
 pnpm engine:release --otp=<code>
@@ -73,8 +76,11 @@ So:
 ## Decision rule
 
 - Changed only `packages/vscode-extension/*` -> **extension release** (no npm publish).
-- Changed `src/`, `server/`, `scripts/`, or `config.js` -> **engine release**, then an
-  **extension release** to bump `engineVersion` so installed extensions pick it up.
+- Changed `src/`, `server/`, `scripts/`, or `config.js` -> **engine release**.
+- Follow with an **extension release** only when Marketplace users should
+  immediately receive that engine in the VSIX's bundled fallback. Action/CLI-only
+  engine fixes can ship without a new extension version; the bumped
+  `engineVersion` is then ready for the next extension release.
 - Docs/plans only -> just commit.
 
 ## Order matters
@@ -87,10 +93,11 @@ enforces this check.
 
 Recommended full release order:
 
-1. Edit versions (`engineVersion` first if engine code changed, then extension `version`).
+1. Edit versions (`engineVersion` first if engine code changed, then extension `version`
+   only if an extension release is also intended) and update the matching changelog(s).
 2. Commit those release changes locally.
 3. Run `pnpm engine:release --otp=<code>` when engine/runtime code changed.
-4. Run `pnpm ext:release`.
+4. If releasing the extension too, run `pnpm ext:release`.
 5. Run `pnpm ext:install` and smoke-test the installed extension.
 6. Upload the VSIX to the Marketplace.
 7. Push the release commit.
