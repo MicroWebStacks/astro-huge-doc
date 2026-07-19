@@ -101,6 +101,8 @@ function cacheElements() {
 	els.popup = document.getElementById('link-preview-popup');
 	els.popupFrame = els.popup?.querySelector('.link-preview-popup-frame');
 	els.popupCatcher = els.popup?.querySelector('.link-preview-popup-catcher');
+	els.popupOpenPage = els.popup?.querySelector('.link-preview-popup-open-page');
+	els.popupOpenPreview = els.popup?.querySelector('.link-preview-popup-open-preview');
 	els.modal = document.getElementById('link-preview-modal');
 	els.modalTitle = els.modal?.querySelector('.link-preview-title');
 	els.modalOpen = els.modal?.querySelector('.link-preview-open');
@@ -300,6 +302,9 @@ function maybeRevealPopup() {
 }
 
 function beginHover(anchor) {
+	if (session?.mode === 'modal') {
+		return; // modal is an explicit, stable end state; hover cannot replace it
+	}
 	if (session && session.anchor === anchor) {
 		cancelPendingDismiss();
 		return;
@@ -319,29 +324,29 @@ function beginHover(anchor) {
 		iframe: warm ? warm.iframe : null,
 		loaded: Boolean(warm),
 		deferralElapsed: false,
-		mode: warm ? 'popup' : 'pending',
+		mode: 'pending',
 		intentTimer: null,
 		deferralTimer: null
 	};
 	session = mySession;
 
-	if (warm) {
-		// AD-007: instant re-show for warm URLs, skipping the spinner/deferral.
-		mySession.mode = 'pending';
-		showPopupNear(anchor);
-		return;
-	}
-
 	mySession.intentTimer = setTimeout(() => {
 		if (session !== mySession) {
 			return;
 		}
+		// Always acknowledge sustained hover, including warm-cache hits. Warm
+		// previews still skip iframe work, but the spinner tells the user that
+		// the delayed mini preview is armed.
 		anchor.classList.add('link-preview-loading');
-		mySession.iframe = createIframe(previewSrc);
-		els.shelf.appendChild(mySession.iframe);
-		mySession.mode = 'loading';
+		if (!warm) {
+			mySession.iframe = createIframe(previewSrc);
+			els.shelf.appendChild(mySession.iframe);
+			mySession.mode = 'loading';
+		}
 	}, INTENT_DELAY_MS);
 
+	// Warm previews skip loading work, but never the intent delay. Immediate
+	// cache hits are visually noisy when the pointer merely crosses a link.
 	mySession.deferralTimer = setTimeout(() => {
 		if (session !== mySession) {
 			return;
@@ -352,12 +357,17 @@ function beginHover(anchor) {
 }
 
 function scheduleDismiss() {
-	if (!session) {
+	// Pointer-leave dismissal belongs only to the transient hover flow. Once
+	// promoted, the modal is stable until an explicit close action.
+	if (!session || session.mode === 'modal') {
 		return;
 	}
 	cancelPendingDismiss();
 	dismissTimerId = setTimeout(() => {
 		dismissTimerId = null;
+		if (!session || session.mode === 'modal') {
+			return;
+		}
 		endSession();
 	}, DISMISS_GRACE_MS);
 }
@@ -404,6 +414,7 @@ function promote() {
 	if (!session || session.mode !== 'popup' || !session.iframe) {
 		return;
 	}
+	cancelPendingDismiss();
 	session.mode = 'modal';
 	hidePopupUI();
 	els.modalSlot.appendChild(session.iframe);
@@ -560,6 +571,16 @@ function wireActivate(el, handler) {
 
 function wireModalChrome() {
 	els.popupCatcher?.addEventListener('click', () => {
+		if (session?.mode === 'popup') {
+			promote();
+		}
+	});
+	wireActivate(els.popupOpenPage, () => {
+		if (session?.mode === 'popup') {
+			window.location.href = session.canonicalTarget;
+		}
+	});
+	wireActivate(els.popupOpenPreview, () => {
 		if (session?.mode === 'popup') {
 			promote();
 		}

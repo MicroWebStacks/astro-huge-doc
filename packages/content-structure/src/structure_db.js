@@ -947,28 +947,29 @@ function buildItemRows(doc, content, options = {}) {
         const line = getNodeLine(node);
         const level = getLevelForLine(line);
         const attributes = extractDirectiveAttributes(node);
-        let astPayload = null;
-        const payload = {name:node.name,attributes};
-        if(node.children){
-            payload.children = node.children;
-        }
-        if (Object.keys(attributes).length || node?.name) {
-            try {
-                astPayload = JSON.stringify(payload);
-            } catch (error) {
-                warn(`(X) failed to serialize containerDirective attributes: ${error.message}`);
-            }
-        }
-        pushRow({
-            type: 'containerDirective',
-            text: '',
-            level,
-            node,
+        const containerRow = {
+            version_id: versionId,
+            doc_sid: doc.sid,
             slug: buildParagraphSlug(),
-            ast: astPayload
-        });
+            asset_uid: null,
+            type: 'containerDirective',
+            level: Number.isFinite(level) ? level : null,
+            order_index: orderIndex,
+            body_text: null,
+            ast: null
+        };
+        orderIndex += 1;
+        rows.push(containerRow);
+        const rowCountBeforeChildren = rows.length;
         if (Array.isArray(node.children)) {
             node.children.forEach(processNode);
+        }
+        const childCount = rows.length - rowCountBeforeChildren;
+        const payload = {name: node.name, attributes, childCount};
+        try {
+            containerRow.ast = JSON.stringify(payload);
+        } catch (error) {
+            warn(`(X) failed to serialize containerDirective attributes: ${error.message}`);
         }
     }
 

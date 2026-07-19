@@ -21,9 +21,10 @@ cleared to start.
 Internal links give no feedback about their target before a full navigation.
 The maintainer wants a hover preview: hovering an internal page link shows
 that something was caught (loading indicator), then — about one second
-deferred — a small popup containing the fully rendered target page. Clicking
-the popup promotes it to a large modal (almost full screen, in the spirit of
-the current diagram lightbox). From the modal's header the user can close it
+deferred — a theme-consistent elevated popup containing a scaled-down rendering
+of the target page. A toolbar at the top offers the choice to open the page
+directly or open the larger preview modal; clicking the rendered thumbnail
+also promotes it to the modal. From the modal's header the user can close it
 or navigate to the previewed page for real. Previews are **not recursive**:
 links inside a preview do not themselves offer previews; only after actually
 navigating to a page do its links become previewable. External links never
@@ -74,11 +75,13 @@ Hovering an internal page link in the article:
 
 1. immediately shows a small "caught + loading" indicator (circular
    progress) anchored to the link;
-2. about one second after hover start, a small popup near the link shows the
-   target page fully rendered (content only, no site chrome);
-3. clicking the popup opens a large modal (almost full screen, diagram-
-   lightbox style) with a header offering **close** and **open page**
-   (real navigation);
+2. about one second after hover start, a theme-consistent small popup near the
+   link shows the target page scaled down as a thumbnail (content only, no
+   site chrome), even when that page is already warm-cached;
+3. the popup toolbar offers **open page** (real navigation) and **open
+   preview**; the latter, or clicking the thumbnail, opens a large modal
+   (almost full screen, diagram-lightbox style) with a header offering
+   **close** and **open page**;
 4. inside a preview, links are inert as previews (no modal-in-modal, no
    recursion) — they become previewable only after real navigation;
 5. external links and asset links are untouched.
@@ -104,8 +107,8 @@ is discharged and AD-001 is definitively closed.
 | --- | --- | --- | --- | --- |
 | AD-001 | Preview rendering technique | closed | **Accepted as proposed:** same-origin iframe of the real target URL; no fetch-and-inject (Phase 0 gate passed 2026-07-19 — reopen condition discharged) | High |
 | AD-002 | Chrome-stripped preview view | closed | **Accepted as proposed:** client-side preview-mode flag + CSS hides app bar/menus/TOC; works in static, SSR, extension | High |
-| AD-003 | Interaction timeline | closed | **Accepted as proposed:** ~150 ms intent delay → spinner + hidden iframe load → popup when both ~1 s elapsed and iframe loaded | High |
-| AD-004 | Popup → modal promotion | closed | **Accepted as proposed:** re-parent the same iframe into a lightbox-token modal with title / open-page / close header | High |
+| AD-003 | Interaction timeline | closed | **Refined 2026-07-19:** ~150 ms intent delay → spinner on every sustained hover (including warm hits) + hidden iframe load when needed → popup when both ~1 s elapsed and iframe loaded | High |
+| AD-004 | Popup → modal promotion | closed | **Refined 2026-07-19:** theme-aware elevated thumbnail card with explicit open-page / open-preview actions; preview action re-parents the same iframe into a stable modal | High |
 | AD-005 | No-recursion enforcement | closed | **Ruled:** modal is end-game — preview script disabled inside iframes *and* any click inside navigates the full window, dismissing the modal | High |
 | AD-006 | Link eligibility scope | closed | **Accepted as proposed:** `.article-slot` anchors only: same-origin page URLs, not `external`, not assets, not pure fragments | High |
 | AD-007 | Caching / resource ceilings | closed | **Accepted as proposed:** one live preview at a time; last 3 dismissed iframes kept warm (OP-007); no persistent cache | High |
@@ -143,17 +146,25 @@ AD-008 carry maintainer modifications, noted inline.
   no-recursion guarantee (AD-005). **Confidence: high.** (Fragment choice
   vs frame-dataset detection: OP-002.)
 - **AD-003 — Interaction timeline.** On `mouseenter` of an eligible anchor,
-  arm a short intent delay (~150 ms) to ignore drive-by passes; then show
-  the circular progress indicator at the link and start loading the iframe
-  off-screen/hidden. The popup reveals when **both** the ~1 s hover
+  arm a short intent delay (~150 ms) to ignore drive-by passes; then always
+  show the circular progress indicator at the link and, for a cold entry,
+  start loading the iframe off-screen/hidden. The popup reveals when **both**
+  the ~1 s hover
   deferral has elapsed **and** the iframe has fired `load` (whichever is
   later) — the user asked for "one second deferred", and gating on load
-  means the popup never shows a white frame. Leaving the link *and* the
+  means the popup never shows a white frame. The deferral also applies to
+  warm-cache hits so an already-loaded preview cannot pop up accidentally.
+  Leaving the link *and* the
   popup dismisses it (small grace gap so the pointer can travel into the
-  popup). `Escape` dismisses popup or modal. **Confidence: high.**
+  popup). Pointer leave can dismiss only this transient flow; a promoted
+  modal stays open until outside click, `Escape`, or close. **Confidence: high.**
 - **AD-004 — Popup→modal promotion reuses the same iframe.** The popup is a
-  fixed-position card (~28–24 rem, viewport-clamped) containing the iframe;
-  clicking it re-parents/expands the same container into the modal shell —
+  fixed-position, theme-aware elevated card (~28–24 rem, viewport-clamped)
+  with a neutral one-pixel boundary and shadow rather than an accent outline. Its
+  iframe is rendered at a larger logical viewport and scaled down to form a
+  recognizable page thumbnail. A top toolbar provides **Open page** and
+  **Open preview** explicitly; Open preview or clicking the thumbnail
+  re-parents/expands the same container into the modal shell —
   no second load, scroll position preserved. The modal follows the diagram
   lightbox's overlay pattern and tokens, sized exactly like the diagram
   lightbox (90vw/90vh — OP-003 ruling), with a header bar: page title
@@ -178,8 +189,9 @@ AD-008 carry maintainer modifications, noted inline.
   interactions. Extendable later (OP-005). **Confidence: high.**
 - **AD-007 — Caching and resource ceilings.** One preview at a time; the
   hidden iframe is destroyed on dismissal, but the last N (~3) previewed
-  URLs keep a detached, paused iframe for instant re-show within the
-  session. No persistent cache — the browser HTTP cache and (in lite) the
+  URLs keep a detached, paused iframe for load-free re-show within the
+  session. The intentional hover deferral still applies. No persistent cache
+  — the browser HTTP cache and (in lite) the
   hash-keyed server record already de-duplicate the expensive work. The
   hover intent delay caps spurious SSR renders from pointer sweeps.
   **Confidence: high** on mechanism; N ruled in OP-007 (N = 3).
@@ -228,7 +240,8 @@ AD-008 carry maintainer modifications, noted inline.
   proposed** — ship pointer-hover only; add `focusin` parity in the same
   iteration if it comes cheap; touch explicitly out of scope.
 - **OP-007 — Warm-cache depth.** **Resolved 2026-07-19: N = 3.** Keep the
-  last three dismissed previews alive for instant re-show; revisit only if
+  last three dismissed previews alive for load-free re-show after the normal
+  hover deferral; revisit only if
   extension-webview memory numbers say otherwise.
 - **OP-008 — Links with fragments to other pages** (`page#section`).
   **Resolved 2026-07-19: configurable best-effort.** Behind a config
@@ -315,13 +328,17 @@ AD-008 carry maintainer modifications, noted inline.
 ## Exit criteria
 
 - Hovering an internal article link on a page shows the indicator, then a
-  rendered popup ~1 s after hover; external, asset, and fragment-only links
-  are unaffected.
+  theme-consistent, scaled-thumbnail popup ~1 s after hover; the same delay
+  and circular progress indicator apply to warm previews. External, asset,
+  and fragment-only links are unaffected.
 - Phase 0 concept-gate result is recorded in this plan before any build
   work starts. **Done: passed 2026-07-19** (see `implementation.md`).
-- Clicking the popup opens the modal at the diagram-lightbox size
-  (90vw/90vh); the header offers close and open page; open page performs a
-  real top-window navigation without the preview flag in the URL.
+- The popup toolbar offers open page and open preview from the start. Open
+  preview or clicking the thumbnail opens the modal at the diagram-lightbox
+  size (90vw/90vh); open page performs a real top-window navigation without
+  the preview flag in the URL.
+- Pointer leave dismisses pending/mini previews only. A promoted modal remains
+  open until outside click, `Escape`, or its close control.
 - The open modal is reflected in the host page's query params: browser
   back restores the page with the modal open, and loading a URL carrying
   the param opens the modal directly (AD-008).

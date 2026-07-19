@@ -46,55 +46,79 @@ function paragraphStyle(node){
 }
 
 ---
-{items.map((item) => {
-    if (item.type === 'heading') {
-        return <Heading item={item} data={data}/>;
-    }
-    if (item.type === 'image') {
-        return <MarkdownImage item={item} />;
-    }
-    if (item.type === 'table') {
-        return <DataTable item={item} />;
-    }
-    if (item.type === 'code') {
-        return <Code item={item} />;
-    }
-    if (item.type === 'link') {
-        return <Link item={item}  />;
-    }
-    if (item.type === 'textDirective') {
-        return <Directive name={item.ast?.name} attributes={item.ast?.attributes ?? {}} />;
-    }
-    if (item.type === 'containerDirective') {
-        return (
-            <ContainerDirective name={item.ast.name} attributes={item.ast.attributes}>
-                {item.ast.children?.map((child) => (
-                    <Fragment set:html={renderAstToHtml(child)}></Fragment>
-                ))}
-            </ContainerDirective>
-        );
-    }
-    if (item.ast) {
-        const astHtml = item.ast ? renderAstToHtml(item.ast) : null;
-        if (astHtml) {
-            return <Fragment set:html={astHtml}></Fragment>;
+{(() => {
+    function renderItem(item){
+        if (item.type === 'heading') {
+            return <Heading item={item} data={data}/>;
         }
-    }
-    if (item.type === 'paragraph' && item.ast) {
-        const style = paragraphStyle(item);
-        const astHtml = item.ast ? renderAstToHtml(item.ast) : null;
-        if (astHtml) {
-            return (
-            <div class={style}>
-                {item.children?.map((child) => (
-                    <Fragment set:html={renderAstToHtml(child)}></Fragment>
-                )) ?? item.value}
-            </div>
-        )
+        if (item.type === 'image') {
+            return <MarkdownImage item={item} />;
         }
+        if (item.type === 'table') {
+            return <DataTable item={item} />;
+        }
+        if (item.type === 'code') {
+            return <Code item={item} />;
+        }
+        if (item.type === 'link') {
+            return <Link item={item}  />;
+        }
+        if (item.type === 'textDirective') {
+            return <Directive name={item.ast?.name} attributes={item.ast?.attributes ?? {}} />;
+        }
+        if (item.ast) {
+            const astHtml = item.ast ? renderAstToHtml(item.ast) : null;
+            if (astHtml) {
+                return <Fragment set:html={astHtml}></Fragment>;
+            }
+        }
+        if (item.type === 'paragraph' && item.ast) {
+            const style = paragraphStyle(item);
+            const astHtml = item.ast ? renderAstToHtml(item.ast) : null;
+            if (astHtml) {
+                return (
+                <div class={style}>
+                    {item.children?.map((child) => (
+                        <Fragment set:html={renderAstToHtml(child)}></Fragment>
+                    )) ?? item.value}
+                </div>
+            )
+            }
+        }
+        if (item.type === 'paragraph' && !item.ast) {
+            return <Fragment >{item.body_text}</Fragment>;
+        }
+        return <Fragment>md.nan</Fragment>;
     }
-    if (item.type === 'paragraph' && !item.ast) {
-        return <Fragment >{item.body_text}</Fragment>;
+
+    // containerDirective items don't nest their children in the flat items
+    // array (see catalog.yaml: items are reading-order, not a tree) — the
+    // directive's own row is immediately followed by `childCount` rows that
+    // belong inside it (recursively, for directives nested inside other
+    // directives). Consume that run here instead of also rendering it again
+    // at the same level, otherwise the child content (e.g. a code block)
+    // ends up duplicated as a sibling outside the <details>, which is why
+    // collapsing the directive previously left it visible.
+    function renderRun(list){
+        const out = [];
+        let i = 0;
+        while (i < list.length) {
+            const item = list[i];
+            if (item.type === 'containerDirective') {
+                const childCount = item.ast?.childCount ?? 0;
+                const childItems = list.slice(i + 1, i + 1 + childCount);
+                out.push(
+                    <ContainerDirective name={item.ast?.name} attributes={item.ast?.attributes ?? {}}>
+                        {renderRun(childItems)}
+                    </ContainerDirective>
+                );
+                i += 1 + childCount;
+                continue;
+            }
+            out.push(renderItem(item));
+            i += 1;
+        }
+        return out;
     }
-    return <Fragment>md.nan</Fragment>;
-})}
+    return renderRun(items);
+})()}

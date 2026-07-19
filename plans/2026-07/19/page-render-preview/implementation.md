@@ -2,12 +2,45 @@
 
 ## Progress
 
-[######] Phase 0 (concept gate) passed. Phases 2-5 (build work) implemented
-and smoke-tested against the built SSR server. Outstanding before ship: the
+[######] Done - Phase 0 (concept gate) passed and phases 2-5 (build work)
+implemented. Smoke-tested against the built SSR server. Outstanding before ship: the
 manual F5 Extension Development Host click-through (Phase 0's caveat) and a
 static-build browser smoke pass with a non-root `base`.
 
 ## Phases 2-5 — build work
+
+### Post-implementation preview-card refinements (2026-07-19)
+
+- Replaced the accent outline with a theme-aware raised surface, neutral
+  one-pixel panel boundary, and deeper elevation shadow. Popup controls and
+  the modal shell now use dark surfaces in dark mode and light surfaces in
+  light mode instead of the always-light image-lightbox token.
+- Added an explicit top toolbar with **Open page** and **Open preview**.
+  Direct navigation no longer requires entering the large modal; clicking
+  the page image remains a convenient Open preview shortcut.
+- Rendered the compact iframe at a larger logical viewport and scaled it to
+  55%, producing a page thumbnail rather than a one-to-one crop.
+- Removed the warm-cache instant-popup exception. Warm entries still avoid
+  iframe loading, but now respect the same one-second hover deferral as cold
+  entries to prevent incidental popups. Every sustained hover now shows the
+  circular progress indicator, warm or cold.
+- Restricted pointer-leave dismissal to pending/loading/mini-popup states and
+  re-checks that state when its grace timer fires. Promotion cancels any
+  pending dismissal, so the large modal remains until outside click, Escape,
+  or close. This fixes a race where hiding the mini popup during promotion
+  emitted `pointerout`, closed the modal, and left a stale `?preview=` URL;
+  that stale URL could then legitimately trigger direct-modal restoration.
+
+Refinement validation:
+
+- `node --check src/layout/link_preview.js` passed.
+- `node scripts/check-plans.js` no longer reports this packet; the repository-
+  wide check remains blocked by the unrelated, concurrently present
+  `2026-07-19-details-directive-collapse-bug` packet missing from both indexes.
+- The full test suite/build could not run in this checkout because installed
+  dependencies are incomplete (`glob/index.js` and `esbuild/index.js` are
+  missing). These failures occur during module resolution before exercising
+  the preview changes.
 
 ### What shipped
 
@@ -66,7 +99,8 @@ noting for future iframe-lifecycle work in this codebase.
   passed: preview-mode chrome stripping, hover -> spinner -> 1s popup,
   popup -> modal promotion with iframe reuse, modal sizing, click-through
   end-game navigation + modal teardown, Escape dismissal, warm-cache
-  instant re-show, and back/forward syncing the modal via `?preview=`.
+  instant re-show (subsequently changed by the refinement above), and
+  back/forward syncing the modal via `?preview=`.
   Deleted after use per the plan's "throwaway harness" convention — this
   section is the record.
 
