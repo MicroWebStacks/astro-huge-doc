@@ -25,15 +25,17 @@ const DOCUMENTS_TABLE_NAME = 'documents'
 let knownEntryFieldsPromise = null
 
 
+function slugPathSegment(value){
+    return title_slug(String(value ?? '')) || 'page'
+}
+
 function get_slug(data,path,url_type){
     if(Object.hasOwn(data,"slug")){
         return data.slug
-    }else if(Object.hasOwn(data,"title")){
-        return title_slug(data.title)
     }else if(url_type == "dir"){
-        return basename(dirname(path))
+        return slugPathSegment(basename(dirname(path)))
     }else{
-        return parse(path).name
+        return slugPathSegment(parse(path).name)
     }
 }
 
@@ -105,15 +107,15 @@ async function* get_all_files(ext_list){
 }
 
 function entry_to_url(url_type,path,slug){
+    const slugifiedDirs = (dir) => dir === '.' || dir === ''
+        ? ''
+        : dir.split(/[\\/]/).filter(Boolean).map(slugPathSegment).join('/')
     if(url_type == "dir"){
-        const dir = dirname(path)
-        if(dir == "."){
-            return ""
-        }
-        return dir.replaceAll('\\','/')
+        return slugifiedDirs(dirname(path))
     }else{
         const parsedPath = parse(path)
-        return join(parsedPath.dir, slug).replaceAll('\\','/')
+        const dir = slugifiedDirs(parsedPath.dir)
+        return [dir, slug].filter(Boolean).join('/')
     }
 }
 
@@ -141,9 +143,14 @@ function isFilenameSameAsParent(filePath) {
     return filename === parentDirName;
 }
 
-function get_url_type(file_path){
-    if(file_path.toLowerCase().endsWith("readme.md")){
+async function get_url_type(file_path){
+    const filename = basename(file_path).toLowerCase()
+    const siblingIndex = join(dirname(file_path), 'index.md')
+    const siblingReadme = join(dirname(file_path), 'readme.md')
+    if(filename === 'index.md' && await exists(siblingReadme)){
         return "dir"
+    }else if(filename === 'readme.md'){
+        return await exists(siblingIndex) ? "file" : "dir"
     }else{
         if(isFilenameSameAsParent(file_path)){
             return "dir"
@@ -154,7 +161,7 @@ function get_url_type(file_path){
 }
 
 async function createMarkdownDocumentSource(file_path){
-    const url_type = get_url_type(file_path)
+    const url_type = await get_url_type(file_path)
     const markdownText = await load_text(file_path)
     const parsed = parseMarkdownFrontmatter(markdownText, file_path)
     if(!parsed){
@@ -416,6 +423,10 @@ function partitionFrontmatter(frontmatter = {}, knownEntryFields){
     const entryFields = {}
     const modelFields = {}
     for(const [key,value] of Object.entries(frontmatter)){
+        if(key === 'timestamp' && !Object.hasOwn(frontmatter, 'date')){
+            entryFields.date = value
+            continue
+        }
         if(knownEntryFields.has(key)){
             entryFields[key] = value
         }else{

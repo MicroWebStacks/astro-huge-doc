@@ -58,7 +58,11 @@ const ASSET_KEY_SEPARATOR = '::';
 // Bump when the page-record shape or its derivation changes (e.g. frontmatter
 // meta_data capture): cached records from older code must re-parse even though
 // the markdown hash still matches.
-const RECORD_VERSION = 2;
+// Version 3 invalidates records whose containerDirective AST still embeds
+// `children`. The renderer now consumes flattened child rows via `childCount`;
+// accepting a v2 record leaves <details> empty and renders its code as a
+// visible sibling outside the collapsed element.
+const RECORD_VERSION = 3;
 // Alt text marking the synthetic image appended for a frontmatter `image:`
 // path; the item is dropped after collection, only its asset/blob remain.
 const META_IMAGE_ALT = 'mws-meta-image';

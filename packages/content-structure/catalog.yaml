@@ -14,6 +14,9 @@ datasets:
           - { name: url_type, type: string, description: Indicates whether the URL maps to a directory or a file }
           - { name: slug, type: string, description: Slug used for building anchors and nested references }
           - { name: title, type: string, description: Document title resolved from folder names or front matter }
+          - { name: type, type: string, description: Open Knowledge Format concept type supplied by front matter }
+          - { name: description, type: string, description: Open Knowledge Format description supplied by front matter }
+          - { name: resource, type: string, description: Open Knowledge Format resource reference supplied by front matter }
           - { name: level, type: int, description: Depth of the document in the navigation tree }
           - { name: order, type: int, description: Ordering index scoped to siblings sharing the same directory and level; defaults to alphabetical order when omitted }
           - { name: tags, type: string_list, description: JSON list of tags assigned to the document via front matter or metadata }

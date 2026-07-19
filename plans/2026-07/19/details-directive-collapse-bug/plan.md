@@ -2,15 +2,14 @@
 
 ## Status
 
-**Blocked / unresolved from the user's point of view.** The source-level bug
-has been found and fixed, and the fix has been verified in isolation to
-produce correct data. Despite that, the live page at
-`http://localhost:4321/other/sound#microcontroller-loopback` still shows the
-`bash` "build log" code block outside the collapsed `::::details{summary="build
-log"}` block. The most likely explanation is that the running server process
-is still serving pre-fix output through one of several caching/build layers
-described below (never confirmed, since this is a handoff) — but it is also
-possible something else is wrong that hasn't been found yet.
+**Resolved.** The source-level directive fix was correct, but the lite lazy
+backend still accepted persisted version-2 page records containing the old
+`ast.children` shape. The renderer expects `ast.childCount`, so those records
+produced an empty `<details>` and a highlighted sibling code block. Bumping the
+lazy record version to 3 forces one automatic reparse and removes the stale
+shape without asking users to clear caches manually. Regression, real-page
+HTML containment, full-suite, development-runtime, built-runtime, and build
+checks are recorded in `implementation.md` and `test.md`.
 
 ## Problem (user-visible)
 

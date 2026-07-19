@@ -180,25 +180,19 @@ async function cloneAsset(center){
     return {is_svg,svg_img}
 }
 
-function window_url_add_pan(x,y){
-  // Convert to integers to remove fractions and ensure the format "&pan=x33_y48"
-  const intX = Math.floor(x);
-  const intY = Math.floor(y);
-  console.log(`Pan finished at (${intX},${intY})`);
-  
-  const currentUrl = new URL(window.location.href);
-  currentUrl.searchParams.set('pan', `x${intX}_y${intY}`);
-  window.history.pushState({}, "", currentUrl.toString());
-}
+function window_url_update_viewport(pz){
+  const transform = pz.getTransform()
+  // Keep deep links compact and update both values in one operation.
+  const intX = Math.floor(transform.x)
+  const intY = Math.floor(transform.y)
+  const roundedZoom = Math.round(transform.scale * 100) / 100
+  const currentUrl = new URL(window.location.href)
+  currentUrl.searchParams.set('pan', `x${intX}_y${intY}`)
+  currentUrl.searchParams.set('zoom', roundedZoom.toString())
 
-function window_url_add_zoom(zoom){
-  // Round to two decimal places to ensure the format "&zoom=1.27"
-  const roundedZoom = Math.round(zoom * 100) / 100;
-  console.log(`Zoom done at (${roundedZoom})`);
-  
-  const currentUrl = new URL(window.location.href);
-  currentUrl.searchParams.set('zoom', roundedZoom.toString());
-  window.history.pushState({}, "", currentUrl.toString());
+  // Viewport adjustments describe the open modal's current state; they should
+  // not create a history entry for every wheel or pinch event.
+  window.history.replaceState(window.history.state, "", currentUrl.toString())
 }
 function window_url_add_modal(center){
     const container = findContainer(center)
@@ -289,16 +283,36 @@ async function openModal(event){
   }
   const { default: panzoom } = await import('panzoom');
   pzref = panzoom(svg_img,zoomOptions)
+  let viewportUrlSyncTimer = null
+  const syncViewportUrl = ()=>{
+    if(viewportUrlSyncTimer){
+      clearTimeout(viewportUrlSyncTimer)
+      viewportUrlSyncTimer = null
+    }
+    window_url_update_viewport(pzref)
+  }
+  const queueViewportUrlSync = ()=>{
+    if(viewportUrlSyncTimer){
+      clearTimeout(viewportUrlSyncTimer)
+    }
+    // A steady cursor inside the viewport still preserves a shareable URL,
+    // while continuous interaction does not repeatedly rewrite it.
+    viewportUrlSyncTimer = setTimeout(syncViewportUrl, 5000)
+  }
   pzref.on('panend', () => {
-    const t = pzref.getTransform()
-    window_url_add_pan(t.x,t.y)
+    queueViewportUrlSync()
   });
   pzref.on('zoom', function() {
-    window_url_add_zoom(pzref.getTransform().scale)
+    queueViewportUrlSync()
   });
+  center.addEventListener('pointerleave', syncViewportUrl)
 
   close.onclick = ()=>{
     //console.log("closed click")
+    if(viewportUrlSyncTimer){
+      clearTimeout(viewportUrlSyncTimer)
+    }
+    center.removeEventListener('pointerleave', syncViewportUrl)
     modal.classList.remove("visible")
     pzref.dispose()
     const img = center.querySelector("img")

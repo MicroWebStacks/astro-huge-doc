@@ -12,6 +12,9 @@ Use these pages to smoke-test the main rich-content features:
 
 - [Math formulas](./math-demo)
 - [PlantUML diagrams](./plantuml-demo)
+- [Frontmatter examples](./frontmatter-examples)
+- [Link examples](./link-examples)
+- [Concept landing page](./knowledge)
 
 ## Why this folder exists
 
@@ -74,3 +77,5 @@ sequenceDiagram
 | `demo/readme.md` | render-root split plus Mermaid smoke test |
 | `demo/math.md` | inline and block math via KaTeX |
 | `demo/plantuml.md` | client-rendered PlantUML with no server or Java |
+| `demo/frontmatter-examples.md` | generic and typed OKF-style YAML frontmatter |
+| `demo/link-examples.md` | relative, root-absolute, anchor, external, and broken links |

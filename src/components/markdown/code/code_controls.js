@@ -1,3 +1,8 @@
+import {computeDetailsContentWidth} from '../directive/details_width.js';
+
+const detailsMeasureFrames = new WeakMap();
+const detailsWithToggleListener = new WeakSet();
+
 function togglePressed(button, pressed) {
     button.setAttribute('aria-pressed', String(pressed));
 }
@@ -15,6 +20,78 @@ function isCodeView(shell) {
         return true;
     }
     return shell.getAttribute('data-view') === 'code';
+}
+
+function clearDetailsContentWidth(details) {
+    const frame = detailsMeasureFrames.get(details);
+    if (frame !== undefined) {
+        window.cancelAnimationFrame(frame);
+        detailsMeasureFrames.delete(details);
+    }
+    details.style.removeProperty('--details-content-width');
+    details.removeAttribute('data-wide-code');
+}
+
+function syncDetailsContentWidth(details) {
+    if (!(details instanceof HTMLDetailsElement)) {
+        return;
+    }
+
+    // Always return to the standard column before measuring. Otherwise a
+    // previously widened surface reports no overflow and the shell oscillates
+    // between wide and narrow sizes.
+    clearDetailsContentWidth(details);
+    if (!details.open) {
+        return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+        detailsMeasureFrames.delete(details);
+        if (!details.open) {
+            return;
+        }
+
+        const detailsWidth = details.getBoundingClientRect().width;
+        let preferredWidth = null;
+        details.querySelectorAll('.code-shell:not(.embedded) [data-code-surface]').forEach((surface) => {
+            if (surface.getAttribute('data-wrap-lines') === 'true' || surface.offsetParent === null) {
+                return;
+            }
+            const code = surface.querySelector('pre code');
+            if (!code) {
+                return;
+            }
+            const candidate = computeDetailsContentWidth(
+                detailsWidth,
+                code.scrollWidth,
+                code.clientWidth
+            );
+            if (candidate !== null) {
+                preferredWidth = Math.max(preferredWidth ?? 0, candidate);
+            }
+        });
+
+        if (preferredWidth !== null) {
+            details.style.setProperty('--details-content-width', `${preferredWidth}px`);
+            details.setAttribute('data-wide-code', 'true');
+        }
+    });
+    detailsMeasureFrames.set(details, frame);
+}
+
+function connectDetailsWidth(shell) {
+    if (!shell?.classList.contains('code-shell') || shell.classList.contains('embedded')) {
+        return;
+    }
+    const details = shell.closest('details.directive');
+    if (!(details instanceof HTMLDetailsElement)) {
+        return;
+    }
+    if (!detailsWithToggleListener.has(details)) {
+        detailsWithToggleListener.add(details);
+        details.addEventListener('toggle', () => syncDetailsContentWidth(details));
+    }
+    syncDetailsContentWidth(details);
 }
 
 function syncCodeButtons(shell) {
@@ -78,6 +155,7 @@ function toggleSurfaceFlag(button, attributeName) {
     const nextValue = surface.getAttribute(attributeName) === 'true' ? 'false' : 'true';
     surface.setAttribute(attributeName, nextValue);
     syncCodeButtons(shell);
+    connectDetailsWidth(shell);
 }
 
 function handleCodeAction(event) {
@@ -107,6 +185,7 @@ function initCodeControls() {
     document.querySelectorAll('[data-code-shell]').forEach((shell) => {
         if (shell.getAttribute('data-code-controls-ready') === 'true') {
             syncCodeButtons(shell);
+            connectDetailsWidth(shell);
             return;
         }
 
@@ -115,6 +194,7 @@ function initCodeControls() {
             button.addEventListener('click', handleCodeAction);
         });
         syncCodeButtons(shell);
+        connectDetailsWidth(shell);
     });
 }
 
