@@ -6,6 +6,7 @@ import { createStructureDbWriter } from './src/structure_db.js';
 import { createStructureJsonWriter } from './src/structure_json.js';
 import { createBlobManager } from './src/blob_manager.js';
 import { computeVersionId } from './src/version_id.js';
+import { buildRelationRows } from './src/relations.js';
 
 // sharp is loaded lazily and treated as optional: the JSON ("lite") profile
 // runs without it (image intrinsic dimensions are simply skipped). The SQLite
@@ -61,6 +62,11 @@ async function collect(config){
     const orderTracker = createDocumentOrderTracker()
     const imageCatalog = createImageCatalog()
     const existingImageKeys = existingState.imageKeys ?? new Set()
+    // Duplicate identity guard (OKF plan OP-4): two files slugifying to the
+    // same url would silently overwrite each other; first wins, later ones are
+    // ignored with a warning so links stay predictable.
+    const claimedUrls = new Map()
+    const relationSources = []
 
     const originalCwd = process.cwd()
     try{
@@ -70,6 +76,12 @@ async function collect(config){
             if(!entry){
                 continue
             }
+            const urlKey = entry.url ?? ''
+            if(claimedUrls.has(urlKey)){
+                warn(`(!) duplicate identity '${urlKey || '/'}': '${entry.path}' collides with '${claimedUrls.get(urlKey)}'; ignoring '${entry.path}'`)
+                continue
+            }
+            claimedUrls.set(urlKey, entry.path)
             assignDocumentOrder(entry, orderTracker)
             if(entry.version_id === undefined || entry.version_id === null){
                 entry.version_id = versionId
@@ -95,6 +107,18 @@ async function collect(config){
             if(assetList.length > 0){
                 writer.insertAssets(assetList)
                 addAssetsToIndex(assetIndex,assetList)
+            }
+            relationSources.push({
+                sid: entry.sid,
+                path: entry.path,
+                url_type: entry.url_type,
+                links: content?.links ?? []
+            })
+        }
+        if(typeof writer.insertRelations === 'function'){
+            const relationRows = await buildRelationRows({documents: relationSources, versionId})
+            if(relationRows.length > 0){
+                writer.insertRelations(relationRows)
             }
         }
         const newBlobRows = Array.from(blobState.newHashes ?? []).map((hash)=>blobState.catalog.get(hash)).filter(Boolean)

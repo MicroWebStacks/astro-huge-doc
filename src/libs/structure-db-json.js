@@ -82,6 +82,23 @@ function load() {
         }
     }
 
+    // Relations (OKF plan TP-7): exported by newer collects; older datasets
+    // simply have no rows and every relation query returns empty.
+    indexes.relationsBySource = new Map();
+    indexes.relationsByTarget = new Map();
+    for (const row of dataset.relations ?? []) {
+        if (row.source_sid != null) {
+            const outgoing = indexes.relationsBySource.get(row.source_sid);
+            if (outgoing) outgoing.push(row);
+            else indexes.relationsBySource.set(row.source_sid, [row]);
+        }
+        if (row.target_sid != null) {
+            const incoming = indexes.relationsByTarget.get(row.target_sid);
+            if (incoming) incoming.push(row);
+            else indexes.relationsByTarget.set(row.target_sid, [row]);
+        }
+    }
+
     return dataset;
 }
 
@@ -391,6 +408,60 @@ function getSourceEntries(versionId = null) {
     });
 }
 
+/* Outgoing links of a document, joined with the target document identity. */
+function getOutgoing(sid, versionId = null) {
+    if (!sid) {
+        return [];
+    }
+    load();
+    return (indexes.relationsBySource.get(sid) ?? []).map((row) => {
+        const target = row.target_sid != null ? indexes.docBySid.get(row.target_sid) : null;
+        return {
+            ...row,
+            target_url: target?.url ?? null,
+            target_title: target?.title ?? null
+        };
+    });
+}
+
+/* Backlinks: documents linking TO the given document, with reading context. */
+function getBacklinks(sid, versionId = null) {
+    if (!sid) {
+        return [];
+    }
+    load();
+    return (indexes.relationsByTarget.get(sid) ?? [])
+        .filter((row) => row.status === 'resolved')
+        .map((row) => {
+            const source = indexes.docBySid.get(row.source_sid);
+            return {
+                ...row,
+                source_url: source?.url ?? null,
+                source_title: source?.title ?? null
+            };
+        })
+        .filter((row) => row.source_url != null);
+}
+
+/* Resolution outcome for one authored href of one document (Link.astro). */
+function resolveLink(docSid, rawUrl, versionId = null) {
+    if (!docSid || !rawUrl) {
+        return null;
+    }
+    load();
+    const row = (indexes.relationsBySource.get(docSid) ?? []).find((entry) => entry.target_raw === rawUrl);
+    if (!row) {
+        return null;
+    }
+    const target = row.target_sid != null ? indexes.docBySid.get(row.target_sid) : null;
+    return {
+        status: row.status,
+        url: target?.url ?? null,
+        fragment: row.fragment ?? null,
+        external: Boolean(row.external)
+    };
+}
+
 function getFirstDocument(versionId = null) {
     load();
     const docs = [...(dataset.documents ?? [])];
@@ -447,5 +518,8 @@ export {
     parseAssetLink,
     getImageInfo,
     getAssetBlob,
-    getAssetUrl
+    getAssetUrl,
+    getOutgoing,
+    getBacklinks,
+    resolveLink
 };

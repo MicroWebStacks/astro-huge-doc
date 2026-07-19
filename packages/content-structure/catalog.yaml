@@ -82,6 +82,19 @@ datasets:
           - { name: width, type: int, description: Pixel width after orientation correction }
           - { name: height, type: int, description: Pixel height after orientation correction }
           - { name: ratio, type: string, description: Aspect ratio width/height as a decimal string }
+      - name: relations
+        description: Directed document-to-document link relationships resolved at collect time; one row per markdown link with its reading context for backlinks and neighbor views.
+        columns:
+          - { name: id, type: int, primary: true, autoincrement: true, description: Autoincrement row id for the versioned relation }
+          - { name: version_id, type: string, description: Encoded seconds-since-2000 identifier for the collection run }
+          - { name: source_sid, type: string, description: SID of the document containing the link }
+          - { name: target_sid, type: string, description: SID of the resolved target document, null when the link did not resolve to a document }
+          - { name: target_raw, type: string, description: Raw href exactly as authored in the markdown source }
+          - { name: fragment, type: string, description: Fragment identifier of the link without the leading hash, null when absent }
+          - { name: link_text, type: string, description: Visible link text providing backlink context }
+          - { name: source_heading, type: string, description: Slug of the heading section containing the link in the source document }
+          - { name: status, type: string, values: [resolved, unresolved, external, asset, public], description: Resolution outcome of the link target }
+          - { name: external, type: boolean, description: True when the target is an external URL }
       - name: versions
         description: One row per collection run to track version metadata.
         columns:

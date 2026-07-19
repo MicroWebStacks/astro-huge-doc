@@ -10,11 +10,12 @@ This repository can now render a local top-level `demo/` tree even while
 
 Use these pages to smoke-test the main rich-content features:
 
-- [Math formulas](./math-demo)
-- [PlantUML diagrams](./plantuml-demo)
-- [Frontmatter examples](./frontmatter-examples)
-- [Link examples](./link-examples)
+- [Math formulas](./math.md)
+- [PlantUML diagrams](./plantuml.md)
+- [Frontmatter examples](./frontmatter-examples.md)
+- [Link examples](./link-examples.md)
 - [Concept landing page](./knowledge)
+- [Knowledge log](./log.md)
 
 ## Why this folder exists
 

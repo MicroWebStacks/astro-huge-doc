@@ -1,0 +1,85 @@
+---
+/*
+ * Breadcrumb bar (OKF plan TP-10/DD-10): path/parent orientation above the
+ * document. Always-on for all content — segments that map to a collected
+ * document link to it, the rest render as plain text. Hidden in preview mode
+ * (the popup shows only the article).
+ */
+import { getDocument } from '@/libs/structure-db';
+import { basePrefix } from '@/libs/blob-files.js';
+import { config } from '@/config';
+
+export interface Props {
+    data: { url?: string };
+}
+
+const { data } = Astro.props as Props;
+const url = typeof data?.url === 'string' ? data.url : '';
+const prefix = basePrefix(config.base);
+const segments = url === '' ? [] : url.split('/');
+
+const crumbs = [];
+let accumulated = '';
+for (let index = 0; index < segments.length; index++) {
+    accumulated = accumulated ? `${accumulated}/${segments[index]}` : segments[index];
+    const isCurrent = index === segments.length - 1;
+    let doc = null;
+    if (!isCurrent) {
+        try {
+            doc = getDocument({url: accumulated});
+        } catch {
+            doc = null;
+        }
+    }
+    crumbs.push({
+        label: doc?.title ?? segments[index],
+        href: doc ? `${prefix}/${accumulated}` : null,
+        current: isCurrent,
+        fallback: segments[index]
+    });
+}
+---
+{segments.length > 0 &&
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href={`${prefix}/`}>Home</a>
+        {crumbs.map((crumb) => (
+            <>
+                <span class="separator" aria-hidden="true">/</span>
+                {crumb.current
+                    ? <span class="current" aria-current="page">{crumb.fallback}</span>
+                    : crumb.href
+                        ? <a href={crumb.href}>{crumb.label}</a>
+                        : <span class="plain">{crumb.label}</span>}
+            </>
+        ))}
+    </nav>
+}
+<style>
+.breadcrumb{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: 0.85em;
+    color: var(--content-color-muted);
+    margin-block: 0 var(--space-3);
+    user-select: none;
+}
+.breadcrumb a{
+    color: var(--content-color-muted);
+    text-decoration: none;
+}
+.breadcrumb a:hover{
+    color: var(--article-anchor-color);
+    text-decoration: underline;
+}
+.separator{
+    opacity: 0.6;
+}
+.current{
+    color: var(--content-color);
+}
+:global(html[data-preview-mode="true"]) .breadcrumb{
+    display: none;
+}
+</style>

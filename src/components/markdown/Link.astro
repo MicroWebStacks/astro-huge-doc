@@ -1,17 +1,26 @@
 ---
 import ModelViewer from './model/ModelViewer.astro';
-import { getAssetInfo, getAssetUrl } from '@/libs/structure-db';
+import { getAssetInfo, getAssetUrl, resolveLink } from '@/libs/structure-db';
+import { basePrefix } from '@/libs/blob-files.js';
 import Code from './code/Code.astro';
 import { config } from '@/config';
 
 export interface Props {
     item: {
       asset_uid?: string;
+      doc_sid?: string;
       version_id?: string;
       body_text: string;
       ast: {
           title: string;
           url: string;
+          rel?: {
+            status?: string;
+            target_sid?: string;
+            raw?: string;
+            fragment?: string | null;
+            external?: boolean;
+          };
     };
     };
 }
@@ -19,9 +28,30 @@ export interface Props {
 const { item } = Astro.props as Props;
 
 const hasAsset = (item.asset_uid != null)
-const external = !hasAsset && item.ast.url.startsWith('http')
+const rawUrl = String(item.ast?.url ?? '')
 const versionId = item.version_id ?? config.collect.version_id
-const url = hasAsset ? getAssetUrl(item.asset_uid!, versionId) : item.ast.url
+
+// Link classification (OKF plan TP-8): the lite backend embeds the resolution
+// outcome in ast.rel at parse time (with ast.url already rewritten to the
+// target route); the sqlite/json backends answer from the relations table via
+// resolveLink(). Links without any relation data keep the legacy passthrough
+// behavior, so older datasets render unchanged.
+let rel = null
+if (!hasAsset && rawUrl && !rawUrl.startsWith('#')) {
+  rel = item.ast?.rel
+    ?? (typeof resolveLink === 'function' ? resolveLink(item.doc_sid, rawUrl, versionId) : null)
+}
+
+const external = rel ? Boolean(rel.external) : (!hasAsset && rawUrl.startsWith('http'))
+const unresolved = rel?.status === 'unresolved'
+const resolved = rel?.status === 'resolved'
+
+let url = hasAsset ? getAssetUrl(item.asset_uid!, versionId) : rawUrl
+if (resolved && !item.ast?.rel && rel && 'url' in rel && rel.url) {
+  // Full-profile concept link: swap the authored .md path for the target route.
+  const fragment = rel.fragment ? `#${rel.fragment}` : ''
+  url = `${basePrefix(config.base)}/${rel.url}${fragment}`
+}
 
 let is_model3d = false
 let is_table = false
@@ -45,8 +75,13 @@ if (hasAsset){
 {is_model3d &&
   <ModelViewer src={url} title={item.body_text} />
 }
-{is_link &&
-  <a href={url ?? '#'} class={`link ${external?"external":""}`} target={external?"_blank":"_self"}>
+{is_link && unresolved &&
+  <a class="link unresolved" title={`Unresolved link: ${rel?.raw ?? rawUrl}`} aria-disabled="true">
+        {item.body_text}
+  </a>
+}
+{is_link && !unresolved &&
+  <a href={url ?? '#'} class={`link ${external?"external":""} ${resolved?"concept":""}`} target={external?"_blank":"_self"} rel={external?"noopener":undefined}>
         {item.body_text}
   </a>
 }
@@ -73,5 +108,22 @@ a{
   scale:0.6;
   top: -0.2em;  /* Adjust this value to move the arrow up or down */
   right: -0.6em;  /* Adjust this value to move the arrow left or right */
+}
+/* Unresolved internal reference (OKF plan TP-8): the text stays readable, the
+   target does not navigate anywhere, and a dashed underline plus marker make
+   the state visible without hiding the document (handoff §5.5). */
+.unresolved{
+  color: var(--content-color-muted, inherit);
+  text-decoration: underline dashed;
+  text-underline-offset: 0.2em;
+  cursor: help;
+  margin-right: 0.6em;
+}
+.unresolved::after {
+  content: '?';
+  position: absolute;
+  scale: 0.6;
+  top: -0.2em;
+  right: -0.6em;
 }
 </style>

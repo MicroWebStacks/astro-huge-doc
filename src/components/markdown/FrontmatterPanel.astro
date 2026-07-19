@@ -1,0 +1,208 @@
+---
+/*
+ * Frontmatter viewer / OKF concept header (OKF plan TP-9, rulings OP-2/OP-5).
+ *
+ * Every page with frontmatter gets a viewer; nothing renders otherwise:
+ *  - `type` present  -> compact concept header (type badge, description, tags,
+ *    date, resource link, concept id) with the remaining fields behind an
+ *    expandable "Additional metadata" section.
+ *  - untyped         -> a single expandable "Metadata" section listing all
+ *    fields generically.
+ * There is deliberately no compliance banner or raw-YAML dump in either tier.
+ */
+export interface Props {
+    data: {
+        type?: string;
+        description?: string;
+        resource?: string;
+        tags?: unknown;
+        date?: string;
+        url?: string;
+        title?: string;
+        meta_data?: Record<string, unknown>;
+    };
+}
+
+const { data } = Astro.props as Props;
+
+const type = typeof data?.type === 'string' ? data.type.trim() : ''
+const description = typeof data?.description === 'string' ? data.description.trim() : ''
+const resource = typeof data?.resource === 'string' ? data.resource.trim() : ''
+const date = typeof data?.date === 'string' ? data.date.trim() : (data?.date ?? '')
+const tags = Array.isArray(data?.tags) ? data.tags.filter((tag) => typeof tag === 'string' && tag.trim()) : []
+const conceptId = typeof data?.url === 'string' ? data.url : ''
+
+// `resource` is untrusted input (handoff §28): only link http(s) targets,
+// anything else renders as inert text.
+const resourceIsUrl = /^https?:\/\//i.test(resource)
+
+const meta = (data?.meta_data && typeof data.meta_data === 'object' && !Array.isArray(data.meta_data))
+    ? data.meta_data
+    : {}
+// `image` drives card thumbnails and is rewritten to an asset uid at collect
+// time; showing it as metadata would leak an internal identifier.
+const HIDDEN_META_KEYS = new Set(['image'])
+const metaEntries = Object.entries(meta).filter(([key]) => !HIDDEN_META_KEYS.has(key))
+
+function formatValue(value){
+    if (value === null || value === undefined) {
+        return ''
+    }
+    if (typeof value === 'string') {
+        return value
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+        return String(value)
+    }
+    try {
+        return JSON.stringify(value)
+    } catch {
+        return String(value)
+    }
+}
+
+// Untyped pages list every recognized field generically alongside the
+// unknown ones; typed pages show the recognized set in the header instead.
+const genericEntries = [
+    ...(description ? [['description', description]] : []),
+    ...(resource ? [['resource', resource]] : []),
+    ...(date ? [['date', String(date)]] : []),
+    ...(tags.length ? [['tags', tags.join(', ')]] : []),
+    ...metaEntries
+]
+
+const isTyped = type.length > 0
+const hasFrontmatter = isTyped || genericEntries.length > 0
+---
+{hasFrontmatter && isTyped &&
+    <aside class="concept-header" aria-label="Concept metadata">
+        <div class="concept-topline">
+            <span class="concept-type">{type}</span>
+            {tags.map((tag) => <span class="concept-tag">{tag}</span>)}
+            {date && <span class="concept-date">{String(date)}</span>}
+        </div>
+        {description && <p class="concept-description">{description}</p>}
+        <div class="concept-details">
+            {resource && resourceIsUrl &&
+                <a class="concept-resource" href={resource} target="_blank" rel="noopener">Resource ↗</a>
+            }
+            {resource && !resourceIsUrl &&
+                <span class="concept-resource">Resource: {resource}</span>
+            }
+            {conceptId && <span class="concept-id" title="Concept identity (path-derived, stable across title changes)">{conceptId}</span>}
+        </div>
+        {metaEntries.length > 0 &&
+            <details class="frontmatter-details">
+                <summary>Additional metadata</summary>
+                <dl>
+                    {metaEntries.map(([key, value]) => (
+                        <>
+                            <dt>{key}</dt>
+                            <dd>{formatValue(value)}</dd>
+                        </>
+                    ))}
+                </dl>
+            </details>
+        }
+    </aside>
+}
+{hasFrontmatter && !isTyped &&
+    <details class="frontmatter-panel frontmatter-details">
+        <summary>Metadata</summary>
+        <dl>
+            {genericEntries.map(([key, value]) => (
+                <>
+                    <dt>{key}</dt>
+                    <dd>{formatValue(value)}</dd>
+                </>
+            ))}
+        </dl>
+    </details>
+}
+<style>
+.concept-header{
+    margin-block: 0 var(--space-4);
+    padding: var(--space-3);
+    border: 1px solid var(--soft-border-color);
+    border-radius: var(--radius-md, 8px);
+    background-color: var(--surface-2-bg);
+    max-width: var(--prose-measure);
+    box-sizing: border-box;
+    font-size: 0.92em;
+}
+.concept-topline{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+.concept-type{
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.8em;
+    padding: 0.15em 0.6em;
+    border-radius: var(--radius-sm);
+    background-color: var(--front-blue, #3b82f6);
+    color: var(--content-bg-color);
+}
+.concept-tag{
+    font-size: 0.85em;
+    padding: 0.1em 0.5em;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--soft-border-color);
+    color: var(--content-color-muted);
+}
+.concept-date{
+    margin-left: auto;
+    font-size: 0.85em;
+    color: var(--content-color-muted);
+}
+.concept-description{
+    margin-block: var(--space-2) 0;
+    color: var(--content-color-muted);
+}
+.concept-details{
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-top: var(--space-2);
+    font-size: 0.85em;
+}
+.concept-resource{
+    color: var(--article-anchor-color);
+}
+.concept-id{
+    font-family: var(--font-mono, monospace);
+    color: var(--content-color-muted);
+    cursor: help;
+}
+.frontmatter-panel{
+    margin-block: 0 var(--space-4);
+    max-width: var(--prose-measure);
+    box-sizing: border-box;
+}
+.frontmatter-details{
+    margin-top: var(--space-2);
+    font-size: 0.9em;
+}
+.frontmatter-details summary{
+    cursor: pointer;
+    color: var(--content-color-muted);
+    user-select: none;
+}
+.frontmatter-details dl{
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--space-1) var(--space-3);
+    margin: var(--space-2) 0 0;
+}
+.frontmatter-details dt{
+    font-weight: 600;
+    color: var(--content-color-muted);
+}
+.frontmatter-details dd{
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+</style>

@@ -35,6 +35,7 @@ async function createStructureJsonWriter(options = {}) {
     const assetInfo = [];
     const blobs = [];
     const images = [];
+    const relations = [];
 
     const outdir = config.outdir;
     const jsonDir = config.json_dir ?? join(outdir ?? '.', 'json');
@@ -96,6 +97,21 @@ async function createStructureJsonWriter(options = {}) {
                 });
             }
         },
+        insertRelations(list = []) {
+            for (const relation of list) {
+                relations.push({
+                    version_id: relation.version_id ?? null,
+                    source_sid: relation.source_sid ?? null,
+                    target_sid: relation.target_sid ?? null,
+                    target_raw: relation.target_raw ?? null,
+                    fragment: relation.fragment ?? null,
+                    link_text: relation.link_text ?? null,
+                    source_heading: relation.source_heading ?? null,
+                    status: relation.status ?? null,
+                    external: relation.external ? 1 : 0
+                });
+            }
+        },
         insertImages(list = []) {
             for (const image of list) {
                 images.push({
@@ -149,6 +165,7 @@ async function createStructureJsonWriter(options = {}) {
                 asset_info: assetInfo,
                 assets: assetVersions,
                 images,
+                relations,
                 blob_store: blobMeta
             };
             await writeFile(join(jsonDir, 'content.json'), JSON.stringify(dataset));

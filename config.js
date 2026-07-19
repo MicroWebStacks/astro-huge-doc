@@ -46,7 +46,10 @@ const DEFAULT_MANIFEST = {
         file_link_ext: ['svg', 'webp', 'png', 'jpeg', 'jpg', 'xlsx', 'glb', 'puml', 'mermaid', 'mmd'],
         file_compress_ext: ['txt', 'md', 'json', 'csv', 'tsv', 'yaml', 'yml', 'mermaid', 'mmd'],
         external_storage_kb: 512,
-        inline_compression_kb: 32
+        inline_compression_kb: 32,
+        // Cap for the lite profile's in-memory relations store (OKF plan
+        // DD-5); overridable via manifest collect.relations_cache_mb.
+        relations_cache_mb: 10
     },
     render: {
         folder: null,

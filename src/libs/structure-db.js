@@ -46,6 +46,11 @@ export const {
     getImageInfo,
     getAssetBlob,
     getAssetUrl,
+    // Relations surface (OKF plan TP-7): all backends export these; results
+    // may be empty (older datasets/databases, unvisited pages in lite).
+    getOutgoing,
+    getBacklinks,
+    resolveLink,
     // Lazy-backend-only introspection for the info surface (undefined on the
     // json/sqlite full backends, which don't do per-page hit/miss caching the
     // same way; callers must guard with typeof === 'function').

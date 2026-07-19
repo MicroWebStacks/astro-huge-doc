@@ -1,7 +1,49 @@
-import {getDocuments, getSourceEntries} from '../libs/structure-db.js';
+import {getDocuments, getSourceEntries, getDocument, getItems} from '../libs/structure-db.js';
 import {basePrefix} from '../libs/blob-files.js';
 import {config} from '../../config.js';
 import {buildSectionMenuFromSourceEntries as buildSourceEntryMenu, firstDocumentUrl} from './source_navigation.js';
+
+/* --- log.md recognition (OKF plan DD-8) ----------------------------------
+   The reserved knowledge-history file is only given special treatment when a
+   sanity check passes: a root-level log.md whose headings contain at least
+   one date-like entry. Anything else stays a completely normal page. */
+const LOG_ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}/;
+
+function headingReadsAsDate(label) {
+    const text = String(label ?? '').trim();
+    if (!text || !/\d/.test(text)) {
+        return false;
+    }
+    if (LOG_ISO_DATE_PATTERN.test(text)) {
+        return true;
+    }
+    return Number.isFinite(Date.parse(text));
+}
+
+function isValidLogStructure(headings) {
+    const list = Array.isArray(headings) ? headings : [];
+    return list.some((heading) => headingReadsAsDate(heading?.label ?? heading?.body_text));
+}
+
+/* Returns {url, title} when the bundle root carries a valid log.md, else
+   null. In the lite profile the page's items exist only once it has been
+   visited, so the app-bar icon appears after the log page first loads. */
+function findKnowledgeLog() {
+    try {
+        const doc = getDocument({url: 'log'});
+        const path = String(doc?.path ?? '');
+        if (!doc || !/^log\.md$/i.test(path)) {
+            return null;
+        }
+        const headingItems = getItems({doc_sid: doc.sid}, 'heading');
+        if (!isValidLogStructure(headingItems)) {
+            return null;
+        }
+        return {url: doc.url, title: doc.title ?? 'Log'};
+    } catch {
+        return null;
+    }
+}
 
 function cloneHeading(heading) {
     const label = (heading.label ?? heading.body_text ?? '').trim();
@@ -440,8 +482,10 @@ function section_from_pathname(pathname){
 export {
     process_toc_list,
     buildNavigationMenus,
-    buildAppBarMenu, 
-    buildSectionMenu, 
+    buildAppBarMenu,
+    buildSectionMenu,
     buildSectionMenuFromSourceEntries,
-    section_from_pathname
+    section_from_pathname,
+    findKnowledgeLog,
+    isValidLogStructure
 };

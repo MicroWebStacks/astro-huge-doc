@@ -1,4 +1,5 @@
 import {globStream} from 'glob'
+import { readdir } from 'fs/promises';
 import { relative, resolve, join, sep, basename, dirname, parse, extname } from 'path';
 import { load_text,exists,exists_public, load_yaml } from './utils.js';
 import { title_slug, buildDocumentContent } from './md_utils.js';
@@ -137,27 +138,51 @@ function entry_to_level(url_type,file_path){
     return level
 }
 
-function isFilenameSameAsParent(filePath) {
-    const filename = basename(filePath, extname(filePath));
-    const parentDirName = basename(dirname(filePath));
-    return filename === parentDirName;
+// Landing-page selection (OKF plan DD-2/OP-6): exactly one file per directory
+// takes the directory route, chosen by the ordered priority list
+// index.md > readme.md > same-name-as-parent.md. Every other candidate stays a
+// normal child page (e.g. readme.md renders at <dir>/readme when index.md
+// coexists). Name matching is case-insensitive; one readdir per directory,
+// cached for the collection run.
+const landingNameCache = new Map()
+
+function pickLandingName(fileNames, parentDirName){
+    const present = new Set(fileNames.map((name)=>String(name).toLowerCase()))
+    const candidates = ['index.md','readme.md']
+    if(parentDirName){
+        candidates.push(`${String(parentDirName).toLowerCase()}.md`)
+    }
+    for(const candidate of candidates){
+        if(present.has(candidate)){
+            return candidate
+        }
+    }
+    return null
+}
+
+async function getLandingName(dir){
+    const key = (dir === '' || dir === '.') ? '.' : dir
+    if(landingNameCache.has(key)){
+        return landingNameCache.get(key)
+    }
+    let names = []
+    try{
+        names = await readdir(join(config.contentdir, key))
+    }catch(_error){
+        // unreadable directory: no landing candidate can be confirmed
+    }
+    const parentDirName = key === '.' ? null : basename(key)
+    const landing = pickLandingName(names, parentDirName)
+    landingNameCache.set(key, landing)
+    return landing
 }
 
 async function get_url_type(file_path){
-    const filename = basename(file_path).toLowerCase()
-    const siblingIndex = join(dirname(file_path), 'index.md')
-    const siblingReadme = join(dirname(file_path), 'readme.md')
-    if(filename === 'index.md' && await exists(siblingReadme)){
+    const landing = await getLandingName(dirname(file_path))
+    if(landing && basename(file_path).toLowerCase() === landing){
         return "dir"
-    }else if(filename === 'readme.md'){
-        return await exists(siblingIndex) ? "file" : "dir"
-    }else{
-        if(isFilenameSameAsParent(file_path)){
-            return "dir"
-        }else{
-            return "file"
-        }
     }
+    return "file"
 }
 
 async function createMarkdownDocumentSource(file_path){
@@ -446,6 +471,7 @@ function applyEntryOverrides(entry, entryFields, knownEntryFields){
 }
 
 function set_config(new_config){
+    landingNameCache.clear()
     if(new_config != null){
         config = {
             ...config,
@@ -474,5 +500,6 @@ export{
     get_config,
     shortMD5,
     iterate_documents,
-    tree_content
+    tree_content,
+    get_url_type
 }

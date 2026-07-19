@@ -62,7 +62,10 @@ const ASSET_KEY_SEPARATOR = '::';
 // `children`. The renderer now consumes flattened child rows via `childCount`;
 // accepting a v2 record leaves <details> empty and renders its code as a
 // visible sibling outside the collapsed element.
-const RECORD_VERSION = 3;
+// Version 4 adds link resolution outcomes (`ast.rel`: status/target_sid/raw)
+// used for unresolved-link rendering and the in-memory relations store, plus
+// OKF frontmatter columns (type/description/resource) on the document row.
+const RECORD_VERSION = 4;
 // Alt text marking the synthetic image appended for a frontmatter `image:`
 // path; the item is dropped after collection, only its asset/blob remain.
 const META_IMAGE_ALT = 'mws-meta-image';
@@ -91,6 +94,70 @@ const indexes = {
 const loadedDocs = new Map(); // sid -> {hash, assetSources, parseMs}
 const inflight = new Map(); // sid -> Promise
 const blobCache = new Map();
+
+/* In-memory relations store (OKF plan DD-5/RK-2): grows incrementally from
+   visited pages only, strictly in-memory (never persisted), capped at
+   ~relations_cache_mb (default 10 MB) with lossy eviction of the
+   least-recently parsed page's rows. Backlink answers therefore cover visited
+   pages only — a deliberate lite-profile trade-off. */
+const relationsStore = new Map(); // source sid -> {rows, bytes}
+let relationsStoreBytes = 0;
+
+function relationsCapBytes() {
+    const mb = Number(config.collect.relations_cache_mb ?? 10);
+    return (Number.isFinite(mb) && mb > 0 ? mb : 10) * 1024 * 1024;
+}
+
+function updateRelationsForDoc(doc, items) {
+    const rows = [];
+    let currentHeading = null;
+    for (const item of items ?? []) {
+        if (item?.type === 'heading') {
+            currentHeading = item.slug ?? null;
+            continue;
+        }
+        if (item?.type !== 'link') {
+            continue;
+        }
+        const ast = safeParseAst(item.ast);
+        const rel = ast?.rel;
+        if (!rel) {
+            continue;
+        }
+        rows.push({
+            source_sid: doc.sid,
+            target_sid: rel.target_sid ?? null,
+            target_raw: rel.raw ?? '',
+            fragment: rel.fragment ?? null,
+            link_text: item.body_text ?? null,
+            source_heading: currentHeading,
+            status: rel.status ?? null,
+            external: Boolean(rel.external)
+        });
+    }
+    const previous = relationsStore.get(doc.sid);
+    if (previous) {
+        relationsStoreBytes -= previous.bytes;
+        relationsStore.delete(doc.sid);
+    }
+    if (rows.length === 0) {
+        return;
+    }
+    const bytes = JSON.stringify(rows).length * 2;
+    relationsStore.set(doc.sid, {rows, bytes});
+    relationsStoreBytes += bytes;
+    const cap = relationsCapBytes();
+    while (relationsStoreBytes > cap && relationsStore.size > 1) {
+        const oldestSid = relationsStore.keys().next().value;
+        if (oldestSid === doc.sid) {
+            break;
+        }
+        const evicted = relationsStore.get(oldestSid);
+        relationsStore.delete(oldestSid);
+        relationsStoreBytes -= evicted?.bytes ?? 0;
+        console.warn(`[lite] relations store over ${Math.round(cap / (1024 * 1024))} MB cap; evicted relations of ${oldestSid}`);
+    }
+}
 
 // Info-surface bookkeeping only (specification/run-modes/spec.md,
 // Observability): both of these just record numbers the lazy pipeline was
@@ -136,18 +203,22 @@ function stripExtension(name) {
     return String(name ?? '').replace(/\.[^.]+$/, '');
 }
 
-/* GitHub-style file identity: readme.md (any case) or a file named like its
-   parent folder represents the folder itself. Mirrors content-structure's
-   get_url_type() so lite and full agree on which file is a folder page. */
-function urlTypeFor(relPath) {
-    const lower = relPath.toLowerCase();
-    if (lower.endsWith('readme.md')) {
-        return 'dir';
+/* Landing-page selection, mirroring content-structure's get_url_type()
+   (OKF plan DD-2/OP-6): per directory exactly one file takes the directory
+   route, chosen by the priority list index.md > readme.md >
+   same-name-as-parent.md. Case-insensitive on the reserved names. */
+function pickLandingName(fileNames, parentDirName) {
+    const present = new Set(fileNames.map((name) => String(name).toLowerCase()));
+    const candidates = ['index.md', 'readme.md'];
+    if (parentDirName) {
+        candidates.push(`${String(parentDirName).toLowerCase()}.md`);
     }
-    const segments = relPath.split('/');
-    const name = stripExtension(segments[segments.length - 1]);
-    const parent = segments.length > 1 ? segments[segments.length - 2] : null;
-    return name === parent ? 'dir' : 'file';
+    for (const candidate of candidates) {
+        if (present.has(candidate)) {
+            return candidate;
+        }
+    }
+    return null;
 }
 
 function levelFor(urlType, relPath) {
@@ -161,12 +232,13 @@ function levelFor(urlType, relPath) {
 
 /* Lite identity contract: url = slugified relative path without extension,
    label = filename (or folder name) without extension, verbatim. Frontmatter
-   is never read (deliberate divergence from the full profile). */
-function identityFor(relPath) {
+   is never read (deliberate divergence from the full profile). isLanding is
+   decided by the walk from the directory listing (pickLandingName). */
+function identityFor(relPath, isLanding) {
     const segments = relPath.split('/');
     const fileName = segments[segments.length - 1];
     const dirSegments = segments.slice(0, -1);
-    const urlType = urlTypeFor(relPath);
+    const urlType = isLanding ? 'dir' : 'file';
     let url;
     let title;
     if (urlType === 'dir') {
@@ -223,6 +295,9 @@ function walkWorkspace() {
             }
             return a.name.localeCompare(b.name);
         });
+        const fileNames = children.filter((c) => !c.isDirectory()).map((c) => c.name);
+        const parentName = relDir ? relDir.split('/').pop() : null;
+        const landingName = pickLandingName(fileNames, parentName);
         for (const child of children) {
             if (IGNORED_NAMES.has(child.name)) {
                 continue;
@@ -250,31 +325,35 @@ function walkWorkspace() {
 
             let doc = null;
             if (!isDirectory && child.name.toLowerCase().endsWith('.md')) {
-                const identity = identityFor(relPath);
-                let url = identity.url;
-                const taken = usedUrls.get(url) ?? 0;
-                usedUrls.set(url, taken + 1);
-                if (taken > 0) {
-                    url = `${url}-${taken + 1}`;
+                const isLanding = landingName !== null && child.name.toLowerCase() === landingName;
+                const identity = identityFor(relPath, isLanding);
+                const url = identity.url;
+                // Duplicate identity guard (OKF plan OP-4): first claimant of a
+                // url wins; later files are warned about and left un-routed —
+                // never silently renamed, links could not know about a rename.
+                if (usedUrls.has(url)) {
+                    console.warn(`[lite] duplicate identity '${url || '/'}': '${relPath}' collides with '${usedUrls.get(url)}'; ignoring '${relPath}'`);
+                } else {
+                    usedUrls.set(url, relPath);
+                    const uid = uidForUrl(url, identity.slug);
+                    const level = levelFor(identity.url_type, relPath);
+                    const orderKey = `${relDir || '.'}|${level}`;
+                    const order = (orderTracker.get(orderKey) ?? 0) + 1;
+                    orderTracker.set(orderKey, order);
+                    doc = {
+                        sid: shortMD5(uid),
+                        uid,
+                        path: relPath,
+                        url,
+                        url_type: identity.url_type,
+                        slug: identity.slug,
+                        title: identity.title,
+                        level,
+                        order,
+                        base_dir: relDir || '.'
+                    };
+                    documents.push(doc);
                 }
-                const uid = uidForUrl(url, identity.slug);
-                const level = levelFor(identity.url_type, relPath);
-                const orderKey = `${relDir || '.'}|${level}`;
-                const order = (orderTracker.get(orderKey) ?? 0) + 1;
-                orderTracker.set(orderKey, order);
-                doc = {
-                    sid: shortMD5(uid),
-                    uid,
-                    path: relPath,
-                    url,
-                    url_type: identity.url_type,
-                    slug: identity.slug,
-                    title: identity.title,
-                    level,
-                    order,
-                    base_dir: relDir || '.'
-                };
-                documents.push(doc);
             }
 
             // Mirrors scripts/source-tree.js: a folder page's own file entry is
@@ -442,6 +521,7 @@ function mergeRecord(doc, record) {
         }
     }
     loadedDocs.set(doc.sid, {hash: record.hash, assetSources: record.asset_sources ?? [], parseMs: record.parse_ms ?? null});
+    updateRelationsForDoc(doc, record.items ?? []);
 }
 
 async function parseDocumentRecord(doc, rawText, hash) {
@@ -516,16 +596,32 @@ async function parseDocumentRecord(doc, rawText, hash) {
     const schema = await getStructureSchema();
     const documentsSchema = schema.tables.get('documents');
     // Lite identity stays filename-derived (never frontmatter), but
-    // frontmatter fields that are not documents columns (image, description,
-    // features, ...) still land in meta_data so meta consumers such as cards
-    // work in the lite profile too.
+    // frontmatter fields that are not documents columns (image, features, ...)
+    // still land in meta_data so meta consumers such as cards work in the lite
+    // profile too. Non-identity document columns (type, description, resource,
+    // tags, date — the OKF-recommended set, DD-4/DD-9) are applied to the
+    // entry so the opened page's metadata viewer sees them; identity columns
+    // never come from frontmatter in lite.
     if (frontmatter) {
         const knownColumns = new Set(documentsSchema.columns.map((column) => column.name));
+        const identityColumns = new Set([
+            'id', 'version_id', 'sid', 'uid', 'path', 'url', 'url_type',
+            'slug', 'title', 'level', 'order', 'base_dir', 'format', 'meta_data'
+        ]);
         const metaFields = {};
         for (const [key, value] of Object.entries(frontmatter)) {
-            if (!knownColumns.has(key) && value !== undefined) {
-                metaFields[key] = value;
+            if (value === undefined) {
+                continue;
             }
+            if (!knownColumns.has(key)) {
+                metaFields[key] = value;
+            } else if (!identityColumns.has(key)) {
+                result.entry[key] = value;
+            }
+        }
+        if (typeof frontmatter.timestamp !== 'undefined' && typeof result.entry.date === 'undefined') {
+            result.entry.date = frontmatter.timestamp;
+            delete metaFields.timestamp;
         }
         if (Object.keys(metaFields).length > 0) {
             result.entry.meta_data = JSON.stringify(metaFields);
@@ -548,10 +644,14 @@ async function parseDocumentRecord(doc, rawText, hash) {
     // A browser resolves ../README.md against the extension-less lite URL,
     // which would request a non-existent *.md route. Resolve Markdown links
     // against the source file instead, then replace them with the target
-    // document's filename-derived lite URL. Anchors, query strings, external
-    // URLs, and non-Markdown assets keep their original behavior.
+    // document's filename-derived lite URL. Anchors, query strings, and
+    // non-Markdown assets keep their original behavior. Each classified .md
+    // link additionally carries its resolution outcome in `ast.rel`
+    // (status/target_sid/raw) for unresolved-link rendering and the in-memory
+    // relations store (OKF plan TP-5/TP-8/RK-2). Matching is exact-case with
+    // URL-decoding only (OP-1).
     const documentsByPath = new Map(
-        ensureTree().documents.map((candidate) => [candidate.path.toLowerCase(), candidate])
+        ensureTree().documents.map((candidate) => [candidate.path, candidate])
     );
     for (const item of payload.items ?? []) {
         if (item?.type !== 'link' || !item.ast) {
@@ -560,28 +660,44 @@ async function parseDocumentRecord(doc, rawText, hash) {
         try {
             const ast = JSON.parse(item.ast);
             const rawUrl = String(ast?.url ?? '');
-            if (!rawUrl || rawUrl.startsWith('#') || rawUrl.startsWith('/')
-                || rawUrl.startsWith('//') || /^[a-z][a-z\d+.-]*:/i.test(rawUrl)) {
+            if (!rawUrl || rawUrl.startsWith('#')) {
+                continue;
+            }
+            if (rawUrl.startsWith('//') || /^[a-z][a-z\d+.-]*:/i.test(rawUrl)) {
+                ast.rel = {status: 'external', external: true, raw: rawUrl};
+                item.ast = JSON.stringify(ast);
                 continue;
             }
             const match = rawUrl.match(/^([^?#]*)(.*)$/);
-            const relativePath = match?.[1] ?? rawUrl;
+            const pathPart = match?.[1] ?? rawUrl;
             const suffix = match?.[2] ?? '';
-            if (!/\.md$/i.test(relativePath)) {
+            if (!/\.md$/i.test(pathPart)) {
                 continue;
             }
-            let decodedPath = relativePath;
+            let decodedPath = pathPart;
             try {
-                decodedPath = decodeURIComponent(relativePath);
+                decodedPath = decodeURIComponent(pathPart);
             } catch {
                 // Leave malformed percent escapes untouched; no target match.
             }
-            const sourcePath = posix.normalize(posix.join(posix.dirname(doc.path), decodedPath));
-            const target = documentsByPath.get(sourcePath.toLowerCase());
+            const fragment = suffix.includes('#') ? suffix.slice(suffix.indexOf('#') + 1) : null;
+            // Root-absolute references check the content root first (DD-3);
+            // relative ones resolve against the source file.
+            const targetPath = decodedPath.startsWith('/')
+                ? posix.normalize(decodedPath.replace(/^\/+/, ''))
+                : posix.normalize(posix.join(posix.dirname(doc.path), decodedPath));
+            const target = documentsByPath.get(targetPath);
             if (target) {
                 ast.url = `${basePrefix(config.base)}/${target.url}${suffix}`;
-                item.ast = JSON.stringify(ast);
+                ast.rel = {status: 'resolved', target_sid: target.sid, raw: rawUrl, fragment};
+            } else if (decodedPath.startsWith('/') && existsSync(join(config.collect.rootdir ?? '', 'public', targetPath))) {
+                // DD-3 fallback: root-absolute target absent from the content
+                // root but present under public/ keeps its authored href.
+                ast.rel = {status: 'public', raw: rawUrl, fragment};
+            } else {
+                ast.rel = {status: 'unresolved', raw: rawUrl, fragment};
             }
+            item.ast = JSON.stringify(ast);
         } catch {
             // Preserve an unrecognized AST payload exactly as collected.
         }
@@ -1029,6 +1145,61 @@ async function getEntry(match) {
     return {found: true, title: document.title, headings, items, data};
 }
 
+/* Relations queries (OKF plan TP-7/RK-2): answered from the incrementally
+   grown in-memory store, i.e. they cover visited pages only. */
+function getOutgoing(sid, versionId = null) {
+    if (!sid) {
+        return [];
+    }
+    const rows = relationsStore.get(sid)?.rows ?? [];
+    const {docBySid} = ensureTree();
+    return rows.map((row) => {
+        const target = row.target_sid ? docBySid.get(row.target_sid) : null;
+        return {...row, target_url: target?.url ?? null, target_title: target?.title ?? null};
+    });
+}
+
+function getBacklinks(sid, versionId = null) {
+    if (!sid) {
+        return [];
+    }
+    const {docBySid} = ensureTree();
+    const results = [];
+    for (const [sourceSid, entry] of relationsStore) {
+        for (const row of entry.rows) {
+            if (row.target_sid !== sid || row.status !== 'resolved') {
+                continue;
+            }
+            const source = docBySid.get(sourceSid);
+            if (!source) {
+                continue;
+            }
+            results.push({...row, source_url: source.url, source_title: source.title});
+        }
+    }
+    return results;
+}
+
+/* Lite link items already carry their outcome in ast.rel; this lookup exists
+   for surface parity with the sqlite/json backends. */
+function resolveLink(docSid, rawUrl, versionId = null) {
+    if (!docSid || !rawUrl) {
+        return null;
+    }
+    const row = (relationsStore.get(docSid)?.rows ?? []).find((entry) => entry.target_raw === rawUrl);
+    if (!row) {
+        return null;
+    }
+    const {docBySid} = ensureTree();
+    const target = row.target_sid ? docBySid.get(row.target_sid) : null;
+    return {
+        status: row.status,
+        url: target?.url ?? null,
+        fragment: row.fragment ?? null,
+        external: Boolean(row.external)
+    };
+}
+
 function getLastPageLoad() {
     return lastPageLoad;
 }
@@ -1052,6 +1223,9 @@ export {
     getImageInfo,
     getAssetBlob,
     getAssetUrl,
+    getOutgoing,
+    getBacklinks,
+    resolveLink,
     getLastPageLoad,
     getWalkHistory
 };

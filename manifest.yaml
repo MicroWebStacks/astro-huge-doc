@@ -1,5 +1,5 @@
 render:
-  folder: content
+  folder: demo
   highlighter:
     theme: dark-plus
     langs: ['javascript','js','python','yaml', 'markdown', 'mermaid', 'text']

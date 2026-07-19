@@ -635,6 +635,114 @@ function getSourceEntries(versionId = null) {
     }
 }
 
+/* ------------------------------------------------------------- relations
+   OKF plan TP-7: relation rows are written by collect (content-structure
+   relations.js). Older databases predate the table, so every query is gated
+   on its existence and degrades to empty results. */
+let hasRelationsTable = null;
+function relationsAvailable(db) {
+    if (hasRelationsTable === null) {
+        try {
+            hasRelationsTable = Boolean(
+                db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'relations'").get()
+            );
+        } catch {
+            hasRelationsTable = false;
+        }
+    }
+    return hasRelationsTable;
+}
+
+function resolveRelationsVersion(db, versionId) {
+    const resolved = versionId ?? config.collect.version_id ?? null;
+    if (resolved) {
+        return resolved;
+    }
+    try {
+        return db.prepare('SELECT version_id FROM relations ORDER BY version_id DESC LIMIT 1').get()?.version_id ?? null;
+    } catch {
+        return null;
+    }
+}
+
+/* Outgoing links of a document, joined with the target document identity. */
+function getOutgoing(sid, versionId = null) {
+    if (!sid) {
+        return [];
+    }
+    const db = ensureDb();
+    if (!relationsAvailable(db)) {
+        return [];
+    }
+    const resolvedVersion = resolveRelationsVersion(db, versionId);
+    if (!resolvedVersion) {
+        return [];
+    }
+    return db.prepare(`
+        SELECT r.target_sid, r.target_raw, r.fragment, r.link_text, r.source_heading, r.status, r.external,
+               d.url AS target_url, d.title AS target_title
+        FROM relations r
+        LEFT JOIN documents d ON d.sid = r.target_sid AND d.version_id = r.version_id
+        WHERE r.source_sid = ? AND r.version_id = ?
+        ORDER BY r.id
+    `).all(sid, resolvedVersion);
+}
+
+/* Backlinks: documents linking TO the given document, with reading context. */
+function getBacklinks(sid, versionId = null) {
+    if (!sid) {
+        return [];
+    }
+    const db = ensureDb();
+    if (!relationsAvailable(db)) {
+        return [];
+    }
+    const resolvedVersion = resolveRelationsVersion(db, versionId);
+    if (!resolvedVersion) {
+        return [];
+    }
+    return db.prepare(`
+        SELECT r.source_sid, r.target_raw, r.fragment, r.link_text, r.source_heading, r.status,
+               d.url AS source_url, d.title AS source_title
+        FROM relations r
+        JOIN documents d ON d.sid = r.source_sid AND d.version_id = r.version_id
+        WHERE r.target_sid = ? AND r.version_id = ? AND r.status = 'resolved'
+        ORDER BY r.id
+    `).all(sid, resolvedVersion);
+}
+
+/* Resolution outcome for one authored href of one document (Link.astro).
+   null when unknown (no relations data), so callers keep legacy behavior. */
+function resolveLink(docSid, rawUrl, versionId = null) {
+    if (!docSid || !rawUrl) {
+        return null;
+    }
+    const db = ensureDb();
+    if (!relationsAvailable(db)) {
+        return null;
+    }
+    const resolvedVersion = resolveRelationsVersion(db, versionId);
+    if (!resolvedVersion) {
+        return null;
+    }
+    const row = db.prepare(`
+        SELECT r.status, r.fragment, r.external, d.url AS target_url
+        FROM relations r
+        LEFT JOIN documents d ON d.sid = r.target_sid AND d.version_id = r.version_id
+        WHERE r.source_sid = ? AND r.target_raw = ? AND r.version_id = ?
+        LIMIT 1
+    `).get(docSid, rawUrl, resolvedVersion);
+    if (!row) {
+        return null;
+    }
+    return {
+        status: row.status,
+        url: row.target_url ?? null,
+        fragment: row.fragment ?? null,
+        external: Boolean(row.external)
+    };
+}
+
 function getAssetBlob(assetUid, versionId = null) {
     if (!assetUid) {
         return null;
@@ -689,5 +797,8 @@ export {
     parseAssetLink,
     getImageInfo,
     getAssetBlob,
-    getAssetUrl
+    getAssetUrl,
+    getOutgoing,
+    getBacklinks,
+    resolveLink
 };

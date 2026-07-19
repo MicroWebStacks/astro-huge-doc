@@ -130,6 +130,7 @@ async function createStructureDbWriter(options = {}) {
     const assetsSchema = requireTableSchema(schema, 'assets');
     const imagesSchema = requireTableSchema(schema, 'images');
     const versionsSchema = requireTableSchema(schema, 'versions');
+    const relationsSchema = requireTableSchema(schema, 'relations');
     runInTransaction(db, () => {
         createTables(db, schema);
         reconcileTables(db, schema);
@@ -168,6 +169,13 @@ async function createStructureDbWriter(options = {}) {
         },
         insertImages(imagesList = []) {
             persistImages(db, imagesList, imagesSchema, existingState);
+        },
+        insertRelations(relationRows = []) {
+            if (!relationRows.length) {
+                return;
+            }
+            const rows = relationRows.map((row) => normalizeTableRow(row, relationsSchema));
+            insertRows(db, 'relations', relationsSchema.insertColumns, rows);
         },
         // Materialize content-addressed <hash>.<ext> static files for every
         // asset/image blob in the store, so assets can be served as immutable,
@@ -527,6 +535,22 @@ function formatColumnValue(column, value) {
     }
     if (column.type === 'boolean') {
         return normalizeScalar(value);
+    }
+    if (column.type === 'blob') {
+        return value ?? null;
+    }
+    // Frontmatter is user input: YAML turns unquoted dates into Date objects
+    // and allows nested maps in scalar fields. SQLite can only bind
+    // primitives, so serialize instead of letting the insert throw.
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+    if (value !== null && typeof value === 'object') {
+        try {
+            return JSON.stringify(value);
+        } catch (_error) {
+            return String(value);
+        }
     }
     return value ?? null;
 }

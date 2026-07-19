@@ -1,6 +1,8 @@
 ---
 import Layout from "@/layout/Layout.astro"
 import AstroMarkdown from '@/components/markdown/AstroMarkdown.astro'
+import FrontmatterPanel from '@/components/markdown/FrontmatterPanel.astro'
+import RelationsFooter from '@/layout/RelationsFooter.astro'
 import {getEntry} from '@/libs/structure-db.js'
 
 console.log(`index> home page`)
@@ -11,6 +13,10 @@ if(!found){
 ---
 <Layout title={title} headings={headings} >
     {found&&
-        <AstroMarkdown items={items} data={data} headings={headings} />
+        <>
+            <FrontmatterPanel data={data} />
+            <AstroMarkdown items={items} data={data} headings={headings} />
+            <RelationsFooter data={data} />
+        </>
     }
 </Layout>

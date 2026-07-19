@@ -5,7 +5,7 @@ import 'katex/dist/katex.min.css';
 import AppBar from './AppBar.astro';
 import SideMenu from './SideMenu.astro';
 import LinkPreviewOverlay from '@/components/linkpreview/LinkPreviewOverlay.astro';
-import { process_toc_list, buildAppBarMenu, buildNavigationMenus } from "./layout_utils";
+import { process_toc_list, buildAppBarMenu, buildNavigationMenus, findKnowledgeLog } from "./layout_utils";
 import { extensionPreviewEnabled } from '@/libs/extension-preview.js';
 
 
@@ -33,6 +33,9 @@ const navigation = liveReload
 	: buildNavigationMenus(Astro.url.pathname)
 const pages_menu_items = navigation.sectionMenu ?? []
 const appbar_menu = navigation.appBarMenu ?? []
+// Reserved log.md (OKF plan DD-8): the app bar links to the knowledge log
+// only when the validation gate passes; otherwise it is a normal page.
+const logPage = findKnowledgeLog()
 // Extension preview only: pages poll the local server's /__lite/version and
 // reload themselves in place when the extension bumps a change stamp. Keeps
 // the current URL across edits (the server never restarts). Purely local —
@@ -155,7 +158,7 @@ const liveReloadPolling = liveReload && Boolean(process.env.MICROWEBSTACKS_LAUNC
 	<body >
 		<div class="appbar-nav_content-footer">
 			<header>
-				<AppBar menu={appbar_menu} showLeftToggle={liveReload || pages_menu_items.length > 0} showRightToggle={toc_menu_items.visible} showRuntimeInfo={liveReload} />
+				<AppBar menu={appbar_menu} showLeftToggle={liveReload || pages_menu_items.length > 0} showRightToggle={toc_menu_items.visible} showRuntimeInfo={liveReload} logPage={logPage} />
 			</header>
 			<main>
 				<div id="wide-nav" class="scroll">

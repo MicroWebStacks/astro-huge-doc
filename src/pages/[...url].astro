@@ -1,7 +1,11 @@
 ---
 import Layout from "@/layout/Layout.astro"
 import AstroMarkdown from '@/components/markdown/AstroMarkdown.astro'
+import FrontmatterPanel from '@/components/markdown/FrontmatterPanel.astro'
+import Breadcrumb from '@/layout/Breadcrumb.astro'
+import RelationsFooter from '@/layout/RelationsFooter.astro'
 import { getEntry, getDocuments } from '@/libs/structure-db.js'
+import { isValidLogStructure } from '@/layout/layout_utils'
 import NotFound from './404.astro'
 
 // Astro only calls this when output is "static" (astro.config.static.mjs);
@@ -27,12 +31,44 @@ const {found, title, headings, items, data} = await getEntry({url:url})
 if (!found) {
     Astro.response.status = 404;
 }
+// Reserved log.md (OKF plan DD-8): the bundle-root log gets a timeline
+// treatment only when the same validation gate as the app-bar icon passes;
+// a log.md that fails the check renders as a completely normal page.
+const isLogView = found
+    && /^log\.md$/i.test(String(data?.path ?? ''))
+    && isValidLogStructure(headings)
 ---
 {found&&
     <Layout title={title} headings={headings} >
-            <AstroMarkdown items={items} data={data} headings={headings} />
+            <Breadcrumb data={data} />
+            <FrontmatterPanel data={data} />
+            <div class={isLogView ? 'log-view' : undefined}>
+                <AstroMarkdown items={items} data={data} headings={headings} />
+            </div>
+            <RelationsFooter data={data} />
     </Layout>
 }
 {!found&&
     <NotFound message={`'${url}' Page not found`} />
 }
+<style>
+/* Curated-history timeline (OKF plan DD-8): a validated log.md gets a rail
+   with a dot per heading, so dated entries read as a change log. */
+.log-view{
+    border-left: 2px solid var(--soft-border-color);
+    padding-left: var(--space-4);
+}
+.log-view :global(.heading){
+    position: relative;
+}
+.log-view :global(.heading)::before{
+    content: '';
+    position: absolute;
+    left: calc(-1 * var(--space-4) - 7px);
+    top: 0.4em;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--front-blue);
+}
+</style>

@@ -1,0 +1,163 @@
+---
+/*
+ * Relations footer (OKF plan TP-10/DD-10): previous/next among siblings plus
+ * contextual backlinks ("Referenced in X under 'heading': 'link text'").
+ * Always-on for all content; each block renders only when it has data, so a
+ * plain-markdown site without relations shows at most prev/next. In the lite
+ * profile backlinks cover visited pages only (RK-2). Hidden in preview mode.
+ */
+import { getDocuments, getBacklinks } from '@/libs/structure-db';
+import { basePrefix } from '@/libs/blob-files.js';
+import { config } from '@/config';
+
+export interface Props {
+    data: { url?: string; sid?: string; level?: number };
+}
+
+const { data } = Astro.props as Props;
+const url = typeof data?.url === 'string' ? data.url : '';
+const sid = data?.sid ?? null;
+const prefix = basePrefix(config.base);
+
+const parentOf = (value) => value.includes('/') ? value.slice(0, value.lastIndexOf('/')) : '';
+
+let prev = null;
+let next = null;
+try {
+    const docs = getDocuments() ?? [];
+    const currentParent = parentOf(url);
+    const level = Number.isFinite(data?.level) ? data.level : null;
+    const siblings = docs
+        .filter((docRow) => parentOf(String(docRow.url ?? '')) === currentParent
+            && (level === null || docRow.level === level))
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+            || String(a.url ?? '').localeCompare(String(b.url ?? '')));
+    const index = siblings.findIndex((docRow) => docRow.url === url);
+    if (index >= 0) {
+        prev = siblings[index - 1] ?? null;
+        next = siblings[index + 1] ?? null;
+    }
+} catch {
+    // Navigation data unavailable: the footer simply omits prev/next.
+}
+
+let backlinkRows = [];
+try {
+    backlinkRows = (typeof getBacklinks === 'function' && sid) ? (getBacklinks(sid) ?? []) : [];
+} catch {
+    backlinkRows = [];
+}
+const bySource = new Map();
+for (const row of backlinkRows) {
+    if (!row?.source_url && row?.source_url !== '') {
+        continue;
+    }
+    const key = row.source_sid ?? row.source_url;
+    const group = bySource.get(key) ?? {url: row.source_url, title: row.source_title ?? row.source_url, refs: []};
+    group.refs.push(row);
+    bySource.set(key, group);
+}
+const backlinkGroups = [...bySource.values()];
+const hasContent = Boolean(prev || next || backlinkGroups.length > 0);
+---
+{hasContent &&
+    <footer class="relations-footer">
+        {backlinkGroups.length > 0 &&
+            <section class="backlinks" aria-label="Pages referencing this page">
+                <h2>Referenced by</h2>
+                <ul>
+                    {backlinkGroups.map((group) => (
+                        <li>
+                            <a href={`${prefix}/${group.url}`}>{group.title}</a>
+                            {group.refs.map((ref) => (
+                                <span class="context">
+                                    {ref.source_heading && <span class="heading">under “{ref.source_heading}”</span>}
+                                    {ref.link_text && <span class="quote">“{ref.link_text}”</span>}
+                                </span>
+                            ))}
+                        </li>
+                    ))}
+                </ul>
+            </section>
+        }
+        {(prev || next) &&
+            <nav class="prev-next" aria-label="Neighboring pages">
+                {prev
+                    ? <a class="prev" href={`${prefix}/${prev.url}`}><span class="direction">← Previous</span><span class="label">{prev.title}</span></a>
+                    : <span class="spacer" />}
+                {next
+                    ? <a class="next" href={`${prefix}/${next.url}`}><span class="direction">Next →</span><span class="label">{next.title}</span></a>
+                    : <span class="spacer" />}
+            </nav>
+        }
+    </footer>
+}
+<style>
+.relations-footer{
+    max-width: var(--prose-measure);
+    margin-top: var(--space-6);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--soft-border-color);
+    box-sizing: border-box;
+}
+.backlinks h2{
+    font-size: var(--text-h4);
+    line-height: var(--leading-heading);
+    margin-block: 0 var(--space-2);
+}
+.backlinks ul{
+    margin: 0 0 var(--space-4);
+    padding-left: var(--space-5);
+}
+.backlinks li + li{
+    margin-top: var(--space-1);
+}
+.backlinks a{
+    color: var(--article-anchor-color);
+}
+.context{
+    display: block;
+    font-size: 0.85em;
+    color: var(--content-color-muted);
+}
+.context .heading{
+    margin-right: var(--space-2);
+}
+.prev-next{
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-block: var(--space-3) var(--space-4);
+}
+.prev-next a{
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+    max-width: 48%;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--soft-border-color);
+    border-radius: var(--radius-md, 8px);
+    text-decoration: none;
+    color: var(--content-color);
+}
+.prev-next a:hover{
+    border-color: var(--front-blue);
+}
+.prev-next .next{
+    margin-left: auto;
+    text-align: right;
+}
+.direction{
+    font-size: 0.8em;
+    color: var(--content-color-muted);
+}
+.label{
+    color: var(--article-anchor-color);
+}
+.spacer{
+    flex: 1;
+}
+:global(html[data-preview-mode="true"]) .relations-footer{
+    display: none;
+}
+</style>
