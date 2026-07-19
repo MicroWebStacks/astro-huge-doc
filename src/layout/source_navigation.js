@@ -78,6 +78,32 @@ function activePathForUrl(sourceEntries, activeUrl) {
     return sourceEntries.find((entry) => (entry.document_url ?? null) === activeUrl)?.path ?? null;
 }
 
+function findAuthoredIndexEntry(sourceEntries, pathname, base = '/', rootFallbackUrl = null, documents = []) {
+    const renderedEntries = renderedSourceEntries(sourceEntries ?? []);
+    let activeUrl = docUrlFromPathname(pathname, base);
+    let activePath = activePathForUrl(renderedEntries, activeUrl);
+    if (activeUrl === '' && !activePath && rootFallbackUrl) {
+        activeUrl = rootFallbackUrl;
+        activePath = activePathForUrl(renderedEntries, activeUrl);
+    }
+    const activeDir = activePath?.includes('/') ? activePath.slice(0, activePath.lastIndexOf('/')) : '';
+    const indexEntries = (documents ?? [])
+        .filter((document) => /(^|\/)index\.md$/i.test(String(document.path ?? '')))
+        .map((document) => ({
+            path: document.path,
+            document_url: document.url ?? '',
+            document_title: document.title ?? null,
+            entry_type: 'file',
+            name: 'index.md'
+        }));
+    return indexEntries
+        .filter((entry) => {
+            const indexDir = entry.path.includes('/') ? entry.path.slice(0, entry.path.lastIndexOf('/')) : '';
+            return !indexDir || activeDir === indexDir || activeDir.startsWith(`${indexDir}/`);
+        })
+        .sort((a, b) => b.path.split('/').length - a.path.split('/').length)[0] ?? null;
+}
+
 /* Mirrors the structure-db backends' getFirstDocument() ranking, so callers
    can scope the root menu to the document the '/' route actually serves when
    the content has no root-level document (no root README.md). */
@@ -205,4 +231,4 @@ function buildSectionMenuFromSourceEntries(sourceEntries, pathname, base = '/', 
     return roots;
 }
 
-export {buildSectionMenuFromSourceEntries, firstDocumentUrl};
+export {buildSectionMenuFromSourceEntries, firstDocumentUrl, findAuthoredIndexEntry, buildDocLink, docUrlFromPathname};

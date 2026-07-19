@@ -1,0 +1,22 @@
+---
+import Layout from '@/layout/Layout.astro';
+import NotFound from '../../404.astro';
+import FacetPage from '@/components/explore/FacetPage.astro';
+import {config} from '@/config';
+import {getDocumentsFull} from '@/libs/structure-db.js';
+import {groupDocumentsByFacet} from '@/libs/explore.js';
+
+export function getStaticPaths() {
+    if (config.profile === 'lite' || typeof getDocumentsFull !== 'function') return [];
+    return groupDocumentsByFacet(getDocumentsFull(), 'tags')
+        .map((group) => ({params: {slug: group.slug}, props: {group}}));
+}
+
+const groups = config.profile === 'lite' || typeof getDocumentsFull !== 'function'
+    ? []
+    : groupDocumentsByFacet(getDocumentsFull(), 'tags');
+const group = Astro.props.group ?? groups.find((entry) => entry.slug === Astro.params.slug);
+if (!group) Astro.response.status = 404;
+---
+{!group && <NotFound message={`Tag '${Astro.params.slug ?? ''}' was not found.`} />}
+{group && <Layout title={`Tag: ${group.label}`} headings={[]}><FacetPage title={`#${group.label}`} description={`${group.documents.length} page${group.documents.length === 1 ? '' : 's'} with this tag.`} variants={group.variants} documents={group.documents} /></Layout>}

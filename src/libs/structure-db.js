@@ -35,6 +35,7 @@ export const {
     getEntry,
     getFirstDocument,
     getDocuments,
+    getDocumentsFull,
     getSourceEntries,
     getAssetByUIDVersion,
     getAssetInfoBlob_version,
@@ -51,6 +52,10 @@ export const {
     getOutgoing,
     getBacklinks,
     resolveLink,
+    getDiagnostics,
+    getUnresolvedRelations,
+    relationIndexStatus,
+    controlRelationIndex,
     // Lazy-backend-only introspection for the info surface (undefined on the
     // json/sqlite full backends, which don't do per-page hit/miss caching the
     // same way; callers must guard with typeof === 'function').

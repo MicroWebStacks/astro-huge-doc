@@ -599,6 +599,25 @@ function getDocuments(versionId = null) {
         .all(resolvedVersion);
 }
 
+/* Complete document rows for full-profile exploration. Kept separate from
+   getDocuments() so the navigation hot path retains its narrow projection. */
+function getDocumentsFull(versionId = null) {
+    const db = ensureDb();
+    let resolvedVersion = versionId ?? config.collect.version_id ?? null;
+    if (!resolvedVersion) {
+        resolvedVersion = db
+            .prepare('SELECT version_id FROM documents ORDER BY version_id DESC LIMIT 1')
+            .get()?.version_id ?? null;
+    }
+    if (!resolvedVersion) {
+        return [];
+    }
+    return db
+        .prepare('SELECT * FROM documents WHERE version_id = ? ORDER BY level, "order", url')
+        .all(resolvedVersion)
+        .map(normalizeDocumentRow);
+}
+
 /* Source-tree rows for the file-tree menu (built by scripts/source-tree.js;
    sqlite backend only — the json backend returns [] and the layout falls back
    to the docs-derived menu). */
@@ -651,6 +670,62 @@ function relationsAvailable(db) {
         }
     }
     return hasRelationsTable;
+}
+
+let hasDiagnosticsTable = null;
+function diagnosticsAvailable(db) {
+    if (hasDiagnosticsTable === null) {
+        try {
+            hasDiagnosticsTable = Boolean(
+                db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'diagnostics'").get()
+            );
+        } catch {
+            hasDiagnosticsTable = false;
+        }
+    }
+    return hasDiagnosticsTable;
+}
+
+function getDiagnostics(versionId = null) {
+    const db = ensureDb();
+    if (!diagnosticsAvailable(db)) {
+        return [];
+    }
+    const resolvedVersion = versionId
+        ?? config.collect.version_id
+        ?? db.prepare('SELECT version_id FROM documents ORDER BY version_id DESC LIMIT 1').get()?.version_id
+        ?? null;
+    if (!resolvedVersion) {
+        return [];
+    }
+    return db.prepare(`
+        SELECT kind, path, related_path, message
+        FROM diagnostics
+        WHERE version_id = ?
+        ORDER BY kind, path, id
+    `).all(resolvedVersion);
+}
+
+function getUnresolvedRelations(versionId = null) {
+    const db = ensureDb();
+    if (!relationsAvailable(db)) {
+        return [];
+    }
+    const resolvedVersion = versionId
+        ?? config.collect.version_id
+        ?? db.prepare('SELECT version_id FROM documents ORDER BY version_id DESC LIMIT 1').get()?.version_id
+        ?? null;
+    if (!resolvedVersion) {
+        return [];
+    }
+    return db.prepare(`
+        SELECT r.source_sid, r.target_raw, r.fragment, r.link_text, r.source_heading,
+               d.path AS source_path, d.url AS source_url, d.title AS source_title
+        FROM relations r
+        LEFT JOIN documents d ON d.sid = r.source_sid AND d.version_id = r.version_id
+        WHERE r.version_id = ? AND r.status = 'unresolved'
+        ORDER BY d.path, r.id
+    `).all(resolvedVersion);
 }
 
 function resolveRelationsVersion(db, versionId) {
@@ -787,6 +862,7 @@ export {
     getEntry,
     getFirstDocument,
     getDocuments,
+    getDocumentsFull,
     getSourceEntries,
     getAssetByUIDVersion,
     getAssetInfoBlob_version,
@@ -800,5 +876,7 @@ export {
     getAssetUrl,
     getOutgoing,
     getBacklinks,
-    resolveLink
+    resolveLink,
+    getDiagnostics,
+    getUnresolvedRelations
 };

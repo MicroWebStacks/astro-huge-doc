@@ -1,0 +1,93 @@
+---
+---
+<aside class="lite-index-status" data-state="waiting" data-collapsed="true" aria-live="polite">
+    <div class="index-summary">
+        <span class="index-dot" aria-hidden="true"></span>
+        <span data-index-label>Link index waiting for first render</span>
+    </div>
+    <progress data-index-progress max="1" value="0" aria-label="Link indexing progress"></progress>
+    <div class="index-actions">
+        <button type="button" data-index-action="pause">Pause</button>
+        <button type="button" data-index-action="stop">Stop</button>
+        <button type="button" class="index-collapse" data-index-collapse
+            title="Hide index status" aria-label="Hide index status">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                <path d="M4 6.5 8 10.5 12 6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+    </div>
+</aside>
+<button type="button" class="lite-index-reopen" data-index-reopen hidden
+    title="Show link index status" aria-label="Show link index status">
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+        <path d="M4 9.5 8 5.5 12 9.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+</button>
+<style>
+.lite-index-status{
+    position:fixed;
+    z-index:30;
+    left:0;
+    right:0;
+    bottom:0;
+    min-height:2rem;
+    display:grid;
+    grid-template-columns:minmax(12rem,auto) minmax(6rem,20rem) auto;
+    align-items:center;
+    gap:var(--space-3);
+    padding:var(--space-1) var(--space-3);
+    border-top:1px solid var(--soft-border-color);
+    background:var(--nav-bg-color);
+    color:var(--content-color-muted);
+    box-shadow:var(--shadow-raised);
+    font-size:var(--text-sm);
+    transform:translateY(0);
+    transition:transform 0.25s ease, visibility 0.25s ease;
+}
+/* Collapsed: the bar slides down out of view; the reopen tab (below) is the
+   only thing left peeking from the bottom edge. */
+.lite-index-status[data-collapsed="true"]{
+    transform:translateY(105%);
+    visibility:hidden;
+    pointer-events:none;
+}
+.index-summary{display:flex;align-items:center;gap:var(--space-2);min-width:0}
+.index-dot{width:.55rem;height:.55rem;border-radius:50%;background:var(--content-color-faint);flex:none}
+[data-state="running"] .index-dot{background:var(--front-blue);animation:index-pulse 1s ease-in-out infinite alternate}
+[data-state="complete"] .index-dot{background:var(--front-green, #22c55e)}
+[data-state="paused"] .index-dot{background:var(--front-orange, #f59e0b)}
+[data-state="stopped"] .index-dot{background:var(--content-color-faint)}
+progress{width:100%;height:.45rem;accent-color:var(--front-blue)}
+.index-actions{display:flex;align-items:center;gap:var(--space-1)}
+button{border:1px solid var(--soft-border-color);border-radius:var(--radius-sm);padding:.2rem .55rem;background:transparent;color:var(--content-color);cursor:pointer}
+button:hover{background:var(--menu-span-hover-color)}
+button[hidden]{display:none}
+.index-collapse{display:inline-flex;align-items:center;justify-content:center;padding:.2rem .35rem;color:var(--content-color-muted)}
+.index-collapse:hover{color:var(--content-color)}
+.lite-index-reopen{
+    position:fixed;
+    z-index:29;
+    right:var(--space-3);
+    bottom:0;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:.15rem .6rem;
+    border:1px solid var(--soft-border-color);
+    border-bottom:0;
+    border-radius:var(--radius-sm) var(--radius-sm) 0 0;
+    background:var(--nav-bg-color);
+    color:var(--content-color-muted);
+    box-shadow:var(--shadow-raised);
+    cursor:pointer;
+}
+.lite-index-reopen:hover{color:var(--content-color);background:var(--menu-span-hover-color)}
+.lite-index-reopen[hidden]{display:none}
+@keyframes index-pulse{from{opacity:.45}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){
+    [data-state="running"] .index-dot{animation:none}
+    .lite-index-status{transition:none}
+}
+@media (max-width:700px){.lite-index-status{grid-template-columns:1fr auto}.lite-index-status progress{grid-column:1/-1;grid-row:2}.index-summary{overflow:hidden}.index-summary span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+</style>
+<script src="./lite_relation_indexer.js" />

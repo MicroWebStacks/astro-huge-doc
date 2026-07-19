@@ -36,6 +36,7 @@ async function createStructureJsonWriter(options = {}) {
     const blobs = [];
     const images = [];
     const relations = [];
+    const diagnostics = [];
 
     const outdir = config.outdir;
     const jsonDir = config.json_dir ?? join(outdir ?? '.', 'json');
@@ -112,6 +113,17 @@ async function createStructureJsonWriter(options = {}) {
                 });
             }
         },
+        insertDiagnostics(list = []) {
+            for (const diagnostic of list) {
+                diagnostics.push({
+                    version_id: diagnostic.version_id ?? null,
+                    kind: diagnostic.kind ?? null,
+                    path: diagnostic.path ?? null,
+                    related_path: diagnostic.related_path ?? null,
+                    message: diagnostic.message ?? null
+                });
+            }
+        },
         insertImages(list = []) {
             for (const image of list) {
                 images.push({
@@ -166,6 +178,7 @@ async function createStructureJsonWriter(options = {}) {
                 assets: assetVersions,
                 images,
                 relations,
+                diagnostics,
                 blob_store: blobMeta
             };
             await writeFile(join(jsonDir, 'content.json'), JSON.stringify(dataset));

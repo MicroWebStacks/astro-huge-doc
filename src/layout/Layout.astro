@@ -5,8 +5,10 @@ import 'katex/dist/katex.min.css';
 import AppBar from './AppBar.astro';
 import SideMenu from './SideMenu.astro';
 import LinkPreviewOverlay from '@/components/linkpreview/LinkPreviewOverlay.astro';
-import { process_toc_list, buildAppBarMenu, buildNavigationMenus, findKnowledgeLog } from "./layout_utils";
+import LiteRelationIndexer from './LiteRelationIndexer.astro';
+import { process_toc_list, buildAppBarMenu, buildNavigationMenusWithContents, findKnowledgeLog } from "./layout_utils";
 import { extensionPreviewEnabled } from '@/libs/extension-preview.js';
+import { config } from '@/config';
 
 
 export interface Props {
@@ -29,9 +31,10 @@ const liveReload = extensionPreviewEnabled()
 // fetched after first paint and starts as a closed skeleton; static/full
 // deployments keep their complete server-rendered navigation.
 const navigation = liveReload
-	? {appBarMenu: buildAppBarMenu(Astro.url.pathname), sectionMenu: []}
-	: buildNavigationMenus(Astro.url.pathname)
+	? {appBarMenu: buildAppBarMenu(Astro.url.pathname), sectionMenu: [], contentsMenu: []}
+	: await buildNavigationMenusWithContents(Astro.url.pathname)
 const pages_menu_items = navigation.sectionMenu ?? []
+const contents_menu_items = navigation.contentsMenu ?? []
 const appbar_menu = navigation.appBarMenu ?? []
 // Reserved log.md (OKF plan DD-8): the app bar links to the knowledge log
 // only when the validation gate passes; otherwise it is a normal page.
@@ -158,16 +161,16 @@ const liveReloadPolling = liveReload && Boolean(process.env.MICROWEBSTACKS_LAUNC
 	<body >
 		<div class="appbar-nav_content-footer">
 			<header>
-				<AppBar menu={appbar_menu} showLeftToggle={liveReload || pages_menu_items.length > 0} showRightToggle={toc_menu_items.visible} showRuntimeInfo={liveReload} logPage={logPage} />
+				<AppBar menu={appbar_menu} showLeftToggle={liveReload || pages_menu_items.length > 0} showRightToggle={toc_menu_items.visible} showRuntimeInfo={liveReload} exploreEnabled={config.profile !== 'lite'} logPage={logPage} />
 			</header>
 			<main>
 				<div id="wide-nav" class="scroll">
-					<SideMenu items={pages_menu_items} category="pages_menu" initialOpen={false} loading={liveReload}/>
+					<SideMenu items={pages_menu_items} contentsItems={contents_menu_items} category="pages_menu" initialOpen={false} loading={liveReload}/>
 				</div>
 				<div id="resize-left" class="nav-resize active"/>
 				<article class="content scroll">
 					<div id="mobile-nav">
-						<SideMenu items={pages_menu_items} category="pages_menu" initialOpen={false} loading={liveReload}/>
+						<SideMenu items={pages_menu_items} contentsItems={contents_menu_items} category="pages_menu" initialOpen={false} loading={liveReload}/>
 					</div>
 					<div class="article-slot">
 						<slot/>
@@ -183,6 +186,7 @@ const liveReloadPolling = liveReload && Boolean(process.env.MICROWEBSTACKS_LAUNC
 			<button id="mobile-nav-backdrop" type="button" aria-label="Close navigation menus"></button>
 		</div>
 		<LinkPreviewOverlay />
+		{liveReload && <LiteRelationIndexer />}
 		{liveReloadPolling &&
 			<script is:inline>
 				// Extension live reload: poll the local preview server's change
@@ -238,6 +242,10 @@ body.mobile-nav-open{
 header{
     flex-grow:0;
 	background-color: var(--header-bg-color);
+	/* Full-width line closing the app bar: marks where the bar ends against
+	   the nav-colored shell row below it (sidebars + breadcrumb band). */
+	border-bottom: 1px solid var(--soft-border-color);
+	box-sizing: border-box;
     width:100%;
     user-select: none;
 }
@@ -258,12 +266,18 @@ main{
 	display: none;
 }
 .content{
+	/* --article-pad: single source for the article gutter, so chrome bands
+	   (breadcrumb, frontmatter, relations footer) can bleed edge-to-edge with
+	   negative margins that stay in sync across breakpoints. */
+	--article-pad: var(--space-3);
+	display:flex;
+	flex-direction:column;
 	color:var(--content-color);
 	background-color: var(--content-bg-color);
 	width:100%;
 	flex-grow: 0;
 	overflow:auto;
-	padding:var(--space-3);
+	padding:var(--article-pad);
 	box-sizing:border-box;
 	min-width:0;
     scroll-behavior: smooth;
@@ -313,7 +327,7 @@ main{
 		display:none;
 	}
 	.content{
-		padding:var(--space-4);
+		--article-pad: var(--space-4);
 	}
 	#wide-nav{
 		display:none;
@@ -371,9 +385,39 @@ main{
    reading experience matches a familiar, well-tuned reference. Tokens
    from tokens.css; no literal sizes here. */
 
+/* Column layout so short pages still pin the relations footer to the bottom
+   of the scroll area instead of leaving a dead band above the viewport edge.
+   Slot children are wrapper blocks (page-chrome / markdown wrapper / footer),
+   so losing margin collapsing between them changes nothing visible. */
 .article-slot{
+	flex: 1 0 auto;
+	display: flex;
+	flex-direction: column;
 	font-size: var(--text-base);
 	line-height: var(--leading-body);
+}
+.article-slot > :global(*){
+	flex: 0 0 auto;
+}
+.article-slot :global(.relations-footer){
+	margin-top: auto;
+}
+
+/* --- Page chrome bands ---------------------------------------------------
+   Everything not authored in markdown (breadcrumb, frontmatter viewer,
+   relations footer) sits on shell surfaces, not the reading surface: the
+   breadcrumb continues the app bar, the metadata/relations bands continue
+   the sidebars, each closed by a 1px separator line before the body. The
+   wrapper cancels the article gutter so the bands run edge-to-edge. */
+.article-slot :global(.page-chrome){
+	margin: calc(-1 * var(--article-pad)) calc(-1 * var(--article-pad)) var(--space-5);
+}
+.article-slot :global(.page-chrome:not(:has(*))){
+	display: none;
+}
+:global(html[data-preview-mode="true"]) .article-slot :global(.page-chrome){
+	/* preview popup shows only the article: no full-bleed chrome cluster */
+	margin: 0 0 var(--space-4);
 }
 
 .article-slot :global(a){

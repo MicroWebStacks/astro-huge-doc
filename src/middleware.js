@@ -4,7 +4,7 @@ import {basename, join} from 'node:path';
 import {config} from '../config.js';
 import {file_mime} from './libs/utils.js';
 import {resolveBlobsSourceDir} from './libs/blob-files.js';
-import {extensionPreviewEnabled, navigationPayload, runtimePayload, statsPayload, versionPayload} from './libs/extension-preview.js';
+import {extensionPreviewEnabled, navigationPayload, runtimePayload, statsPayload, versionPayload, indexStatusPayload, indexControlPayload} from './libs/extension-preview.js';
 
 const blobsDir = resolveBlobsSourceDir(config);
 
@@ -49,7 +49,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
             return jsonResponse(await versionPayload());
         }
         if (pathname === '/__lite/navigation') {
-            return jsonResponse(await navigationPayload(url.searchParams.get('pathname') ?? '/'));
+            return jsonResponse(await navigationPayload(
+                url.searchParams.get('pathname') ?? '/',
+                url.searchParams.get('source') === 'contents' ? 'contents' : 'files'
+            ));
         }
         if (pathname === '/__lite/runtime') {
             return jsonResponse(runtimePayload({dev: import.meta.env.DEV}));
@@ -57,6 +60,19 @@ export const onRequest = defineMiddleware(async (context, next) => {
         if (pathname === '/__lite/stats') {
             return jsonResponse(await statsPayload());
         }
+        if (pathname === '/__lite/index-status') {
+            return jsonResponse(await indexStatusPayload());
+        }
+    }
+    if (extensionPreviewEnabled() && method === 'POST' && pathname === '/__lite/index-control') {
+        const action = url.searchParams.get('action') ?? 'start';
+        if (!['start', 'pause', 'resume', 'stop'].includes(action)) {
+            return new Response(JSON.stringify({error: 'unknown index action'}), {
+                status: 400,
+                headers: {'Cache-Control': 'no-store', 'Content-Type': 'application/json'}
+            });
+        }
+        return jsonResponse(await indexControlPayload(action));
     }
 
     if (!pathname.startsWith('/blobs/') || (method !== 'GET' && method !== 'HEAD')) {

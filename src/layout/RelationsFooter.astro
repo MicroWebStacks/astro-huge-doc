@@ -93,15 +93,26 @@ const hasContent = Boolean(prev || next || backlinkGroups.length > 0);
     </footer>
 }
 <style>
+/* Chrome band: continuation of the sidebar surface below the body, opened
+   by a separator line — mirrors the metadata band on top. Bleeds into the
+   article gutter so it reads as shell, not as part of the document. */
 .relations-footer{
-    max-width: var(--prose-measure);
-    margin-top: var(--space-6);
-    padding-top: var(--space-3);
+    margin: var(--space-7) calc(-1 * var(--article-pad, var(--space-3))) calc(-1 * var(--article-pad, var(--space-3)));
+    padding: var(--space-4) var(--article-pad, var(--space-3)) var(--space-5);
+    background-color: var(--nav-bg-color);
     border-top: 1px solid var(--soft-border-color);
+    color: var(--menu-text-color);
     box-sizing: border-box;
 }
+.backlinks{
+    max-width: var(--prose-measure);
+}
 .backlinks h2{
-    font-size: var(--text-h4);
+    font-size: 0.8em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--content-color-faint);
     line-height: var(--leading-heading);
     margin-block: 0 var(--space-2);
 }
@@ -127,7 +138,8 @@ const hasContent = Boolean(prev || next || backlinkGroups.length > 0);
     display: flex;
     justify-content: space-between;
     gap: var(--space-3);
-    margin-block: var(--space-3) var(--space-4);
+    max-width: var(--prose-measure);
+    margin-block: var(--space-3) 0;
 }
 .prev-next a{
     display: flex;
@@ -137,6 +149,7 @@ const hasContent = Boolean(prev || next || backlinkGroups.length > 0);
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--soft-border-color);
     border-radius: var(--radius-md, 8px);
+    background-color: var(--content-bg-color);
     text-decoration: none;
     color: var(--content-color);
 }

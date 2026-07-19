@@ -14,8 +14,15 @@ if(!found){
 <Layout title={title} headings={headings} >
     {found&&
         <>
-            <FrontmatterPanel data={data} />
-            <AstroMarkdown items={items} data={data} headings={headings} />
+            <div class="page-chrome">
+                <FrontmatterPanel data={data} />
+            </div>
+            {/* Wrapper keeps markdown blocks in one flow-root: the layout's
+                article column is a flex container (footer pinning), which
+                would otherwise disable margin collapsing between blocks. */}
+            <div>
+                <AstroMarkdown items={items} data={data} headings={headings} />
+            </div>
             <RelationsFooter data={data} />
         </>
     }

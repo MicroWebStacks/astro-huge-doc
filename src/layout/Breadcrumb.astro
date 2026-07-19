@@ -55,18 +55,25 @@ for (let index = 0; index < segments.length; index++) {
     </nav>
 }
 <style>
+/* Chrome band: sits on the sidebar surface (like the metadata band and the
+   side rails) so the whole row under the app bar reads as one shell layer;
+   the line separating it from the app bar is the header's own border in
+   Layout.astro. Closed by a separator line toward the next band / body. */
 .breadcrumb{
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-1);
     font-size: 0.85em;
-    color: var(--content-color-muted);
-    margin-block: 0 var(--space-3);
+    color: var(--menu-text-color);
+    background-color: var(--nav-bg-color);
+    padding: var(--space-2) var(--article-pad);
+    border-bottom: 1px solid var(--soft-border-color);
+    margin: 0;
     user-select: none;
 }
 .breadcrumb a{
-    color: var(--content-color-muted);
+    color: var(--menu-text-color);
     text-decoration: none;
 }
 .breadcrumb a:hover{

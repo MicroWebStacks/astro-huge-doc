@@ -131,6 +131,7 @@ async function createStructureDbWriter(options = {}) {
     const imagesSchema = requireTableSchema(schema, 'images');
     const versionsSchema = requireTableSchema(schema, 'versions');
     const relationsSchema = requireTableSchema(schema, 'relations');
+    const diagnosticsSchema = requireTableSchema(schema, 'diagnostics');
     runInTransaction(db, () => {
         createTables(db, schema);
         reconcileTables(db, schema);
@@ -176,6 +177,13 @@ async function createStructureDbWriter(options = {}) {
             }
             const rows = relationRows.map((row) => normalizeTableRow(row, relationsSchema));
             insertRows(db, 'relations', relationsSchema.insertColumns, rows);
+        },
+        insertDiagnostics(diagnosticRows = []) {
+            if (!diagnosticRows.length) {
+                return;
+            }
+            const rows = diagnosticRows.map((row) => normalizeTableRow(row, diagnosticsSchema));
+            insertRows(db, 'diagnostics', diagnosticsSchema.insertColumns, rows);
         },
         // Materialize content-addressed <hash>.<ext> static files for every
         // asset/image blob in the store, so assets can be served as immutable,

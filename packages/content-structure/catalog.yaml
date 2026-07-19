@@ -95,6 +95,15 @@ datasets:
           - { name: source_heading, type: string, description: Slug of the heading section containing the link in the source document }
           - { name: status, type: string, values: [resolved, unresolved, external, asset, public], description: Resolution outcome of the link target }
           - { name: external, type: boolean, description: True when the target is an external URL }
+      - name: diagnostics
+        description: Data-consistency findings recorded during collection; these are authoring issues, not OKF compliance results.
+        columns:
+          - { name: id, type: int, primary: true, autoincrement: true, description: Autoincrement row id for the diagnostic }
+          - { name: version_id, type: string, description: Encoded seconds-since-2000 identifier for the collection run }
+          - { name: kind, type: string, values: [duplicate_identity, malformed_frontmatter], description: Stable diagnostic category }
+          - { name: path, type: string, description: Source-relative path associated with the finding }
+          - { name: related_path, type: string, description: A second source path involved in the finding, when applicable }
+          - { name: message, type: string, description: Human-readable explanation of the inconsistency }
       - name: versions
         description: One row per collection run to track version metadata.
         columns:

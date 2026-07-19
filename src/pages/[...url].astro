@@ -40,8 +40,10 @@ const isLogView = found
 ---
 {found&&
     <Layout title={title} headings={headings} >
-            <Breadcrumb data={data} />
-            <FrontmatterPanel data={data} />
+            <div class="page-chrome">
+                <Breadcrumb data={data} />
+                <FrontmatterPanel data={data} />
+            </div>
             <div class={isLogView ? 'log-view' : undefined}>
                 <AstroMarkdown items={items} data={data} headings={headings} />
             </div>

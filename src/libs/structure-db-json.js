@@ -391,6 +391,42 @@ function getDocuments(versionId = null) {
         });
 }
 
+function getDocumentsFull(versionId = null) {
+    load();
+    return (dataset.documents ?? [])
+        .map(normalizeDocumentRow)
+        .sort((a, b) => {
+            const level = (a.level ?? 0) - (b.level ?? 0);
+            if (level !== 0) return level;
+            const order = (a.order ?? 0) - (b.order ?? 0);
+            if (order !== 0) return order;
+            return String(a.url ?? '').localeCompare(String(b.url ?? ''));
+        });
+}
+
+function getDiagnostics(versionId = null) {
+    load();
+    return [...(dataset.diagnostics ?? [])]
+        .sort((a, b) => String(a.kind ?? '').localeCompare(String(b.kind ?? ''))
+            || String(a.path ?? '').localeCompare(String(b.path ?? '')));
+}
+
+function getUnresolvedRelations(versionId = null) {
+    load();
+    return (dataset.relations ?? [])
+        .filter((row) => row.status === 'unresolved')
+        .map((row) => {
+            const source = row.source_sid != null ? indexes.docBySid.get(row.source_sid) : null;
+            return {
+                ...row,
+                source_path: source?.path ?? null,
+                source_url: source?.url ?? null,
+                source_title: source?.title ?? null
+            };
+        })
+        .sort((a, b) => String(a.source_path ?? '').localeCompare(String(b.source_path ?? '')));
+}
+
 /* Newer JSON datasets carry exported `source_entries` so the lite/runtime menu
    can follow the same folder-aware file-tree contract as sqlite. Older exports
    may not have it yet, so [] remains the compatibility fallback. */
@@ -508,6 +544,7 @@ export {
     getEntry,
     getFirstDocument,
     getDocuments,
+    getDocumentsFull,
     getSourceEntries,
     getAssetByUIDVersion,
     getAssetInfoBlob_version,
@@ -521,5 +558,7 @@ export {
     getAssetUrl,
     getOutgoing,
     getBacklinks,
-    resolveLink
+    resolveLink,
+    getDiagnostics,
+    getUnresolvedRelations
 };

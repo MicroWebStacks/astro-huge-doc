@@ -95,17 +95,45 @@ const loadedDocs = new Map(); // sid -> {hash, assetSources, parseMs}
 const inflight = new Map(); // sid -> Promise
 const blobCache = new Map();
 
-/* In-memory relations store (OKF plan DD-5/RK-2): grows incrementally from
-   visited pages only, strictly in-memory (never persisted), capped at
+/* In-memory relations store (OKF plan DD-5/RK-2/DD-13): grows from parsed
+   pages and the post-render background line scanner, strictly in-memory, capped at
    ~relations_cache_mb (default 10 MB) with lossy eviction of the
    least-recently parsed page's rows. Backlink answers therefore cover visited
    pages only — a deliberate lite-profile trade-off. */
-const relationsStore = new Map(); // source sid -> {rows, bytes}
+const relationsStore = new Map(); // source sid -> {rows, bytes, provenance}
 let relationsStoreBytes = 0;
+let relationsEvicted = 0;
 
 function relationsCapBytes() {
     const mb = Number(config.collect.relations_cache_mb ?? 10);
     return (Number.isFinite(mb) && mb > 0 ? mb : 10) * 1024 * 1024;
+}
+
+function storeRelationsForDoc(doc, rows, provenance) {
+    const previous = relationsStore.get(doc.sid);
+    // A cheap scan racing with a real page-open parse must never replace the
+    // AST-accurate result. Parsed data naturally upgrades scanned data.
+    if (provenance === 'scanned' && previous?.provenance === 'parsed') {
+        return;
+    }
+    if (previous) {
+        relationsStoreBytes -= previous.bytes;
+        relationsStore.delete(doc.sid);
+    }
+    const stampedRows = rows.map((row) => ({...row, provenance}));
+    const bytes = JSON.stringify(stampedRows).length * 2;
+    relationsStore.set(doc.sid, {rows: stampedRows, bytes, provenance});
+    relationsStoreBytes += bytes;
+    const cap = relationsCapBytes();
+    while (relationsStoreBytes > cap && relationsStore.size > 1) {
+        const oldestSid = relationsStore.keys().next().value;
+        if (oldestSid === doc.sid) break;
+        const evicted = relationsStore.get(oldestSid);
+        relationsStore.delete(oldestSid);
+        relationsStoreBytes -= evicted?.bytes ?? 0;
+        relationsEvicted += 1;
+        console.warn(`[lite] relations store over ${Math.round(cap / (1024 * 1024))} MB cap; evicted relations of ${oldestSid}`);
+    }
 }
 
 function updateRelationsForDoc(doc, items) {
@@ -135,28 +163,246 @@ function updateRelationsForDoc(doc, items) {
             external: Boolean(rel.external)
         });
     }
-    const previous = relationsStore.get(doc.sid);
-    if (previous) {
-        relationsStoreBytes -= previous.bytes;
-        relationsStore.delete(doc.sid);
+    storeRelationsForDoc(doc, rows, 'parsed');
+}
+
+function updateRelationsFromScan(doc, rows) {
+    storeRelationsForDoc(doc, rows, 'scanned');
+}
+
+/* ------------------------------------------------ background link index */
+
+const relationScanner = {
+    running: false,
+    paused: false,
+    stopped: false,
+    complete: false,
+    current: 0,
+    total: 0,
+    scanned: 0,
+    errors: 0,
+    startedAt: null,
+    completedAt: null,
+    documents: [],
+    documentsByPath: new Map(),
+    timer: null,
+    generation: 0
+};
+
+function headingSlug(text) {
+    return slugSegment(String(text ?? '').replace(/[*_`~[\]]/g, '').trim());
+}
+
+function splitHref(rawHref) {
+    const value = String(rawHref ?? '').trim().replace(/^<|>$/g, '');
+    const match = value.match(/^([^?#]*)(?:\?[^#]*)?(?:#(.*))?$/);
+    return {value, pathPart: match?.[1] ?? value, fragment: match?.[2] ?? null};
+}
+
+function candidateDocument(documentsByPath, targetPath) {
+    const normalized = posix.normalize(targetPath).replace(/^\.\//, '');
+    const candidates = [normalized];
+    if (!/\.md$/i.test(normalized)) {
+        candidates.push(`${normalized}.md`, posix.join(normalized, 'index.md'), posix.join(normalized, 'readme.md'));
     }
-    if (rows.length === 0) {
-        return;
+    return candidates.map((candidate) => documentsByPath.get(candidate)).find(Boolean) ?? null;
+}
+
+function classifyScannedHref(doc, rawHref, documentsByPath) {
+    const {value, pathPart, fragment} = splitHref(rawHref);
+    if (!value) return null;
+    if (value.startsWith('//') || /^[a-z][a-z\d+.-]*:/i.test(value)) {
+        return {target_sid: null, status: 'external', external: true, fragment};
     }
-    const bytes = JSON.stringify(rows).length * 2;
-    relationsStore.set(doc.sid, {rows, bytes});
-    relationsStoreBytes += bytes;
-    const cap = relationsCapBytes();
-    while (relationsStoreBytes > cap && relationsStore.size > 1) {
-        const oldestSid = relationsStore.keys().next().value;
-        if (oldestSid === doc.sid) {
-            break;
+    if (!pathPart) {
+        return {target_sid: doc.sid, status: 'resolved', external: false, fragment};
+    }
+    let decoded = pathPart;
+    try { decoded = decodeURIComponent(pathPart); } catch { /* exact authored fallback */ }
+    const targetPath = decoded.startsWith('/')
+        ? posix.normalize(decoded.replace(/^\/+/, ''))
+        : posix.normalize(posix.join(posix.dirname(doc.path), decoded));
+    if (targetPath === '..' || targetPath.startsWith('../')) {
+        return {target_sid: null, status: 'unresolved', external: false, fragment};
+    }
+    const target = candidateDocument(documentsByPath, targetPath);
+    if (target) return {target_sid: target.sid, status: 'resolved', external: false, fragment};
+    if (decoded.startsWith('/') && existsSync(join(config.collect.rootdir ?? '', 'public', targetPath))) {
+        return {target_sid: null, status: 'public', external: false, fragment};
+    }
+    if (existsSync(join(contentDir(), ...targetPath.split('/')))) {
+        return {target_sid: null, status: 'asset', external: false, fragment};
+    }
+    return {target_sid: null, status: 'unresolved', external: false, fragment};
+}
+
+function scanMarkdownRelations(doc, markdown, documentsByPath) {
+    const lines = String(markdown ?? '').split(/\r?\n/);
+    const references = new Map();
+    let inFrontmatter = lines[0]?.trim() === '---';
+    let fence = null;
+    const usable = [];
+    for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index];
+        if (inFrontmatter) {
+            if (index > 0 && line.trim() === '---') inFrontmatter = false;
+            continue;
         }
-        const evicted = relationsStore.get(oldestSid);
-        relationsStore.delete(oldestSid);
-        relationsStoreBytes -= evicted?.bytes ?? 0;
-        console.warn(`[lite] relations store over ${Math.round(cap / (1024 * 1024))} MB cap; evicted relations of ${oldestSid}`);
+        const fenceMatch = /^\s*(`{3,}|~{3,})/.exec(line);
+        if (fenceMatch) {
+            const marker = fenceMatch[1][0];
+            if (!fence) fence = marker;
+            else if (fence === marker) fence = null;
+            continue;
+        }
+        if (fence) continue;
+        const definition = /^\s*\[([^\]]+)\]:\s*(?:<([^>]+)>|(\S+))/.exec(line);
+        if (definition) references.set(definition[1].trim().toLowerCase(), definition[2] ?? definition[3]);
+        usable.push(line);
     }
+
+    const rows = [];
+    let currentHeading = null;
+    const push = (rawHref, linkText) => {
+        const classified = classifyScannedHref(doc, rawHref, documentsByPath);
+        if (!classified) return;
+        rows.push({
+            source_sid: doc.sid,
+            target_sid: classified.target_sid,
+            target_raw: String(rawHref),
+            fragment: classified.fragment,
+            link_text: linkText || null,
+            source_heading: currentHeading,
+            status: classified.status,
+            external: classified.external
+        });
+    };
+    for (const line of usable) {
+        const heading = /^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
+        if (heading) currentHeading = headingSlug(heading[1]);
+
+        const occupied = [];
+        const inline = /(!?)\[([^\]]+)\]\(\s*(?:<([^>]+)>|([^\s)]+))(?:\s+["'][^"']*["'])?\s*\)/g;
+        for (const match of line.matchAll(inline)) {
+            occupied.push([match.index, match.index + match[0].length]);
+            if (!match[1]) push(match[3] ?? match[4], match[2]);
+        }
+        const reference = /(!?)\[([^\]]+)\]\[([^\]]*)\]/g;
+        for (const match of line.matchAll(reference)) {
+            occupied.push([match.index, match.index + match[0].length]);
+            if (match[1]) continue;
+            const id = (match[3] || match[2]).trim().toLowerCase();
+            if (references.has(id)) push(references.get(id), match[2]);
+        }
+        const html = /<a\s+[^>]*href\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))[^>]*>(.*?)<\/a>/gi;
+        for (const match of line.matchAll(html)) push(match[1] ?? match[2] ?? match[3], match[4]?.replace(/<[^>]+>/g, ''));
+
+        // Shortcut reference links, excluding spans already consumed by an
+        // inline link and excluding reference-definition lines.
+        if (!/^\s*\[[^\]]+\]:/.test(line)) {
+            const shortcut = /(?<!!)\[([^\]]+)\](?![\[(])/g;
+            for (const match of line.matchAll(shortcut)) {
+                if (occupied.some(([start, end]) => match.index >= start && match.index < end)) continue;
+                const id = match[1].trim().toLowerCase();
+                if (references.has(id)) push(references.get(id), match[1]);
+            }
+        }
+    }
+    return rows;
+}
+
+function relationIndexStatus() {
+    return {
+        running: relationScanner.running,
+        paused: relationScanner.paused,
+        stopped: relationScanner.stopped,
+        complete: relationScanner.complete,
+        current: relationScanner.current,
+        total: relationScanner.total,
+        scanned: relationScanner.scanned,
+        errors: relationScanner.errors,
+        startedAt: relationScanner.startedAt,
+        completedAt: relationScanner.completedAt,
+        storeBytes: relationsStoreBytes,
+        capBytes: relationsCapBytes(),
+        evicted: relationsEvicted
+    };
+}
+
+function scheduleRelationScan(generation) {
+    clearTimeout(relationScanner.timer);
+    relationScanner.timer = setTimeout(() => {
+        if (generation !== relationScanner.generation || !relationScanner.running || relationScanner.paused) return;
+        if (statMtime(treeStampPath()) !== treeStampSeen) {
+            ensureTree();
+            return;
+        }
+        if (!relationScanner.documents[relationScanner.current]) {
+            relationScanner.running = false;
+            relationScanner.complete = true;
+            relationScanner.completedAt = new Date().toISOString();
+            relationScanner.timer = null;
+            return;
+        }
+        // A bounded batch amortizes timer overhead on large trees while the
+        // zero-delay reschedule yields to page and endpoint work between ticks.
+        const batchEnd = Math.min(relationScanner.current + 50, relationScanner.total);
+        while (relationScanner.current < batchEnd) {
+            const doc = relationScanner.documents[relationScanner.current];
+            try {
+                const markdown = readFileSync(join(contentDir(), ...doc.path.split('/')), 'utf8');
+                updateRelationsFromScan(doc, scanMarkdownRelations(doc, markdown, relationScanner.documentsByPath));
+                relationScanner.scanned += 1;
+            } catch (error) {
+                relationScanner.errors += 1;
+                console.warn(`[lite] relation scan skipped '${doc.path}': ${error.message}`);
+            }
+            relationScanner.current += 1;
+        }
+        scheduleRelationScan(generation);
+    }, 0);
+}
+
+function controlRelationIndex(action = 'start') {
+    if (action === 'pause') {
+        relationScanner.paused = true;
+        clearTimeout(relationScanner.timer);
+        relationScanner.timer = null;
+        return relationIndexStatus();
+    }
+    if (action === 'stop') {
+        relationScanner.running = false;
+        relationScanner.paused = false;
+        relationScanner.stopped = true;
+        relationScanner.generation += 1;
+        clearTimeout(relationScanner.timer);
+        relationScanner.timer = null;
+        return relationIndexStatus();
+    }
+    if (action === 'resume' && relationScanner.current < relationScanner.total) {
+        relationScanner.running = true;
+        relationScanner.paused = false;
+        relationScanner.stopped = false;
+        scheduleRelationScan(relationScanner.generation);
+        return relationIndexStatus();
+    }
+    if (relationScanner.stopped) return relationIndexStatus();
+    if (relationScanner.running || relationScanner.complete) return relationIndexStatus();
+    relationScanner.documents = [...ensureTree().documents];
+    relationScanner.documentsByPath = new Map(relationScanner.documents.map((doc) => [doc.path, doc]));
+    relationScanner.running = true;
+    relationScanner.paused = false;
+    relationScanner.stopped = false;
+    relationScanner.complete = false;
+    relationScanner.current = 0;
+    relationScanner.total = relationScanner.documents.length;
+    relationScanner.scanned = 0;
+    relationScanner.errors = 0;
+    relationScanner.startedAt = new Date().toISOString();
+    relationScanner.completedAt = null;
+    relationScanner.generation += 1;
+    scheduleRelationScan(relationScanner.generation);
+    return relationIndexStatus();
 }
 
 // Info-surface bookkeeping only (specification/run-modes/spec.md,
@@ -462,6 +708,23 @@ function ensureTree() {
     if (tree && stamp === treeStampSeen) {
         return tree;
     }
+    if (tree && stamp !== treeStampSeen) {
+        relationScanner.generation += 1;
+        clearTimeout(relationScanner.timer);
+        relationScanner.running = false;
+        relationScanner.paused = false;
+        relationScanner.stopped = false;
+        relationScanner.complete = false;
+        relationScanner.current = 0;
+        relationScanner.total = 0;
+        relationScanner.scanned = 0;
+        relationScanner.documents = [];
+        relationScanner.documentsByPath = new Map();
+        relationScanner.timer = null;
+        relationsStore.clear();
+        relationsStoreBytes = 0;
+        relationsEvicted = 0;
+    }
     tree = walkWorkspace();
     treeStampSeen = stamp;
     return tree;
@@ -660,7 +923,12 @@ async function parseDocumentRecord(doc, rawText, hash) {
         try {
             const ast = JSON.parse(item.ast);
             const rawUrl = String(ast?.url ?? '');
-            if (!rawUrl || rawUrl.startsWith('#')) {
+            if (!rawUrl) {
+                continue;
+            }
+            if (rawUrl.startsWith('#')) {
+                ast.rel = {status: 'resolved', target_sid: doc.sid, raw: rawUrl, fragment: rawUrl.slice(1)};
+                item.ast = JSON.stringify(ast);
                 continue;
             }
             if (rawUrl.startsWith('//') || /^[a-z][a-z\d+.-]*:/i.test(rawUrl)) {
@@ -671,9 +939,6 @@ async function parseDocumentRecord(doc, rawText, hash) {
             const match = rawUrl.match(/^([^?#]*)(.*)$/);
             const pathPart = match?.[1] ?? rawUrl;
             const suffix = match?.[2] ?? '';
-            if (!/\.md$/i.test(pathPart)) {
-                continue;
-            }
             let decodedPath = pathPart;
             try {
                 decodedPath = decodeURIComponent(pathPart);
@@ -686,7 +951,7 @@ async function parseDocumentRecord(doc, rawText, hash) {
             const targetPath = decodedPath.startsWith('/')
                 ? posix.normalize(decodedPath.replace(/^\/+/, ''))
                 : posix.normalize(posix.join(posix.dirname(doc.path), decodedPath));
-            const target = documentsByPath.get(targetPath);
+            const target = candidateDocument(documentsByPath, targetPath);
             if (target) {
                 ast.url = `${basePrefix(config.base)}/${target.url}${suffix}`;
                 ast.rel = {status: 'resolved', target_sid: target.sid, raw: rawUrl, fragment};
@@ -694,6 +959,8 @@ async function parseDocumentRecord(doc, rawText, hash) {
                 // DD-3 fallback: root-absolute target absent from the content
                 // root but present under public/ keeps its authored href.
                 ast.rel = {status: 'public', raw: rawUrl, fragment};
+            } else if (targetPath !== '..' && !targetPath.startsWith('../') && existsSync(join(contentDir(), ...targetPath.split('/')))) {
+                ast.rel = {status: 'asset', raw: rawUrl, fragment};
             } else {
                 ast.rel = {status: 'unresolved', raw: rawUrl, fragment};
             }
@@ -1087,6 +1354,20 @@ function getDocuments(versionId = null) {
         });
 }
 
+// Full-profile exploration deliberately does not expose a partial view of
+// frontmatter discovered only from visited lite pages (OKF plan DD-12).
+function getDocumentsFull() {
+    return [];
+}
+
+function getDiagnostics() {
+    return [];
+}
+
+function getUnresolvedRelations() {
+    return [];
+}
+
 function getSourceEntries(versionId = null) {
     const {sourceEntries} = ensureTree();
     return [...sourceEntries].sort((a, b) => {
@@ -1212,6 +1493,7 @@ export {
     getEntry,
     getFirstDocument,
     getDocuments,
+    getDocumentsFull,
     getSourceEntries,
     getAssetByUIDVersion,
     getAssetInfoBlob_version,
@@ -1226,6 +1508,11 @@ export {
     getOutgoing,
     getBacklinks,
     resolveLink,
+    getDiagnostics,
+    getUnresolvedRelations,
+    relationIndexStatus,
+    controlRelationIndex,
+    scanMarkdownRelations,
     getLastPageLoad,
     getWalkHistory
 };

@@ -1,0 +1,102 @@
+---
+import Layout from '@/layout/Layout.astro';
+import NotFound from '../404.astro';
+import {config} from '@/config';
+import {basePrefix} from '@/libs/blob-files.js';
+import {getDocumentsFull, getDiagnostics, getUnresolvedRelations} from '@/libs/structure-db.js';
+import {groupDocumentsByFacet} from '@/libs/explore.js';
+
+const enabled = config.profile !== 'lite';
+if (!enabled) Astro.response.status = 404;
+const documents = enabled && typeof getDocumentsFull === 'function' ? getDocumentsFull() : [];
+const types = groupDocumentsByFacet(documents, 'type');
+const tags = groupDocumentsByFacet(documents, 'tags');
+const diagnostics = enabled && typeof getDiagnostics === 'function' ? getDiagnostics() : [];
+const unresolved = enabled && typeof getUnresolvedRelations === 'function' ? getUnresolvedRelations() : [];
+const prefix = basePrefix(config.base);
+const issueCount = diagnostics.length + unresolved.length;
+const kindLabel = (kind) => ({
+    duplicate_identity: 'Duplicate identity',
+    malformed_frontmatter: 'Malformed frontmatter'
+}[kind] ?? String(kind ?? 'Data issue'));
+---
+{!enabled && <NotFound message="Explore is available in the full documentation profile." />}
+{enabled &&
+<Layout title="Explore" headings={[]}>
+    <section class="explore-index">
+        <header class="hero">
+            <p class="eyebrow">Knowledge overview</p>
+            <h1>Explore</h1>
+            <p>Browse concepts by type or tag, and review data inconsistencies found during collection.</p>
+        </header>
+
+        <div class="facet-grid">
+            <section>
+                <h2>Types <span>{types.length}</span></h2>
+                {types.length === 0 && <p class="empty">No typed concepts found.</p>}
+                <ul>{types.map((group) => <li><a href={`${prefix}/explore/types/${group.slug}`}>{group.label}</a><span>{group.documents.length}</span></li>)}</ul>
+            </section>
+            <section>
+                <h2>Tags <span>{tags.length}</span></h2>
+                {tags.length === 0 && <p class="empty">No tags found.</p>}
+                <ul>{tags.map((group) => <li><a href={`${prefix}/explore/tags/${group.slug}`}>{group.label}</a><span>{group.documents.length}</span></li>)}</ul>
+            </section>
+        </div>
+
+        <section class="issues" id="data-issues">
+            <h2>Data inconsistencies <span>{issueCount}</span></h2>
+            <p class="section-note">Authoring and link-resolution findings only; this is not a compliance report.</p>
+            {issueCount === 0 && <p class="empty">No inconsistencies were recorded for this collection.</p>}
+            {diagnostics.length > 0 &&
+                <div class="issue-group">
+                    <h3>Source diagnostics</h3>
+                    <ul>{diagnostics.map((diagnostic) => (
+                        <li>
+                            <strong>{kindLabel(diagnostic.kind)}</strong>
+                            <code>{diagnostic.path || 'unknown path'}</code>
+                            <p>{diagnostic.message}</p>
+                            {diagnostic.related_path && <p class="related">Related: <code>{diagnostic.related_path}</code></p>}
+                        </li>
+                    ))}</ul>
+                </div>
+            }
+            {unresolved.length > 0 &&
+                <div class="issue-group">
+                    <h3>Unresolved links</h3>
+                    <ul>{unresolved.map((relation) => (
+                        <li>
+                            <strong>Unresolved link</strong>
+                            {relation.source_url != null
+                                ? <a href={`${prefix}/${relation.source_url}`}>{relation.source_title || relation.source_path || 'Source page'}</a>
+                                : <code>{relation.source_path || 'unknown source'}</code>}
+                            <p><code>{relation.target_raw}</code>{relation.source_heading && <> under <code>#{relation.source_heading}</code></>}</p>
+                        </li>
+                    ))}</ul>
+                </div>
+            }
+        </section>
+    </section>
+</Layout>
+}
+<style>
+.explore-index{max-width:var(--prose-measure, 58rem);margin-inline:auto;padding:var(--space-5) var(--article-pad, var(--space-3))}
+.hero{margin-bottom:var(--space-5)}
+.eyebrow{margin:0;color:var(--content-color-faint);font-size:.78rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+h1{margin-block:var(--space-2)}
+.hero > p:last-child,.section-note,.empty{color:var(--content-color-muted)}
+.facet-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:var(--space-4)}
+.facet-grid > section,.issues{border:1px solid var(--soft-border-color);border-radius:var(--radius-sm);padding:var(--space-4);background:var(--surface-2-bg, var(--nav-bg-color))}
+h2{display:flex;align-items:baseline;gap:var(--space-2);margin-top:0}
+h2 > span,.facet-grid li > span{color:var(--content-color-faint);font-size:.8rem;font-weight:500}
+ul{list-style:none;padding:0;margin:0}
+.facet-grid li{display:flex;justify-content:space-between;gap:var(--space-3);padding-block:.45rem;border-top:1px solid var(--soft-border-color)}
+a{color:var(--article-anchor-color)}
+.issues{margin-top:var(--space-4)}
+.issue-group{margin-top:var(--space-4)}
+.issue-group ul{display:grid;gap:var(--space-2)}
+.issue-group li{padding:var(--space-3);border-left:3px solid var(--front-orange, #f59e0b);background:var(--content-bg-color)}
+.issue-group strong{display:block}
+.issue-group p{margin:.35rem 0 0;color:var(--content-color-muted)}
+.related{font-size:.88rem}
+code{overflow-wrap:anywhere}
+</style>

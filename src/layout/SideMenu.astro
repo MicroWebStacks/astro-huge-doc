@@ -6,15 +6,16 @@ import {config} from '../../config.js';
 
 export interface Props {
   items: Array<Object>;
+  contentsItems?: Array<Object>;
   category: string;
   initialOpen?: boolean;
   loading?: boolean;
 }
 
-let { items, category, initialOpen = true, loading = false } = Astro.props;
+let { items, contentsItems = [], category, initialOpen = true, loading = false } = Astro.props;
 
-const open_class = (items.length > 0 && initialOpen)?"open":"closed"
-const data_width = (items.length > 0 || loading)?"20vw":"0vw"
+const open_class = ((items.length > 0 || contentsItems.length > 0) && initialOpen)?"open":"closed"
+const data_width = (items.length > 0 || contentsItems.length > 0 || loading)?"20vw":"0vw"
 
 function getMaxDepth(entries, level = 1) {
   let max = level;
@@ -39,7 +40,10 @@ function collectActiveLinks(entry, accumulator = []) {
   return isActiveBranch;
 }
 
-const max_level = getMaxDepth(items);
+const files_max_level = getMaxDepth(items);
+const contents_max_level = getMaxDepth(contentsItems);
+const max_level = Math.max(files_max_level, contents_max_level);
+const has_contents = category !== "toc_menu" && contentsItems.length > 0;
 const default_level = 1;
 const link_class = category === "toc_menu" ? "toc_href" : "";
 const auto_title = category === "toc_menu" ? "Auto - follow scroll" : "Auto - fit height";
@@ -53,6 +57,9 @@ const activePathEntries = [];
 for (const entry of items) {
   collectActiveLinks(entry, activePathEntries);
 }
+for (const entry of contentsItems) {
+  collectActiveLinks(entry, activePathEntries);
+}
 const activePath = new Set(activePathEntries);
 const state_scope = createHash('sha1')
   .update(`${config.workspaceRoot}|${config.content_path}`)
@@ -61,7 +68,14 @@ const state_scope = createHash('sha1')
 const state_key = `microwebstacks:${state_scope}:${category}`;
 ---
 <nav class={`${open_class} ${category}${loading ? " loading" : ""}`} data-width={data_width} data-max-level={max_level} data-default-level={default_level} data-state-key={state_key} data-lazy-navigation={loading ? "true" : undefined} aria-busy={loading ? "true" : undefined}>
-    <div class="menu-title">{category === "toc_menu" ? "On this page" : "Pages"}</div>
+    <div class="menu-title">
+      {category === "toc_menu" ? "On this page" : has_contents ?
+        <div class="menu-source-toggle" role="group" aria-label="Navigation source">
+          <button type="button" data-menu-source="contents" aria-pressed="true">Contents</button>
+          <button type="button" data-menu-source="files" aria-pressed="false">Files</button>
+        </div>
+        : "Pages"}
+    </div>
     {loading &&
       <div class="menu-skeleton" aria-label="Loading pages" role="status">
         <span></span><span></span><span></span><span></span><span></span>
@@ -79,7 +93,14 @@ const state_key = `microwebstacks:${state_scope}:${category}`;
         <button type="button" class="depth-btn all" data-action="max" title="Show all levels" aria-label="Show all levels">All</button>
       </div>
     }
-    <SubMenu items={items} level={1} visibleLevel={default_level} activePath={activePath} forceVisible={false} linkClass={link_class} />
+    {has_contents &&
+      <div class="menu-tree" data-menu-tree="contents" data-max-depth={contents_max_level}>
+        <SubMenu items={contentsItems} level={1} visibleLevel={default_level} activePath={activePath} forceVisible={false} linkClass={link_class} />
+      </div>
+    }
+    <div class="menu-tree" data-menu-tree="files" data-max-depth={files_max_level} hidden={has_contents}>
+      <SubMenu items={items} level={1} visibleLevel={default_level} activePath={activePath} forceVisible={false} linkClass={link_class} />
+    </div>
 </nav>
 
 <style define:vars={{ data_width }}>
@@ -104,6 +125,28 @@ nav{
   background:var(--nav-bg-color);
   border-bottom:1px solid var(--soft-border-color);
 }
+.menu-source-toggle{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  width:100%;
+  gap:2px;
+  padding:2px;
+  border:1px solid var(--soft-border-color);
+  border-radius:var(--radius-sm);
+}
+.menu-source-toggle button{
+  border:0;
+  border-radius:calc(var(--radius-sm) - 2px);
+  padding:var(--space-1) var(--space-2);
+  background:transparent;
+  color:var(--content-color-muted);
+  cursor:pointer;
+}
+.menu-source-toggle button[aria-pressed="true"]{
+  background:var(--menu-active-color);
+  color:var(--content-color);
+}
+.menu-tree[hidden]{display:none}
 nav.closed{
     width:0px;
 }
@@ -239,3 +282,5 @@ nav.measuring ul.nested{
 }
 
 </style>
+
+<script src="./menu_source_toggle.js" />

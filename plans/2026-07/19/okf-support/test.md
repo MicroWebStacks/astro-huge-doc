@@ -19,3 +19,16 @@ The earlier environment blocker is gone: `pnpm` is on PATH and `pnpm install` co
 - Re-ran `pnpm test` (47/47) and `node scripts/check-plans.js` after the fix.
 
 Not covered yet: interactive extension-preview session against the relations store (only exercised through the lazy-backend static build), and the JSON server-mode deferred flush noted as postponed in implementation.md.
+
+## 2026-07-19 (Stage 3)
+
+- Passed: `pnpm test` — 52/52, including five focused Stage 3 tests for folded `index.md` discovery, authored list hierarchy/synthesized entries, diagnostic reset/related paths, persisted JSON diagnostics, and the lite line scanner's frontmatter/fence/reference handling.
+- Passed: JSON collection against `demo/` into `.tmp/okf-stage3/store` — 10 documents, 20 relations, diagnostics array present (empty for the clean fixture).
+- Passed: SQLite collection against `demo/` into `.tmp/okf-stage3/sqlite-store` — both `diagnostics` and `relations` tables present; zero diagnostics and one intentionally unresolved relation for the clean fixture.
+- Passed: full/json static Astro build into `.tmp/okf-stage3/static-full` — 17 pages including `/explore`, one type page, four tag pages, the unresolved-link report, linked concept facets, and server-rendered Contents/Files navigation from `knowledge/index.md`.
+- Passed: lite static Astro build — lazy navigation skeleton, post-paint contents request code, and the in-page link-index status bar are present; Explore links remain omitted in lite.
+- Passed: end-to-end lite scanner smoke test against all 10 demo documents — completed 10/10 with zero errors, 9,496 relation-store bytes, and zero evictions under the 10 MB cap.
+- Passed: `pnpm build` for the lite SSR engine, followed by `pnpm ext:stage-engine`; staging completed with the current dirty build stamp and vendored production dependencies.
+- Environment note: the workspace's pnpm junctions had to be repaired from the local package store, and validation commands ran outside the filesystem sandbox so Node could follow those Windows junctions.
+
+Still not covered: interactive browser clicking of pause/resume/stop controls. Endpoint/state behavior and scanner completion were exercised directly. JSON server-mode deferred relation flushing remains postponed from DD-5.

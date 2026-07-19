@@ -7,6 +7,7 @@ import { createStructureJsonWriter } from './src/structure_json.js';
 import { createBlobManager } from './src/blob_manager.js';
 import { computeVersionId } from './src/version_id.js';
 import { buildRelationRows } from './src/relations.js';
+import {resetDiagnostics, recordDiagnostic, getDiagnostics} from './src/diagnostics.js';
 
 // sharp is loaded lazily and treated as optional: the JSON ("lite") profile
 // runs without it (image intrinsic dimensions are simply skipped). The SQLite
@@ -42,6 +43,7 @@ function cloneEntry(entry){
 
 async function collect(config){
 
+    resetDiagnostics()
     set_config(config)
     const runDate = new Date()
     const runTimestamp = runDate.toISOString()
@@ -78,7 +80,10 @@ async function collect(config){
             }
             const urlKey = entry.url ?? ''
             if(claimedUrls.has(urlKey)){
-                warn(`(!) duplicate identity '${urlKey || '/'}': '${entry.path}' collides with '${claimedUrls.get(urlKey)}'; ignoring '${entry.path}'`)
+                const relatedPath = claimedUrls.get(urlKey)
+                const message = `duplicate identity '${urlKey || '/'}'; ignored because it collides with '${relatedPath}'`
+                recordDiagnostic('duplicate_identity', entry.path, message, relatedPath)
+                warn(`(!) duplicate identity '${urlKey || '/'}': '${entry.path}' collides with '${relatedPath}'; ignoring '${entry.path}'`)
                 continue
             }
             claimedUrls.set(urlKey, entry.path)
@@ -119,6 +124,12 @@ async function collect(config){
             const relationRows = await buildRelationRows({documents: relationSources, versionId})
             if(relationRows.length > 0){
                 writer.insertRelations(relationRows)
+            }
+        }
+        if(typeof writer.insertDiagnostics === 'function'){
+            const diagnosticRows = getDiagnostics().map((row) => ({...row, version_id: versionId}))
+            if(diagnosticRows.length > 0){
+                writer.insertDiagnostics(diagnosticRows)
             }
         }
         const newBlobRows = Array.from(blobState.newHashes ?? []).map((hash)=>blobState.catalog.get(hash)).filter(Boolean)

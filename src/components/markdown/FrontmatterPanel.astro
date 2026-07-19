@@ -2,12 +2,13 @@
 /*
  * Frontmatter viewer / OKF concept header (OKF plan TP-9, rulings OP-2/OP-5).
  *
- * Every page with frontmatter gets a viewer; nothing renders otherwise:
- *  - `type` present  -> compact concept header (type badge, description, tags,
- *    date, resource link, concept id) with the remaining fields behind an
- *    expandable "Additional metadata" section.
- *  - untyped         -> a single expandable "Metadata" section listing all
- *    fields generically.
+ * Every page with frontmatter gets a single collapsed status line; nothing
+ * renders otherwise:
+ *  - `type` present  -> the line carries the type badge, tag chips and date;
+ *    expanding reveals the description plus all remaining fields (resource,
+ *    concept id, unknown metadata) as labeled rows.
+ *  - untyped         -> the same band labeled "Metadata", expanding to every
+ *    field generically.
  * There is deliberately no compliance banner or raw-YAML dump in either tier.
  */
 export interface Props {
@@ -23,6 +24,9 @@ export interface Props {
     };
 }
 
+import {exploreHref} from '@/libs/explore.js';
+import {config} from '@/config';
+
 const { data } = Astro.props as Props;
 
 const type = typeof data?.type === 'string' ? data.type.trim() : ''
@@ -31,6 +35,9 @@ const resource = typeof data?.resource === 'string' ? data.resource.trim() : ''
 const date = typeof data?.date === 'string' ? data.date.trim() : (data?.date ?? '')
 const tags = Array.isArray(data?.tags) ? data.tags.filter((tag) => typeof tag === 'string' && tag.trim()) : []
 const conceptId = typeof data?.url === 'string' ? data.url : ''
+// Timestamps map to `date` verbatim; a midnight ISO stamp reads as noise on
+// the status line, so show the calendar day only.
+const dateDisplay = /^\d{4}-\d{2}-\d{2}T/.test(String(date)) ? String(date).slice(0, 10) : String(date)
 
 // `resource` is untrusted input (handoff §28): only link http(s) targets,
 // anything else renders as inert text.
@@ -61,80 +68,107 @@ function formatValue(value){
     }
 }
 
-// Untyped pages list every recognized field generically alongside the
-// unknown ones; typed pages show the recognized set in the header instead.
-const genericEntries = [
-    ...(description ? [['description', description]] : []),
-    ...(resource ? [['resource', resource]] : []),
-    ...(date ? [['date', String(date)]] : []),
-    ...(tags.length ? [['tags', tags.join(', ')]] : []),
-    ...metaEntries
-]
-
 const isTyped = type.length > 0
-const hasFrontmatter = isTyped || genericEntries.length > 0
+// Typed pages carry type/tags/date on the status line itself; everything else
+// becomes a labeled row. Untyped pages list every field as a row.
+const rows = isTyped
+    ? [
+        ...(resource ? [['resource', resource]] : []),
+        ...(conceptId ? [['id', conceptId]] : []),
+        ...metaEntries
+    ]
+    : [
+        ...(description ? [['description', description]] : []),
+        ...(resource ? [['resource', resource]] : []),
+        ...(date ? [['date', dateDisplay]] : []),
+        ...(tags.length ? [['tags', tags.join(', ')]] : []),
+        ...metaEntries
+    ]
+const hasFrontmatter = isTyped || rows.length > 0
+const exploreEnabled = config.profile !== 'lite'
 ---
-{hasFrontmatter && isTyped &&
-    <aside class="concept-header" aria-label="Concept metadata">
-        <div class="concept-topline">
-            <span class="concept-type">{type}</span>
-            {tags.map((tag) => <span class="concept-tag">{tag}</span>)}
-            {date && <span class="concept-date">{String(date)}</span>}
-        </div>
-        {description && <p class="concept-description">{description}</p>}
-        <div class="concept-details">
-            {resource && resourceIsUrl &&
-                <a class="concept-resource" href={resource} target="_blank" rel="noopener">Resource ↗</a>
-            }
-            {resource && !resourceIsUrl &&
-                <span class="concept-resource">Resource: {resource}</span>
-            }
-            {conceptId && <span class="concept-id" title="Concept identity (path-derived, stable across title changes)">{conceptId}</span>}
-        </div>
-        {metaEntries.length > 0 &&
-            <details class="frontmatter-details">
-                <summary>Additional metadata</summary>
+{hasFrontmatter &&
+    <details class="page-meta" aria-label={isTyped ? 'Concept metadata' : 'Page metadata'}>
+        <summary>
+            <svg class="meta-caret" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+                <path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {isTyped
+                ? (exploreEnabled
+                    ? <a class="concept-type" href={exploreHref('types', type)}>{type}</a>
+                    : <span class="concept-type">{type}</span>)
+                : <span class="meta-label">Metadata</span>}
+            {isTyped && tags.map((tag) => exploreEnabled
+                ? <a class="concept-tag" href={exploreHref('tags', tag)}>{tag}</a>
+                : <span class="concept-tag">{tag}</span>)}
+            {isTyped && date && <span class="concept-date">{dateDisplay}</span>}
+        </summary>
+        <div class="meta-body">
+            {isTyped && description && <p class="concept-description">{description}</p>}
+            {rows.length > 0 &&
                 <dl>
-                    {metaEntries.map(([key, value]) => (
+                    {rows.map(([key, value]) => (
                         <>
                             <dt>{key}</dt>
-                            <dd>{formatValue(value)}</dd>
+                            {key === 'resource' && resourceIsUrl
+                                ? <dd><a href={resource} target="_blank" rel="noopener">{resource} ↗</a></dd>
+                                : key === 'id'
+                                    ? <dd class="meta-id" title="Concept identity (path-derived, stable across title changes)">{value}</dd>
+                                    : <dd>{formatValue(value)}</dd>}
                         </>
                     ))}
                 </dl>
-            </details>
-        }
-    </aside>
-}
-{hasFrontmatter && !isTyped &&
-    <details class="frontmatter-panel frontmatter-details">
-        <summary>Metadata</summary>
-        <dl>
-            {genericEntries.map(([key, value]) => (
-                <>
-                    <dt>{key}</dt>
-                    <dd>{formatValue(value)}</dd>
-                </>
-            ))}
-        </dl>
+            }
+        </div>
     </details>
 }
 <style>
-.concept-header{
-    margin-block: 0 var(--space-4);
-    padding: var(--space-3);
-    border: 1px solid var(--soft-border-color);
-    border-radius: var(--radius-md, 8px);
-    background-color: var(--surface-2-bg);
-    max-width: var(--prose-measure);
+/* Chrome band: continuation of the sidebar surface (not the reading
+   surface), closed by a separator line before the markdown body. The line
+   above comes from the breadcrumb band's own border. Collapsed it is a
+   single status line; expanding opens a clearly bounded body below it. */
+.page-meta{
+    margin: 0;
+    border-bottom: 1px solid var(--soft-border-color);
+    background-color: var(--nav-bg-color);
+    color: var(--menu-text-color);
     box-sizing: border-box;
     font-size: 0.92em;
 }
-.concept-topline{
+.page-meta summary{
+    list-style: none;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);
+    min-height: 2rem;
+    padding: var(--space-1) var(--article-pad, var(--space-3));
+    cursor: pointer;
+    user-select: none;
+}
+.page-meta summary::-webkit-details-marker{
+    display: none;
+}
+.page-meta summary:hover{
+    background-color: var(--menu-span-hover-color);
+}
+.page-meta[open] summary{
+    border-bottom: 1px solid var(--soft-border-color);
+}
+.meta-caret{
+    flex: none;
+    color: var(--content-color-faint);
+    transition: transform 0.15s ease;
+}
+.page-meta[open] .meta-caret{
+    transform: rotate(90deg);
+}
+.meta-label{
+    font-weight: 600;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--content-color-muted);
 }
 .concept-type{
     font-weight: 600;
@@ -145,6 +179,7 @@ const hasFrontmatter = isTyped || genericEntries.length > 0
     border-radius: var(--radius-sm);
     background-color: var(--front-blue, #3b82f6);
     color: var(--content-bg-color);
+    text-decoration: none;
 }
 .concept-tag{
     font-size: 0.85em;
@@ -152,57 +187,58 @@ const hasFrontmatter = isTyped || genericEntries.length > 0
     border-radius: var(--radius-sm);
     border: 1px solid var(--soft-border-color);
     color: var(--content-color-muted);
+    text-decoration: none;
+}
+a.concept-type:hover,
+a.concept-tag:hover{
+    filter: brightness(1.12);
 }
 .concept-date{
     margin-left: auto;
     font-size: 0.85em;
     color: var(--content-color-muted);
 }
+.meta-body{
+    padding: var(--space-3) var(--article-pad, var(--space-3));
+}
 .concept-description{
-    margin-block: var(--space-2) 0;
-    color: var(--content-color-muted);
-}
-.concept-details{
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
-    margin-top: var(--space-2);
-    font-size: 0.85em;
-}
-.concept-resource{
-    color: var(--article-anchor-color);
-}
-.concept-id{
-    font-family: var(--font-mono, monospace);
-    color: var(--content-color-muted);
-    cursor: help;
-}
-.frontmatter-panel{
-    margin-block: 0 var(--space-4);
     max-width: var(--prose-measure);
-    box-sizing: border-box;
-}
-.frontmatter-details{
-    margin-top: var(--space-2);
-    font-size: 0.9em;
-}
-.frontmatter-details summary{
-    cursor: pointer;
+    margin: 0 0 var(--space-3);
     color: var(--content-color-muted);
-    user-select: none;
 }
-.frontmatter-details dl{
+.concept-description:last-child{
+    margin-bottom: 0;
+}
+.meta-body dl{
     display: grid;
     grid-template-columns: max-content 1fr;
-    gap: var(--space-1) var(--space-3);
-    margin: var(--space-2) 0 0;
+    gap: var(--space-2) var(--space-4);
+    margin: 0;
 }
-.frontmatter-details dt{
+.meta-body dt{
     font-weight: 600;
-    color: var(--content-color-muted);
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    line-height: inherit;
+    padding-top: 0.15em;
+    color: var(--content-color-faint);
 }
-.frontmatter-details dd{
+.meta-body dd{
     margin: 0;
     overflow-wrap: anywhere;
+    color: var(--content-color-muted);
+}
+.meta-body dd a{
+    color: var(--article-anchor-color);
+}
+.meta-id{
+    font-family: var(--font-mono, monospace);
+    cursor: help;
+}
+@media (prefers-reduced-motion: reduce){
+    .meta-caret{
+        transition: none;
+    }
 }
 </style>
