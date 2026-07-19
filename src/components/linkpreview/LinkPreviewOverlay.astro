@@ -1,0 +1,204 @@
+---
+// Rendered once per page by Layout.astro. Markup only — all behavior lives
+// in src/layout/link_preview.js, which self-disables inside a previewed
+// iframe (data-preview-mode="true" on <html>, set by Layout.astro's early
+// head script) so this shell is inert there (AD-005 no-recursion).
+//
+// Three pieces, referenced by link_preview.js via id (Astro's style scoping
+// does not touch element ids):
+//  - #link-preview-popup: the small ~1s-deferred teaser (AD-003). Its iframe
+//    is pointer-events:none — any click promotes to the modal (AD-004).
+//  - #link-preview-modal: the diagram-lightbox-sized end-game view (OP-003).
+//    Its iframe is fully interactive (scroll, hover); only link clicks
+//    inside it are intercepted and redirected to a real top navigation
+//    (AD-005/OP-004) via link_preview.js.
+//  - #link-preview-cache-shelf: an invisible, always-in-document parking
+//    spot for the last N dismissed iframes (AD-007/OP-007). Moving an
+//    iframe within the document preserves its browsing context (no reload);
+//    fully detaching it does not, so warm iframes must stay shelved here
+//    rather than removed.
+---
+<div id="link-preview-popup" class="link-preview-popup" hidden>
+	<div class="link-preview-popup-frame"><!-- iframe injected by link_preview.js --></div>
+	<div class="link-preview-popup-catcher" title="Open"></div>
+</div>
+
+<div id="link-preview-modal" class="link-preview-modal-background" hidden>
+	<div class="modal">
+		<div class="modal-header">
+			<span class="link-preview-title"></span>
+			<span class="link-preview-open" role="button" tabindex="0">Open page</span>
+			<span class="link-preview-close close-x" role="button" tabindex="0" title="Close">&times;</span>
+		</div>
+		<div class="modal-content">
+			<div class="modal-center" id="link-preview-modal-slot"><!-- iframe re-parented here on promote --></div>
+			<div class="link-preview-modal-loading" aria-hidden="true"><span class="link-preview-spinner"></span></div>
+		</div>
+	</div>
+</div>
+
+<div id="link-preview-cache-shelf" class="link-preview-cache-shelf" aria-hidden="true"></div>
+
+<style>
+.link-preview-cache-shelf{
+	position: absolute;
+	width: 0;
+	height: 0;
+	overflow: hidden;
+	pointer-events: none;
+}
+
+/* --- Popup (AD-003/AD-004) ------------------------------------------- */
+.link-preview-popup{
+	position: fixed;
+	z-index: 900;
+	width: min(28rem, 90vw);
+	height: min(18rem, 60vh);
+	background-color: var(--lightbox-surface-bg);
+	border: 1px solid var(--lightbox-border-color);
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-raised);
+	overflow: hidden;
+	cursor: pointer;
+}
+.link-preview-popup[hidden]{
+	display: none;
+}
+.link-preview-popup-frame{
+	width: 100%;
+	height: 100%;
+}
+.link-preview-popup-frame :global(iframe){
+	width: 100%;
+	height: 100%;
+	border: 0;
+	/* Popup content is a teaser, not a live surface: any click promotes to
+	   the modal instead of interacting with the framed page (AD-004). */
+	pointer-events: none;
+}
+.link-preview-popup-catcher{
+	position: absolute;
+	inset: 0;
+}
+
+/* --- Modal (OP-003: identical size/tokens to the diagram lightbox) ---- */
+.link-preview-modal-background{
+	display: none;
+	position: fixed;
+	z-index: 1000;
+	padding-top: 5vh;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+	overflow: auto;
+	background-color: var(--lightbox-overlay-color);
+}
+.link-preview-modal-background.visible{
+	display: block;
+}
+.link-preview-modal-background .modal{
+	background-color: var(--lightbox-surface-bg);
+	margin: auto;
+	padding: var(--space-1);
+	border: 1px solid var(--lightbox-border-color);
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	justify-content: flex-start;
+	width: 90vw;
+	height: 90vh;
+	box-sizing: border-box;
+}
+.modal-header{
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: var(--space-3);
+	border-radius: var(--radius-sm);
+	width: 100%;
+	padding: var(--space-2) var(--space-3);
+	box-sizing: border-box;
+}
+.link-preview-title{
+	flex-grow: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--content-color);
+	font-weight: 600;
+}
+.link-preview-open{
+	flex-shrink: 0;
+	padding: var(--space-1) var(--space-3);
+	border-radius: var(--radius-sm);
+	color: var(--content-color);
+	white-space: nowrap;
+}
+.link-preview-open:hover{
+	cursor: pointer;
+	background: var(--lightbox-header-hover-bg);
+}
+.link-preview-close{
+	flex-shrink: 0;
+	padding: 0 var(--space-2);
+}
+.link-preview-close:hover{
+	cursor: pointer;
+	background: var(--lightbox-header-hover-bg);
+}
+.close-x{
+	color: var(--lightbox-close-color);
+	font-size: var(--text-h2);
+	font-weight: bold;
+}
+.link-preview-close:hover.close-x,
+.link-preview-close:hover > .close-x{
+	color: var(--lightbox-close-hover-color);
+}
+.modal-content{
+	position: relative;
+	overflow: hidden;
+	width: 100%;
+	height: 100%;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+.modal-center{
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+}
+.modal-center :global(iframe){
+	width: 100%;
+	height: 100%;
+	border: 0;
+}
+.link-preview-modal-loading{
+	display: none;
+	position: absolute;
+	inset: 0;
+	align-items: center;
+	justify-content: center;
+	background-color: var(--lightbox-surface-bg);
+}
+.link-preview-modal-background.loading .link-preview-modal-loading{
+	display: flex;
+}
+.link-preview-spinner{
+	width: 2rem;
+	height: 2rem;
+	border-radius: 50%;
+	border: 3px solid var(--soft-border-color);
+	border-top-color: var(--front-blue);
+	animation: link-preview-modal-spin 0.8s linear infinite;
+}
+@keyframes link-preview-modal-spin{
+	to { transform: rotate(360deg); }
+}
+</style>

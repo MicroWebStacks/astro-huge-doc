@@ -2,8 +2,86 @@
 
 ## Progress
 
-[#-----] Phase 0 (concept gate) done and **passed** — build work (phases 2-5)
-not started.
+[######] Phase 0 (concept gate) passed. Phases 2-5 (build work) implemented
+and smoke-tested against the built SSR server. Outstanding before ship: the
+manual F5 Extension Development Host click-through (Phase 0's caveat) and a
+static-build browser smoke pass with a non-root `base`.
+
+## Phases 2-5 — build work
+
+### What shipped
+
+- **Preview-mode flag (AD-002)**: `src/layout/Layout.astro` gained an early
+  `is:inline` head script (same pattern as the existing theme-flash script)
+  that reads `location.hash` for `#__preview` (optionally
+  `#__preview&<section>`), with a `window.frameElement.dataset.mwsPreview`
+  fallback, and sets `data-preview-mode`/`data-preview-section` on `<html>`
+  before first paint. Scoped CSS in the same file hides header/side-menus/
+  TOC/resize gutters when the flag is set, leaving only `.article-slot`.
+- **Overlay markup**: `src/components/linkpreview/LinkPreviewOverlay.astro`
+  — the popup card, the modal shell (lightbox tokens, 90vw/90vh per OP-003),
+  and an always-in-document "cache shelf" div that warm iframes park in
+  (moving an iframe keeps its browsing context alive; fully detaching it
+  does not). Rendered once, unconditionally, from `Layout.astro`.
+- **Hover engine + modal + caching**: `src/layout/link_preview.js` — a
+  single always-loaded script (self-disables via the preview-mode flag,
+  which is the whole no-recursion mechanism, AD-005). Implements the AD-003
+  intent-delay/spinner/1s-deferred-popup timeline, AD-004 popup->modal
+  promotion by re-parenting the same iframe (no reload), the AD-005/OP-004
+  click-through end-game (any link click inside the preview navigates
+  `window.location`, not the iframe), AD-007/OP-007 warm cache (N=3, LRU),
+  AD-008 `?preview=` query-param sync via `pushState`/`popstate`, OP-001's
+  absolute-positioned spinner (`a.link-preview-loading::after`), OP-006
+  `focusin`/`focusout` parity, and the OP-002/OP-008 section-scroll
+  best-effort (`ENABLE_SECTION_SCROLL_PREVIEW` constant — the configurable
+  toggle the plan called for; flip to `false` if it ever misbehaves).
+
+### A real bug the smoke test caught
+
+Initial click-through used `iframe.dataset.mwsClickThroughAttached` (a flag
+on the element) to avoid double-attaching the listener on the iframe's
+`load` event. In practice a freshly-inserted iframe with `src` already set
+still fires an initial `load` for its implicit `about:blank` document before
+the real navigation lands. The element-scoped flag latched "attached" on
+that throwaway document, so the *real* document never got the click-through
+listener — link clicks inside the modal fell through to a real iframe-
+internal navigation (visible as a 404 inside the frame) instead of
+navigating the top window. Fixed by keying attachment on the `Document`
+object itself via a `WeakSet` (`clickThroughDocs`), so every distinct
+document the iframe ever holds gets exactly one listener. Caught by an
+end-to-end Playwright harness (see below), not by static reading — worth
+noting for future iframe-lifecycle work in this codebase.
+
+### How it was verified
+
+- `pnpm test` (31 node:test cases) passes unchanged.
+- `astro build` (SSR) succeeds; a plain static build
+  (`DOCS_OUTPUT=static astro build --config astro.config.static.mjs`) hits a
+  pre-existing, unrelated crash (`Cannot read properties of null (reading
+  'gallery')` in `AstroMarkdown`) confirmed via `git stash` to reproduce
+  identically on `main` without any of this work — not caused by this
+  feature, not fixed here.
+- A throwaway Playwright script (built server on `127.0.0.1:4321`, no Vite
+  HMR client in the loop) drove the real flow end-to-end and all 23 checks
+  passed: preview-mode chrome stripping, hover -> spinner -> 1s popup,
+  popup -> modal promotion with iframe reuse, modal sizing, click-through
+  end-game navigation + modal teardown, Escape dismissal, warm-cache
+  instant re-show, and back/forward syncing the modal via `?preview=`.
+  Deleted after use per the plan's "throwaway harness" convention — this
+  section is the record.
+
+### Not yet done
+
+- The Phase 0 caveat (manual click-through inside a real `F5` Extension
+  Development Host) is still open — exit criteria calls for it before
+  Phase 4 ships to users, not before starting the build.
+- No browser pass yet against a static build with a non-root `base` (GitHub
+  Pages style deployment) — the static build itself is blocked by the
+  pre-existing unrelated crash above; worth a rebuild once that's fixed
+  independently, or a targeted build excluding the offending page.
+- `focusin`/`focusout` keyboard parity and the OP-002/OP-008 section-scroll
+  best-effort are implemented but were not separately exercised by the
+  Playwright pass (only pointer-driven flows were scripted).
 
 ## Phase 0 — concept gate result: PASS
 

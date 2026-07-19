@@ -4,6 +4,7 @@ import './tokens.css';
 import 'katex/dist/katex.min.css';
 import AppBar from './AppBar.astro';
 import SideMenu from './SideMenu.astro';
+import LinkPreviewOverlay from '@/components/linkpreview/LinkPreviewOverlay.astro';
 import { process_toc_list, buildAppBarMenu, buildNavigationMenus } from "./layout_utils";
 import { extensionPreviewEnabled } from '@/libs/extension-preview.js';
 
@@ -83,6 +84,40 @@ const liveReloadPolling = liveReload && Boolean(process.env.MICROWEBSTACKS_LAUNC
 				}
 			})();
 		</script>
+		<script is:inline>
+			// Preview-mode detection (page-render-preview plan, AD-002/AD-005). A
+			// previewed page loads inside an iframe at "<url>#__preview" (optionally
+			// "#__preview&<section>" for the OP-002/OP-008 section-scroll
+			// best-effort). Runs before <body> so the chrome-hiding CSS below has
+			// zero flash, and exposes data-preview-mode on <html> so both that CSS
+			// and link_preview.js read the one flag instead of re-deriving it.
+			(function () {
+				try {
+					var hash = window.location.hash || '';
+					var flag = '#__preview';
+					var isPreview = hash === flag || hash.indexOf(flag + '&') === 0;
+					// Belt-and-braces (OP-002): if the fragment was lost (e.g. some
+					// navigation normalizes it away) but this document sits in a
+					// same-origin iframe placed by link_preview.js, its dataset still
+					// carries the flag.
+					if (!isPreview) {
+						try {
+							isPreview = Boolean(window.frameElement && window.frameElement.dataset.mwsPreview === 'true');
+						} catch (e) {
+							// cross-origin frameElement access - not applicable here, ignore
+						}
+					}
+					var root = document.documentElement;
+					root.setAttribute('data-preview-mode', isPreview ? 'true' : 'false');
+					var ampIndex = hash.indexOf('&');
+					if (isPreview && ampIndex !== -1) {
+						root.setAttribute('data-preview-section', decodeURIComponent(hash.slice(ampIndex + 1)));
+					}
+				} catch (e) {
+					document.documentElement.setAttribute('data-preview-mode', 'false');
+				}
+			})();
+		</script>
 		<style is:inline>
 			/* Critical pre-stylesheet paint: give the page its real background
 			   the instant anything paints, instead of a white flash while the
@@ -144,6 +179,7 @@ const liveReloadPolling = liveReload && Boolean(process.env.MICROWEBSTACKS_LAUNC
 			</main>
 			<button id="mobile-nav-backdrop" type="button" aria-label="Close navigation menus"></button>
 		</div>
+		<LinkPreviewOverlay />
 		{liveReloadPolling &&
 			<script is:inline>
 				// Extension live reload: poll the local preview server's change
@@ -400,8 +436,48 @@ main{
 	padding-bottom: 0.15rem;
 }
 
+/* --- Preview mode (page-render-preview plan, AD-002) ---------------------
+   A previewed page (loaded in the hover popup/modal iframe) strips all site
+   chrome and shows only the article. data-preview-mode is set by the inline
+   head script above, before first paint. This also disables link_preview.js
+   itself inside the frame (AD-005) — no-recursion by construction. */
+:global(html[data-preview-mode="true"]) header,
+:global(html[data-preview-mode="true"]) #wide-nav,
+:global(html[data-preview-mode="true"]) #mobile-nav,
+:global(html[data-preview-mode="true"]) #resize-left,
+:global(html[data-preview-mode="true"]) #resize-right,
+:global(html[data-preview-mode="true"]) #toc-nav-div,
+:global(html[data-preview-mode="true"]) #mobile-nav-backdrop {
+	display: none !important;
+}
+
+/* --- Hover-preview loading indicator (OP-001) -----------------------------
+   Absolute-positioned like .external::after (Link.astro) so it never shifts
+   surrounding text. reduced-motion is handled globally by tokens.css. */
+.article-slot :global(a.link-preview-loading){
+	position: relative;
+}
+.article-slot :global(a.link-preview-loading::after){
+	content: "";
+	position: absolute;
+	top: 50%;
+	right: -1.1em;
+	width: 0.75em;
+	height: 0.75em;
+	margin-top: -0.375em;
+	border-radius: 50%;
+	border: 2px solid currentColor;
+	border-top-color: transparent;
+	opacity: 0.65;
+	animation: link-preview-spin 0.7s linear infinite;
+}
+@keyframes link-preview-spin {
+	to { transform: rotate(360deg); }
+}
+
 </style>
 
 <script src="./menu_interactions_activation.js" />
 {liveReload && <script src="./lazy_navigation.js" />}
 {liveReload && <script src="./runtime_info.js" />}
+<script src="./link_preview.js" />
