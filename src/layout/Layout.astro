@@ -291,10 +291,17 @@ main{
 
 
 .nav-resize{
-	width:var(--space-2);
-	background-color: var(--content-bg-color);
-	border-inline:1px solid transparent;
+	/* Keep the navigation boundary visible without reserving a white gutter.
+	   The pseudo-element below retains a comfortably sized resize target. */
+	position:relative;
+	width:1px;
+	background-color: var(--soft-border-color);
 	box-sizing:border-box;
+}
+.nav-resize::after{
+	content:"";
+	position:absolute;
+	inset:0 calc(-1 * var(--space-2));
 }
 .active.nav-resize{
 	cursor:col-resize;
@@ -400,7 +407,9 @@ main{
 	flex: 0 0 auto;
 }
 .article-slot :global(.relations-footer){
-	margin-top: auto;
+	/* A flex auto margin collapses to zero on long articles, letting the
+	   footer border run directly into the last markdown block. */
+	margin-top: var(--space-7);
 }
 
 /* --- Page chrome bands ---------------------------------------------------

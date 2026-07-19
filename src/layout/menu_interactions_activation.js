@@ -1,12 +1,3 @@
-const root = document.querySelector(':root');
-// Read tokens live so resize-handle colors follow the active light/dark theme
-// instead of being frozen to whatever was active at page load.
-function cssVar(name){
-    return getComputedStyle(root).getPropertyValue(name).trim();
-}
-function header_bg_color(){ return cssVar('--header-bg-color'); }
-function content_bg_color(){ return cssVar('--content-bg-color'); }
-
 // Open/close is now driven by the app-bar toggle buttons (the side rails are
 // gone). The button is the single authority; it reflects state via
 // aria-expanded so the icon styling and the persisted preference stay in sync.
@@ -69,18 +60,11 @@ function configure_resize(resize_el,nav_el,left_to_right){
             nav_el.classList.add("open")
             nav_el.classList.remove("closed")
         }
-        resize_el.style.backgroundColor = content_bg_color()
         nav_el.dispatchEvent(new CustomEvent("microwebstacks:nav-visibility", {
             detail: {open: nav_el.classList.contains("open")}
         }));
     }
 
-    resize_el.addEventListener("mouseenter",(e)=>{
-        resize_el.style.backgroundColor = header_bg_color()
-    })
-    resize_el.addEventListener("mouseleave",(e)=>{
-        resize_el.style.backgroundColor = content_bg_color()
-    })
     resize_el.addEventListener("mousedown",(e)=>{
         global_resize_state = true
         x_down = e.x
@@ -101,15 +85,11 @@ function configure_resize(resize_el,nav_el,left_to_right){
             if(new_width <= 60){//snap effect
                 nav_el.style.width = "0px"
                 nav_el.setAttribute("data-width","0px")
-                resize_el.style.backgroundColor = header_bg_color
             }else if(new_width < 160){
                 //do nothing here
             }else if(new_width < (document.documentElement.clientWidth)*0.4){
                 nav_el.style.width = new_width+"px"
                 nav_el.setAttribute("data-width",new_width+"px")
-                resize_el.style.backgroundColor = header_bg_color
-            }else{
-                resize_el.style.backgroundColor = "red"
             }
             e.preventDefault()
         }
