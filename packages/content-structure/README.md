@@ -7,7 +7,7 @@ JSON backend consumed by the render layer.
 This package was adopted from the standalone
 [content-structure](https://github.com/MicroWebStacks/content-structure)
 repository on 2026-07-13 (source commit `2de04f9`, npm version 2.2.4) —
-decision OP-003 in `plans/2026-07/13-extension-performance/plan.md`. This
+decision OP-003 in `plans/2026-07/13/extension-performance/plan.md`. This
 engine is its only consumer; maintaining it here removes the cross-package
 release cycle. It is `private` and is **never published to npm** — the
 external repository is frozen at 2.2.4.

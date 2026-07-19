@@ -16,7 +16,7 @@ It covers:
 
 It does not cover the VS Code extension's lite/json SSR startup path, which is
 unaffected and out of scope here (see
-`plans/2026-07/12-reusable-render-action/plan.md` OP-009).
+`plans/2026-07/12/reusable-render-action/plan.md` OP-009).
 
 ## Output, backend, and profile are independent axes
 

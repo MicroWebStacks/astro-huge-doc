@@ -585,7 +585,7 @@ inspection; not committed.
   fixture are indistinguishable from each other in the DOM. This is not a
   regression from static rendering or this packet's work: it reproduces
   identically regardless of output/backend, and matches an already-recorded
-  gap (`OP-008`, `plans/2026-07/04-features-alignment/plan.md`, memory
+  gap (`OP-008`, `plans/2026-07/04/features-alignment/plan.md`, memory
   `content-structure-sibling-repo`) in the `content-structure` sibling
   package's collect step, which flattens `footnoteDefinition` mdast nodes
   and loses their identifiers before the app renders them - fixing it

@@ -14,8 +14,8 @@ This repository reserves `specification/` for stable requirements and uses
   it or a durable implementation contract has clearly emerged.
 - Store durable specifications under `specification/<slug>/spec.md` when a
   requirement must outlive one implementation pass.
-- Store planning work under `plans/YYYY-MM/DD-<slug>/`. Use the ISO month as
-  the bucket, then the day the plan packet starts plus a short lowercase slug.
+- Store planning work under `plans/YYYY-MM/DD/<slug>/`. Use the ISO month and
+  day as date buckets, then a short lowercase slug for the packet directory.
 - New dated plan folders should always contain `plan.md`.
 - Create `implementation.md` only after implementation work has actually
   happened. Do not create it upfront as a planning stub.

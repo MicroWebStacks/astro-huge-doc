@@ -1,7 +1,7 @@
 # vectormind.github.io adoption workflow
 
 Reference for the first intended external consumer of the reusable render
-command and Action (see `plans/2026-07/12-reusable-render-action/plan.md`,
+command and Action (see `plans/2026-07/12/reusable-render-action/plan.md`,
 problem summary and Non-goals). This packet does not implement or deploy this
 workflow, and does not modify the `vectormind.github.io` repository — it only
 records the exact pinned workflow that repository should adopt once a real
@@ -73,7 +73,7 @@ are placeholders for the same reason `render-example.yml`'s are: no published
 `@microwebstacks/md-render` version currently contains `bin/md-render.js`
 (Phase 3 added it but nothing has been tagged/released yet — see
 `action.yml`'s `engine-version` input and the "Deviations from the plan"
-note in `plans/2026-07/12-reusable-render-action/implementation.md`'s Phase 4
+note in `plans/2026-07/12/reusable-render-action/implementation.md`'s Phase 4
 section). Once a release exists, both placeholders resolve to a single pinned
 tag/SHA pair.
 

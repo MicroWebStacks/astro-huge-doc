@@ -30,7 +30,7 @@ const BUNDLED_MANIFEST_SCHEMA_VERSION = 1;
 // real production install (the real tree runs in the tens of thousands).
 const MIN_VENDORED_ENTRIES = 50;
 // Files the bundled engine must contain for the runtime to function; see
-// AD-004 in plans/2026-07/09-vsix-packaging-performance/plan.md.
+// AD-004 in plans/2026-07/09/vsix-packaging-performance/plan.md.
 const REQUIRED_TARBALL_PATHS = [
   'package/package.json',
   'package/build-meta.json',

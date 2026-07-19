@@ -12,21 +12,73 @@ function slugFromDir(rootRelativePath) {
     return rootRelativePath.split(/[\\/]/).join('-');
 }
 
+function isValidMonth(month) {
+    return /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
+}
+
+function isValidDay(month, day) {
+    if (!/^\d{2}$/.test(day)) {
+        return false;
+    }
+    const [year, monthNumber] = month.split('-').map(Number);
+    const dayNumber = Number(day);
+    const date = new Date(Date.UTC(year, monthNumber - 1, dayNumber));
+    return date.getUTCFullYear() === year
+        && date.getUTCMonth() === monthNumber - 1
+        && date.getUTCDate() === dayNumber;
+}
+
 async function findPacketDirs() {
-    const monthDirs = (await readdir(plansDir, {withFileTypes: true}))
+    const problems = [];
+    const topLevelDirs = (await readdir(plansDir, {withFileTypes: true}))
         .filter((entry) => entry.isDirectory());
+    const monthDirs = topLevelDirs.filter((entry) => isValidMonth(entry.name));
+
+    for (const entry of topLevelDirs) {
+        if (entry.name !== 'archive' && !isValidMonth(entry.name)) {
+            problems.push(`${entry.name}: unexpected plans directory; packets must use YYYY-MM/DD/<slug>/`);
+        }
+    }
+
     const packets = [];
     for (const monthDir of monthDirs) {
         const monthPath = join(plansDir, monthDir.name);
-        const dayDirs = (await readdir(monthPath, {withFileTypes: true}))
-            .filter((entry) => entry.isDirectory());
+        const monthEntries = await readdir(monthPath, {withFileTypes: true});
+        const dayDirs = monthEntries.filter((entry) => entry.isDirectory() && isValidDay(monthDir.name, entry.name));
+
+        for (const entry of monthEntries) {
+            if (!entry.isDirectory() || !isValidDay(monthDir.name, entry.name)) {
+                problems.push(`${monthDir.name}/${entry.name}: invalid day directory; expected YYYY-MM/DD/<slug>/`);
+            }
+        }
+
         for (const dayDir of dayDirs) {
-            const packetPath = join(monthPath, dayDir.name);
-            const relPath = relative(plansDir, packetPath);
-            packets.push({slug: slugFromDir(relPath), path: packetPath});
+            const dayPath = join(monthPath, dayDir.name);
+            const dayEntries = await readdir(dayPath, {withFileTypes: true});
+            const packetDirs = dayEntries.filter((entry) => entry.isDirectory());
+
+            if (!packetDirs.length) {
+                problems.push(`${monthDir.name}/${dayDir.name}: empty day directory; expected at least one packet slug`);
+            }
+
+            for (const entry of dayEntries) {
+                if (!entry.isDirectory()) {
+                    problems.push(`${monthDir.name}/${dayDir.name}/${entry.name}: expected a packet slug directory at this level`);
+                }
+            }
+
+            for (const packetDir of packetDirs) {
+                const packetPath = join(dayPath, packetDir.name);
+                const relPath = relative(plansDir, packetPath);
+                if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(packetDir.name)) {
+                    problems.push(`${relPath}: invalid packet slug; use lowercase letters, numbers, and hyphens`);
+                    continue;
+                }
+                packets.push({slug: slugFromDir(relPath), path: packetPath});
+            }
         }
     }
-    return packets;
+    return {packets, problems};
 }
 
 async function readIndexSlugs(indexFile) {
@@ -58,10 +110,9 @@ async function progressStatus(packetPath) {
 }
 
 async function main() {
-    const packets = await findPacketDirs();
+    const {packets, problems} = await findPacketDirs();
     const openSlugs = await readIndexSlugs('open.md');
     const closedSlugs = await readIndexSlugs('closed.md');
-    const problems = [];
 
     for (const packet of packets) {
         const inOpen = openSlugs.has(packet.slug);

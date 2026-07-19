@@ -163,7 +163,7 @@ When adding or changing UI:
 
 Where the current implementation is good design already, and where it should move
 toward the guidelines above. These are *opportunities*, not regressions — the
-site works today. Tracked in `plans/2026-06/27-ui-redesign/plan.md`.
+site works today. Tracked in `plans/2026-06/27/ui-redesign/plan.md`.
 
 | # | Area | Today | Toward |
 |---|------|-------|--------|

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * Lite-engine startup benchmark (plans/2026-07/13-extension-performance).
+ * Lite-engine startup benchmark (plans/2026-07/13/extension-performance).
  *
  * Generates a synthetic "huge" markdown website under .cache/bench/ (git-
  * ignored) and measures the lazy lite flow the VS Code extension runs

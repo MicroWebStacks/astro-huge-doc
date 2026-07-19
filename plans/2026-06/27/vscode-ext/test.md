@@ -26,8 +26,8 @@ Commands run:
 
 ```txt
 git status --short
-Get-ChildItem -LiteralPath plans\2026-06\27-vscode-ext
-Get-Content -Raw -LiteralPath plans\2026-06\27-vscode-ext\plan.md
+Get-ChildItem -LiteralPath plans\2026-06\27\vscode-ext
+Get-Content -Raw -LiteralPath plans\2026-06\27\vscode-ext\plan.md
 ```
 
 Known gaps:
@@ -69,7 +69,7 @@ node -e "import('./config.js').then(()=>console.log('config import ok'))"
 pnpm build
 $env:ASTRO_TELEMETRY_DISABLED='1'; node node_modules\astro\astro.js build
 $env:MICROWEBSTACKS_ENGINE_ROOT='C:\dev\MicroWebStacks\astro-huge-doc'; $env:MICROWEBSTACKS_WORKSPACE_ROOT='C:\tmp\docs-workspace'; $env:MICROWEBSTACKS_DOCS_ROOT='C:\tmp\docs-workspace'; $env:MICROWEBSTACKS_DB_PATH='C:\tmp\vscode-storage\content.db'; $env:MICROWEBSTACKS_STORE_PATH='C:\tmp\vscode-storage\store'; $env:MICROWEBSTACKS_OUTDIR='C:\dev\MicroWebStacks\astro-huge-doc\dist'; $env:MICROWEBSTACKS_HOST='127.0.0.1'; $env:MICROWEBSTACKS_PORT='49152'; node -e "import('./config.js').then(({config})=>console.log(JSON.stringify({rootdir:config.rootdir,workspaceRoot:config.workspaceRoot,content_path:config.content_path,outDir:config.outDir,db_path:config.collect.db_path,outdir:config.collect.outdir,host:config.server.host,port:config.server.port}, null, 2)))"
-rg -n "storageUri|enginePath|extensionDevelopmentPath|Preview Docs|Open Docs|Restart Docs|Stop Docs|MICROWEBSTACKS" readme.md plans\2026-06\27-vscode-ext packages\vscode-extension config.js server
+rg -n "storageUri|enginePath|extensionDevelopmentPath|Preview Docs|Open Docs|Restart Docs|Stop Docs|MICROWEBSTACKS" readme.md plans\2026-06\27\vscode-ext packages\vscode-extension config.js server
 ```
 
 Known gaps:

@@ -9,14 +9,14 @@ document consistency review rather than runtime app behavior.
 Get-ChildItem plans | Select-Object Name,Mode
 Get-ChildItem plans -Recurse | Select-Object FullName
 rg -n "plans/YYYY-MM-DD-<slug>|plans/20[0-9]{2}-[0-9]{2}-[0-9]{2}-|plans\\20[0-9]{2}-[0-9]{2}-[0-9]{2}-" . -g '!node_modules' -g '!dist' -g '!.git'
-rg -n "plans/YYYY-MM/DD-<slug>|plans/open.md|plans/closed.md|plans/README.md" AGENTS.md WORKFLOW.md plans\README.md plans\open.md plans\closed.md
+rg -n "plans/YYYY-MM/DD/<slug>|plans/open.md|plans/closed.md|plans/README.md" AGENTS.md WORKFLOW.md plans\README.md plans\open.md plans\closed.md
 git status --short
 ```
 
 ## Expected
 
 - The `plans/` tree uses month buckets with day-prefixed packet folders.
-- Workflow docs point at `plans/YYYY-MM/DD-<slug>/` and the new index files.
+- Workflow docs point at `plans/YYYY-MM/DD/<slug>/` and the new index files.
 - Repo-local stale-path scans find no active flat packet references after the
   move.
 
@@ -26,7 +26,7 @@ git status --short
   `plans/archive/`, plus `plans/README.md`, `plans/open.md`, and
   `plans/closed.md`.
 - Passed: `AGENTS.md` and `WORKFLOW.md` now document
-  `plans/YYYY-MM/DD-<slug>/` and the top-level plan index files.
+  `plans/YYYY-MM/DD/<slug>/` and the top-level plan index files.
 - Passed with one intentional exception: the stale-path scan only reports this
   packet's own `plan.md` problem statement, which preserves the old flat
   layout as historical context for the migration itself.

@@ -6,7 +6,7 @@
   components compose on one rhythm instead of ad-hoc px values.
 
   See `specification/ui_design.md` (Foundations) for the intent and
-  `plans/2026-06/27-ui-redesign/plan.md` for the rollout. These do not
+  `plans/2026-06/27/ui-redesign/plan.md` for the rollout. These do not
   vary by theme, so they sit on :root unconditionally.
 */
 
@@ -30,7 +30,7 @@
 
   /* Reading measure — the max comfortable line length for text content
      (prose and code). Wide media (diagram shells) may exceed it up to the
-     content column; see plans/2026-07/12-diagram-width-contract/plan.md. */
+     content column; see plans/2026-07/12/diagram-width-contract/plan.md. */
   --prose-measure: 80ch;
 
   /* Space scale (rem). Pick the nearest step; raw px only for hairlines. */

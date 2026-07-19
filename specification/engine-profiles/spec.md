@@ -110,7 +110,7 @@ deployment. Performance is monitored exclusively through local output:
   mode. The log is for the user's own eyes; nothing is aggregated or sent.
 - There are no absolute performance budgets. After optimization, achieved
   numbers are recorded as reference values
-  (`plans/2026-07/13-extension-performance/test.md`) and regressions are
+  (`plans/2026-07/13/extension-performance/test.md`) and regressions are
   judged as deltas against them.
 
 ## Non-goals

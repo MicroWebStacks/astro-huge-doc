@@ -8,7 +8,8 @@ This repository still stores planning packets under the flat
 
 ```text
 plans/YYYY-MM/
-  DD-<slug>/
+  DD/
+    <slug>/
 ```
 
 The repo also lacks the packet index surfaces that workflow expects
@@ -23,7 +24,7 @@ logic, and update repo references so packet links stay valid.
 
 ## Scope
 
-- Move existing plan packets into `plans/YYYY-MM/DD-<slug>/`.
+- Move existing plan packets into `plans/YYYY-MM/DD/<slug>/`.
 - Update `WORKFLOW.md` and `AGENTS.md` to document the new packet layout and
   top-level packet indexes.
 - Add `plans/README.md`, `plans/open.md`, and `plans/closed.md`.
@@ -57,7 +58,7 @@ logic, and update repo references so packet links stay valid.
 
 ## Exit Criteria
 
-- All existing packets live under `plans/YYYY-MM/DD-<slug>/`.
+- All existing packets live under `plans/YYYY-MM/DD/<slug>/`.
 - Workflow docs and plan index docs describe the month-bucket layout.
 - Repo-local references to moved packet paths are updated.
 - A targeted stale-reference scan shows no active flat packet paths outside

@@ -8,7 +8,7 @@ path references rewritten.
 ## Changes
 
 - Moved every dated packet from the flat `plans/YYYY-MM-DD-<slug>/` layout into
-  month buckets under `plans/YYYY-MM/DD-<slug>/`.
+  month buckets under `plans/YYYY-MM/DD/<slug>/`.
 - Updated `WORKFLOW.md` and `AGENTS.md` to adopt the month-bucket packet
   layout and to require the top-level plan index surfaces.
 - Added `plans/README.md`, `plans/open.md`, and `plans/closed.md`.

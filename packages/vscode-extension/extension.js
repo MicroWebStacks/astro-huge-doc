@@ -342,7 +342,7 @@ function probeNodeRunner(execPath, extraEnv) {
 
 // Resolves how to spawn scripts as Node, without requiring a system Node
 // install (BLK-002 hidden constraint; see
-// plans/2026-07/05-vscode-node-free-bootstrap/plan.md OP-001/OP-003):
+// plans/2026-07/05/vscode-node-free-bootstrap/plan.md OP-001/OP-003):
 // 1. MICROWEBSTACKS_NODE_PATH, if the maintainer/user set it explicitly.
 // 2. VS Code's own bundled runtime (process.execPath), run as plain Node via
 //    ELECTRON_RUN_AS_NODE=1 - this is what makes no-system-Node possible.
@@ -1470,7 +1470,7 @@ module.exports = {
   deactivate
 };
 
-// Test-only seam (plans/2026-07/09-vsix-packaging-performance): exposes the
+// Test-only seam (plans/2026-07/09/vsix-packaging-performance): exposes the
 // engine extraction/activation internals so a harness can exercise AD-003's
 // failure scenarios (bad manifest, digest mismatch, corrupt tar, missing
 // runtime files, wrong version, missing vendored deps, failure cleanup)

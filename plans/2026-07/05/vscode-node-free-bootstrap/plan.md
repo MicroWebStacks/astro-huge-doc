@@ -2,7 +2,7 @@
 
 ## Problem Summary
 
-`plans/2026-06/28-vscode-marketplace-readiness` (BLK-002) records a hidden
+`plans/2026-06/28/vscode-marketplace-readiness` (BLK-002) records a hidden
 constraint: the extension spawns a child `node`/`node.exe` process to run
 `collect.js`, `diagrams.js`, and `server.js`, and shells out to `npm`/`npm.cmd`
 to install the `@microwebstacks/md-render` engine package. Both require a
@@ -55,7 +55,7 @@ Non-goals (unchanged from the marketplace-readiness plan):
 ### OP-001 - Does `process.execPath` + `ELECTRON_RUN_AS_NODE=1` reliably replace system Node for spawning scripts?
 
 Status: resolved and implemented; clean-profile validation is tracked by
-`plans/2026-06/28-vscode-marketplace-readiness`.
+`plans/2026-06/28/vscode-marketplace-readiness`.
 
 Replace the `node`/`node.exe` PATH lookup in `findNodeExecutable` /
 `runNodeScript` / `startServer` with VS Code's own binary
@@ -95,7 +95,7 @@ If neither route works, raise a clear error.
   override, and falls back to system `node` with a clear error path.
 - Validation hand-off: end-to-end collect/diagrams/server proof in a clean VS
   Code profile with no Node/npm on PATH remains part of
-  `plans/2026-06/28-vscode-marketplace-readiness`.
+  `plans/2026-06/28/vscode-marketplace-readiness`.
 
 ### Phase 2 - Engine install without npm
 
@@ -107,7 +107,7 @@ If neither route works, raise a clear error.
   the extension installer restores it after extraction.
 - Validation hand-off: first-run install proof in the same Node-free
   environment as Phase 1 remains part of
-  `plans/2026-06/28-vscode-marketplace-readiness`.
+  `plans/2026-06/28/vscode-marketplace-readiness`.
 
 ### Phase 3 - Trim unnecessary transitive weight (optional, size only)
 
@@ -117,15 +117,15 @@ If neither route works, raise a clear error.
 
 ### Phase 4 - Fold back into marketplace-readiness plan
 
-- Completed: `plans/2026-06/28-vscode-marketplace-readiness/plan.md` and the
+- Completed: `plans/2026-06/28/vscode-marketplace-readiness/plan.md` and the
   extension README now match the landed bootstrap and keep the remaining
   validation gap under the broader publish-readiness packet.
 
 ## Dependencies And Risks
 
 - Depends on Option B engine packaging from
-  `plans/2026-06/28-vscode-marketplace-readiness` and the lite/json
-  zero-native-deps design from `plans/2026-06/29-vscode-lite`.
+  `plans/2026-06/28/vscode-marketplace-readiness` and the lite/json
+  zero-native-deps design from `plans/2026-06/29/vscode-lite`.
 - Risk: `runAsNode` fuse disabled on some distribution - needs graceful
   fallback, not a hard assumption.
 - Risk: reimplementing tarball fetch/extract must work cross-platform without
@@ -135,5 +135,5 @@ If neither route works, raise a clear error.
 
 - Preview install, collect, and serve work end to end on a clean VS Code
   profile with zero Node/npm anywhere on the machine or PATH.
-- `plans/2026-06/28-vscode-marketplace-readiness` is updated so its Node
+- `plans/2026-06/28/vscode-marketplace-readiness` is updated so its Node
   requirement caveat matches the resolved behavior.

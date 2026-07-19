@@ -25,7 +25,7 @@
 - `scripts/release-engine.js` / `RELEASE.md` already align with that release
   shape: the engine is staged from this repo, published first, then the
   extension release pins the new `engineVersion`.
-- `plans/2026-06/28-vscode-marketplace-readiness/plan.md` and
+- `plans/2026-06/28/vscode-marketplace-readiness/plan.md` and
   `packages/vscode-extension/README.md` now describe the bundled-runtime,
   npm-free bootstrap as the normal install path, so this packet's document
   reconciliation is complete.
@@ -42,7 +42,7 @@
 ## Follow-up hand-off
 
 - Clean-profile and zero-Node end-to-end validation remain under
-  `plans/2026-06/28-vscode-marketplace-readiness`, where package, platform,
+  `plans/2026-06/28/vscode-marketplace-readiness`, where package, platform,
   privacy, and publish-readiness checks already belong.
 - Phase 3 size trimming remains optional future work; it is not required to
   close this implementation packet.

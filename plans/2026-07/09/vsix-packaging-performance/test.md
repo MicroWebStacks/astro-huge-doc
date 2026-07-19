@@ -145,7 +145,7 @@ Actual:
 
 - Rebuilt the VSIX (`pnpm ext:package`) so it included the Phase 2
   `extension.js` changes, then followed the isolated-profile method recorded
-  in `plans/2026-06/28-vscode-marketplace-readiness/test.md` (2026-07-09
+  in `plans/2026-06/28/vscode-marketplace-readiness/test.md` (2026-07-09
   entry): real `code --install-extension` into a fully isolated
   `--user-data-dir`/`--extensions-dir`, a throwaway probe extension
   (`onStartupFinished`) registered in that profile's own `extensions.json`,
@@ -245,7 +245,7 @@ Actual:
   containing 24,336 vendored dependency files (AD-004 verification passed).
   Total packaging time 97.6s.
 - Compared against the 2026-07-09 baseline recorded in
-  `plans/2026-06/28-vscode-marketplace-readiness/test.md` (65.37 MB VSIX,
+  `plans/2026-06/28/vscode-marketplace-readiness/test.md` (65.37 MB VSIX,
   22,846 files, 20-30 min packaging): entry count and packaging time both
   dropped by an order of magnitude or more; the final `.vsix` size went
   **up** slightly (65.37 MB -> 73.9 MB, +~13%), an explicitly anticipated

@@ -40,11 +40,12 @@ Each new plan folder should use:
 
 ```text
 plans/YYYY-MM/
-  DD-<slug>/
-    survey.md            # only when explicitly requested
-    plan.md
-    implementation.md    # created only after implementation work has happened
-    test.md              # optional validation notes when useful
+  DD/
+    <slug>/
+      survey.md            # only when explicitly requested
+      plan.md
+      implementation.md    # created only after implementation work has happened
+      test.md              # optional validation notes when useful
 ```
 
 Create `survey.md` only when the maintainer explicitly requests a survey. For
@@ -60,7 +61,8 @@ block, delay, or reopen the plan by itself.
 Writing the Done marker and moving the index row are the same action, done in
 the same edit — not "implement, then remember to close later." Run
 `pnpm check:plans` (`scripts/check-plans.js`) after touching either index; it
-walks every `plans/*/*/implementation.md`, reads the Progress marker on its
+walks every `plans/*/*/*/implementation.md`, validates that every packet uses
+the `plans/YYYY-MM/DD/<slug>/` hierarchy, reads the Progress marker on its
 own line (`[#-----]` in progress, fully-filled `[######]` done — bracket width
 tracks that packet's own phase count, it does not have to be six), and fails
 if a packet's Done/in-progress status disagrees with which index file lists

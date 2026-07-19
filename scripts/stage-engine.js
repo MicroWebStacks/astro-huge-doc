@@ -8,7 +8,7 @@
 // Also vendors the package's production dependency tree into the staged
 // output (see vendorDependencies below), so the VS Code extension can install
 // the published tarball with a plain HTTPS fetch instead of running npm
-// (plans/2026-07/05-vscode-node-free-bootstrap OP-002). Pass --no-vendor to
+// (plans/2026-07/05/vscode-node-free-bootstrap OP-002). Pass --no-vendor to
 // skip this and stage a source-only package instead (npm's packer runs a real
 // dependency install; this needs npm on PATH here on the maintainer's
 // machine, same as `pnpm build` already does).
@@ -86,7 +86,7 @@ const EXCLUDED_DEPS = new Set([
 ]);
 // content-structure lives in this repo as a private workspace package
 // (packages/content-structure, adopted per
-// plans/2026-07/13-extension-performance OP-003) and is never published, so
+// plans/2026-07/13/extension-performance OP-003) and is never published, so
 // npm cannot resolve it during vendoring. It is dropped from the staged
 // dependency list, its own runtime dependencies are merged in instead, and
 // the vendor step copies the workspace source into the vendored modules tree.

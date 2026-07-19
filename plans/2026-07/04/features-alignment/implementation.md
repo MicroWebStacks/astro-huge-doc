@@ -53,7 +53,7 @@
 - Engine vendoring (`OP-001`) declined for this pass — see `plan.md` Open
   Points for the full rationale (accepted download-vs-bundle-size tradeoff,
   and clarified it's unrelated to the Node.js-runtime requirement already
-  tracked in `plans/2026-06/28-vscode-marketplace-readiness`).
+  tracked in `plans/2026-06/28/vscode-marketplace-readiness`).
 - Local Mermaid rendering (`OP-002`) intentionally not touched — confirmed
   with the maintainer that it's already in progress under a separate,
   existing plan.

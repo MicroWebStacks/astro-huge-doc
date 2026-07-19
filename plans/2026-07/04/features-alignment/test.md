@@ -22,11 +22,11 @@ planning-only changes.
 - `plan.md`'s open points (`OP-001`..`OP-006`) were cross-checked against
   existing packets to avoid contradicting already-accepted decisions:
   - `OP-001` (engine vendoring) cross-checked against
-    `plans/2026-06/28-vscode-marketplace-readiness/plan.md`'s "Option B"
+    `plans/2026-06/28/vscode-marketplace-readiness/plan.md`'s "Option B"
     engine-packaging decision — flagged as overlapping, not duplicated.
   - `OP-002`/diagram architecture cross-checked against
-    `plans/2026-06/28-mermaid-diagrams/` and
-    `plans/2026-06/28-diagram-toolbar/` to confirm the current Kroki-based
+    `plans/2026-06/28/mermaid-diagrams/` and
+    `plans/2026-06/28/diagram-toolbar/` to confirm the current Kroki-based
     design is accurately described.
   - `OP-004` (scroll sync) cross-checked against the webview/iframe
     architecture described in `packages/vscode-extension/extension.js` to

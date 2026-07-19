@@ -85,7 +85,7 @@ step; the script validates the build exists before staging.
       specifically (the 2026-07-09 run exercised the default `auto` path,
       which resolves to the bundled engine, not the registry-download tier) -
       accepted as a deferred follow-up at closure, consistent with the same
-      accepted gap in `plans/2026-07/09-vsix-packaging-performance`
+      accepted gap in `plans/2026-07/09/vsix-packaging-performance`
 
 ## Follow-up: node-free bootstrap landing
 
@@ -319,7 +319,7 @@ packet. The following minor points were left open as deferred follow-ups:
 - **`engineSource=registry` end-to-end.** The clean-profile run exercised the
   default `auto` -> bundled-engine path only; the registry download/extract
   tier has never been driven in a clean profile. Same gap was accepted as
-  deferred in `plans/2026-07/09-vsix-packaging-performance`.
+  deferred in `plans/2026-07/09/vsix-packaging-performance`.
 - **macOS/Linux platform validation.** Explicitly post-preview per OP-002;
   Windows x64 remains the only validated target.
 - **Minor validation gaps** (recorded in `test.md`): the local Kroki
@@ -328,7 +328,7 @@ packet. The following minor points were left open as deferred follow-ups:
   HTTP server rather than visually.
 
 Later work has already built on this packet:
-`plans/2026-07/09-vsix-packaging-performance` (closed 2026-07-10) replaced
+`plans/2026-07/09/vsix-packaging-performance` (closed 2026-07-10) replaced
 the loose bundled-engine files with one authenticated `engine.tgz` +
 `manifest.json`, and 0.0.13 was installed and confirmed working in the
 maintainer's real VS Code profile.
