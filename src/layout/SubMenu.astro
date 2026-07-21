@@ -23,8 +23,8 @@ const imageIcon = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" s
 {items &&
     <ul class:list={[root?"root":"nested",{hidden:(!root && level > visibleLevel && !forceVisible)}]} data-level={level}>
         {items.map((item)=>(
-            <li class:list={[{synthesized:item.synthesized}]}>
-                <div class:list={[{entry_container:true, active:item.active, parent:item.parent, synthesized:item.synthesized, expanded:(item.parent && (nextLevel <= visibleLevel || forceVisible || activePath?.has(item.link??'')))}]} data-node-key={item.nodeKey ?? item.link ?? item.label} title={item.synthesized ? 'Added from the file tree; not explicitly linked in index.md' : undefined}>
+            <li>
+                <div class:list={[{entry_container:true, active:item.active, parent:item.parent, expanded:(item.parent && (nextLevel <= visibleLevel || forceVisible || activePath?.has(item.link??'')))}]} data-node-key={item.nodeKey ?? item.link ?? item.label}>
                     {item.parent &&
                         <span class="icon expand">
                             <svg viewBox="0 0 100 100" width="60" height="60" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -150,17 +150,6 @@ const imageIcon = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" s
     span.text.href_hover:hover{
         background-color: var(--menu-span-hover-color);
     }
-    .entry_container.synthesized span.text{
-        color:var(--content-color-muted);
-        font-style:italic;
-    }
-    .entry_container.synthesized::after{
-        content:'+';
-        margin-right:var(--space-2);
-        color:var(--content-color-faint);
-        font-size:.75rem;
-    }
-
     /* table / diagram indicators shown after a toc label */
     span.toc-mark{
         flex-grow: 0;

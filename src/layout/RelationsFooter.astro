@@ -61,7 +61,7 @@ const backlinkGroups = [...bySource.values()];
 const hasContent = Boolean(prev || next || backlinkGroups.length > 0);
 ---
 {hasContent &&
-    <footer class="relations-footer">
+    <footer class="relations-footer" data-link-preview="off">
         {backlinkGroups.length > 0 &&
             <section class="backlinks" aria-label="Pages referencing this page">
                 <h2>Referenced by</h2>
@@ -143,10 +143,10 @@ const hasContent = Boolean(prev || next || backlinkGroups.length > 0);
 }
 .prev-next a{
     display: flex;
-    flex-direction: column;
-    gap: 0.15em;
+    align-items: baseline;
+    gap: var(--space-2);
     max-width: 48%;
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-1) var(--space-3);
     border: 1px solid var(--soft-border-color);
     border-radius: var(--radius-md, 8px);
     background-color: var(--content-bg-color);
@@ -157,11 +157,14 @@ const hasContent = Boolean(prev || next || backlinkGroups.length > 0);
     border-color: var(--front-blue);
 }
 .prev-next .next{
+    flex-direction: row-reverse;
     margin-left: auto;
     text-align: right;
 }
 .direction{
+    flex-shrink: 0;
     font-size: 0.8em;
+    white-space: nowrap;
     color: var(--content-color-muted);
 }
 .label{

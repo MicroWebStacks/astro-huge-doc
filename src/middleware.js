@@ -49,10 +49,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
             return jsonResponse(await versionPayload());
         }
         if (pathname === '/__lite/navigation') {
-            return jsonResponse(await navigationPayload(
-                url.searchParams.get('pathname') ?? '/',
-                url.searchParams.get('source') === 'contents' ? 'contents' : 'files'
-            ));
+            return jsonResponse(await navigationPayload(url.searchParams.get('pathname') ?? '/'));
         }
         if (pathname === '/__lite/runtime') {
             return jsonResponse(runtimePayload({dev: import.meta.env.DEV}));

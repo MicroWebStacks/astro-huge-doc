@@ -2,17 +2,30 @@
 import { getAssetUrl } from '@/libs/structure-db';
 import { config } from '@/config';
 import MarkdownTable from './MarkdownTable.jsx';
+import {buildRichTableModel} from './rich-table.js';
+import {resolveLinkPresentation} from '../link-presentation.js';
+import '../Link.css';
 
 export interface Props {
     item: {
         asset_uid?: string;
+        doc_sid?: string;
         version_id?: string;
         ast?: object;
     };
+    data?: {
+        sid?: string;
+        version_id?: string;
+    };
 }
 
-const { item } = Astro.props as Props;
+const {item, data = {}} = Astro.props as Props;
 const tableNode = item.ast?.type === 'table' ? item.ast : null;
 const asset_url = item.asset_uid ? getAssetUrl(item.asset_uid, item.version_id ?? config.collect.version_id) : null;
+const richModel = tableNode ? buildRichTableModel(tableNode, (ast) => resolveLinkPresentation({
+    ast,
+    docSid: item.doc_sid ?? data.sid,
+    versionId: item.version_id ?? data.version_id
+})) : null;
 ---
-<MarkdownTable client:load node={tableNode} assetUrl={asset_url} />
+<MarkdownTable client:load model={richModel} assetUrl={asset_url} />

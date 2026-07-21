@@ -26,6 +26,15 @@ Not covered yet: interactive extension-preview session against the relations sto
 - Passed: JSON collection against `demo/` into `.tmp/okf-stage3/store` — 10 documents, 20 relations, diagnostics array present (empty for the clean fixture).
 - Passed: SQLite collection against `demo/` into `.tmp/okf-stage3/sqlite-store` — both `diagnostics` and `relations` tables present; zero diagnostics and one intentionally unresolved relation for the clean fixture.
 - Passed: full/json static Astro build into `.tmp/okf-stage3/static-full` — 17 pages including `/explore`, one type page, four tag pages, the unresolved-link report, linked concept facets, and server-rendered Contents/Files navigation from `knowledge/index.md`.
+
+## 2026-07-21 — canonical Pages navigation
+
+- Passed: `node --test test/layout-navigation.test.js` — 3/3, including the invariant that a directory landing `index.md` is represented by the linked directory node while sibling documents remain child entries.
+- Passed: `node --test --test-name-pattern="navigation payload prefers" test/extension-preview-endpoints.test.js` — the lite endpoint returns the single persisted Pages tree.
+- Passed: `node scripts/check-plans.js` — 32 packets checked; open/closed indexes are consistent.
+- Passed: JavaScript syntax checks for `lazy_navigation.js`, `extension-preview.js`, and `source_navigation.js`; `git diff --check`; repository scans found no remaining authored-navigation imports, Contents/Files controls, or `source=contents` branches under `src/` and `test/`.
+- Full `pnpm test` was attempted through Corepack: 27 tests passed and 10 suites could not load because the existing install lacks `glob` in the root and `packages/content-structure` dependency trees. The navigation-focused tests above passed independently.
+- `pnpm build` was attempted with Astro telemetry disabled and could not start because the existing install lacks `esbuild`. The ignored staged engine under `packages/md-render/` was therefore not regenerated; run `pnpm ext:stage-engine` after dependencies are repaired and a successful build exists.
 - Passed: lite static Astro build — lazy navigation skeleton, post-paint contents request code, and the in-page link-index status bar are present; Explore links remain omitted in lite.
 - Passed: end-to-end lite scanner smoke test against all 10 demo documents — completed 10/10 with zero errors, 9,496 relation-store bytes, and zero evictions under the 10 MB cap.
 - Passed: `pnpm build` for the lite SSR engine, followed by `pnpm ext:stage-engine`; staging completed with the current dirty build stamp and vendored production dependencies.

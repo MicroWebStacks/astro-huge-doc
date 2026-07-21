@@ -40,18 +40,6 @@ nav.pages_menu .lazy-menu-tree .entry_container.active {
   background: var(--menu-active-color);
 }
 
-nav.pages_menu .lazy-menu-tree .entry_container.synthesized .text {
-  color: var(--content-color-muted);
-  font-style: italic;
-}
-
-nav.pages_menu .lazy-menu-tree .entry_container.synthesized::after {
-  content: '+';
-  margin-right: var(--space-2);
-  color: var(--content-color-faint);
-  font-size: 0.75rem;
-}
-
 nav.pages_menu .lazy-menu-tree .entry_container > a {
   flex-grow: 1;
   text-decoration: none;

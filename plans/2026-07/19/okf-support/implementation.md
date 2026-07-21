@@ -1,6 +1,6 @@
 # Implementation log
 
-[#####-] Stages 1–3 implemented (identity, schema, salvage, relations, reading UI, exploration, authored nav, lite link indexer); Stage 4 graph/beyond work remains.
+[#####-] Stages 1–3 implemented (identity, schema, salvage, relations, reading UI, exploration, canonical Pages nav, lite link indexer); Stage 4 graph/beyond work remains.
 
 ## 2026-07-19
 
@@ -145,3 +145,16 @@ Implemented TP-11, TP-12, and TP-16 from the preceding handoff. Stage 4 remains 
 ### Packaging handoff
 
 - Built the lite SSR engine and ran `pnpm ext:stage-engine`; `packages/md-render` now contains the staged Stage 3 runtime and vendored dependencies. No extension package was produced.
+
+## 2026-07-21 (TP-11 simplified)
+
+The authored-navigation implementation above was superseded after review. The sidebar now has one canonical **Pages** tree in every run mode:
+
+- `index.md` keeps its reserved landing-page role and is folded into the corresponding directory node.
+- Other renderable files remain ordinary child entries.
+- Markdown lists and links inside `index.md` render on the landing page but no longer redefine sidebar order, labels, or grouping.
+- Removed the Contents/Files switch, its persisted source state, authored-index AST navigation builder, synthesized-entry presentation, and the lite `source=contents` request branch.
+- Full/static rendering uses the existing source-entry tree directly; lite performs one post-paint navigation request against the same tree contract.
+- Replaced the authored-navigation test with a focused invariant test for a linked directory landing node plus visible sibling pages.
+
+This preserves OKF landing-page support while removing content-dependent application navigation. Stage 4 remains pending.

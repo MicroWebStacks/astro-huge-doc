@@ -8,19 +8,6 @@ import {
 } from '@tanstack/react-table';
 import './MarkdownTable.css';
 
-function nodeText(node) {
-    if (!node) {
-        return '';
-    }
-    if (typeof node.value === 'string') {
-        return node.value;
-    }
-    if (Array.isArray(node.children)) {
-        return node.children.map(nodeText).join('');
-    }
-    return '';
-}
-
 function normalizeValue(value) {
     if (value === null || value === undefined) {
         return '';
@@ -40,35 +27,61 @@ function uniqueColumnId(index, label) {
     return normalized ? `${normalized}_${index}` : `column_${index}`;
 }
 
-function tableFromMdast(node) {
-    const rows = Array.isArray(node?.children) ? node.children : [];
-    if (!rows.length) {
-        return {columns: [], data: []};
-    }
-
-    const headerCells = rows[0]?.children ?? [];
-    const headers = headerCells.map((cell, index) => nodeText(cell) || `Column ${index + 1}`);
-    const columnCount = Math.max(headers.length, ...rows.slice(1).map((row) => row.children?.length ?? 0));
-    const columns = Array.from({length: columnCount}, (_, index) => {
-        const header = headers[index] || `Column ${index + 1}`;
-        return {
-            accessorKey: `c${index}`,
-            id: uniqueColumnId(index, header),
-            header,
-            cell: (info) => normalizeValue(info.getValue()),
-            meta: {
-                align: node.align?.[index] ?? null
+function RichContent({tokens = []}) {
+    return tokens.map((token, index) => {
+        const key = `${token.type}-${index}`;
+        if (token.type === 'text') return token.value;
+        if (token.type === 'inlineCode') return <code key={key}>{token.value}</code>;
+        if (token.type === 'break') return <br key={key} />;
+        if (token.type === 'strong') return <strong key={key}><RichContent tokens={token.children} /></strong>;
+        if (token.type === 'emphasis') return <em key={key}><RichContent tokens={token.children} /></em>;
+        if (token.type === 'delete') return <del key={key}><RichContent tokens={token.children} /></del>;
+        if (token.type === 'link') {
+            const content = <RichContent tokens={token.children} />;
+            if (token.unresolved) {
+                return <a key={key} className="link unresolved" title={token.title ?? undefined} aria-disabled="true">{content}</a>;
             }
-        };
-    });
-    const data = rows.slice(1).map((row) => {
-        const record = {};
-        for (let index = 0; index < columnCount; index += 1) {
-            record[`c${index}`] = nodeText(row.children?.[index]);
+            return (
+                <a
+                    key={key}
+                    href={token.href || '#'}
+                    className={token.className || 'link'}
+                    target={token.target || '_self'}
+                    rel={token.rel || undefined}
+                    title={token.title || undefined}
+                >
+                    {content}
+                </a>
+            );
         }
+        return null;
+    });
+}
+
+function tokensContainLink(tokens = []) {
+    return tokens.some((token) => token.type === 'link' || tokensContainLink(token.children));
+}
+
+function tableFromModel(model) {
+    const headers = Array.isArray(model?.headers) ? model.headers : [];
+    const rows = Array.isArray(model?.rows) ? model.rows : [];
+    const columns = headers.map((headerCell, index) => ({
+        accessorKey: `c${index}`,
+        id: uniqueColumnId(index, headerCell.text),
+        header: () => <RichContent tokens={headerCell.content} />,
+        cell: (info) => <RichContent tokens={info.row.original.__rich[index]?.content} />,
+        // Avoid invalid nested interactive content (<a> inside the sort
+        // <button>) when an author puts a link in a header cell.
+        enableSorting: !tokensContainLink(headerCell.content),
+        meta: {align: headerCell.align ?? null}
+    }));
+    const data = rows.map((cells) => {
+        const record = {__rich: cells};
+        cells.forEach((cell, index) => {
+            record[`c${index}`] = cell.text;
+        });
         return record;
     });
-
     return {columns, data};
 }
 
@@ -109,7 +122,7 @@ function tableFromJsonRows(rows) {
     return {columns, data: rows};
 }
 
-export default function MarkdownTable({node = null, assetUrl = null}) {
+export default function MarkdownTable({model = null, assetUrl = null}) {
     const [assetRows, setAssetRows] = useState(null);
     const [error, setError] = useState('');
     const [sorting, setSorting] = useState([]);
@@ -118,7 +131,7 @@ export default function MarkdownTable({node = null, assetUrl = null}) {
     const scrollRef = useRef(null);
 
     useEffect(() => {
-        if (node?.type === 'table' || !assetUrl) {
+        if (model || !assetUrl) {
             return;
         }
         let cancelled = false;
@@ -142,14 +155,14 @@ export default function MarkdownTable({node = null, assetUrl = null}) {
         return () => {
             cancelled = true;
         };
-    }, [assetUrl, node]);
+    }, [assetUrl, model]);
 
     const {columns, data} = useMemo(() => {
-        if (node?.type === 'table') {
-            return tableFromMdast(node);
+        if (model) {
+            return tableFromModel(model);
         }
         return tableFromJsonRows(assetRows);
-    }, [assetRows, node]);
+    }, [assetRows, model]);
 
     const table = useReactTable({
         columns,

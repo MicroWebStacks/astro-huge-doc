@@ -1,0 +1,37 @@
+.link {
+    position: relative;
+    display: inline-block;
+    color: var(--link-inline-color);
+}
+
+.link + .link {
+    margin-left: var(--space-2);
+}
+
+.external {
+    margin-right: 0.6em;
+}
+
+.external::after {
+    content: '\2197';
+    position: absolute;
+    scale: 0.6;
+    top: -0.2em;
+    right: -0.6em;
+}
+
+.unresolved {
+    color: var(--content-color-muted, inherit);
+    text-decoration: underline dashed;
+    text-underline-offset: 0.2em;
+    cursor: help;
+    margin-right: 0.6em;
+}
+
+.unresolved::after {
+    content: '?';
+    position: absolute;
+    scale: 0.6;
+    top: -0.2em;
+    right: -0.6em;
+}

@@ -17,7 +17,6 @@ import {stat} from 'node:fs/promises';
 import {join} from 'node:path';
 import {config} from '../../config.js';
 import {buildSectionMenuFromSourceEntries, firstDocumentUrl} from '../layout/source_navigation.js';
-import {buildAuthoredSectionMenu} from '../layout/authored_navigation.js';
 
 function extensionPreviewEnabled() {
     return process.env.MICROWEBSTACKS_EXTENSION_MODE === 'true';
@@ -207,7 +206,7 @@ async function statsPayload() {
 }
 
 /* Post-paint navigation for the lazy side menu (src/layout/lazy_navigation.js). */
-async function navigationPayload(pathname, source = 'files') {
+async function navigationPayload(pathname) {
     const startedAt = performance.now();
     let entries;
     let documents;
@@ -223,19 +222,11 @@ async function navigationPayload(pathname, source = 'files') {
         const {getSourceEntries, getDocuments} = await import('./structure-db.js');
         entries = getSourceEntries();
         documents = getDocuments();
-        try {
-            const snapshot = JSON.parse(readFileSync(join(config.collect.json_dir, 'filetree.json'), 'utf8'));
-            documents = snapshot.documents ?? documents;
-        } catch {
-            // Files navigation remains available if snapshot persistence failed.
-        }
     }
-    const items = source === 'contents'
-        ? await buildAuthoredSectionMenu(entries, documents, pathname, config.base, config.content_path)
-        : buildSectionMenuFromSourceEntries(entries, pathname, config.base, firstDocumentUrl(documents));
+    const items = buildSectionMenuFromSourceEntries(entries, pathname, config.base, firstDocumentUrl(documents));
     const ms = Math.round(performance.now() - startedAt);
-    console.log(`[lite] ${source} navigation for ${pathname} ready in ${ms} ms (${items.length} roots)`);
-    return {items, source, ms};
+    console.log(`[lite] navigation for ${pathname} ready in ${ms} ms (${items.length} roots)`);
+    return {items, ms};
 }
 
 async function indexStatusPayload() {

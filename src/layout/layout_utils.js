@@ -1,6 +1,5 @@
-import {getDocuments, getDocumentsFull, getSourceEntries, getDocument, getItems} from '../libs/structure-db.js';
+import {getDocuments, getSourceEntries, getDocument, getItems} from '../libs/structure-db.js';
 import {basePrefix} from '../libs/blob-files.js';
-import {buildAuthoredSectionMenu} from './authored_navigation.js';
 import {config} from '../../config.js';
 import {buildSectionMenuFromSourceEntries as buildSourceEntryMenu, firstDocumentUrl} from './source_navigation.js';
 
@@ -462,16 +461,6 @@ function buildNavigationMenus(pathname) {
     };
 }
 
-async function buildNavigationMenusWithContents(pathname) {
-    const menus = buildNavigationMenus(pathname);
-    const docs = typeof getDocumentsFull === 'function' ? getDocumentsFull() : getDocuments();
-    const sourceEntries = getSourceEntries();
-    const contentsMenu = sourceEntries.length
-        ? await buildAuthoredSectionMenu(sourceEntries, docs, pathname, config.base, config.content_path)
-        : [];
-    return {...menus, contentsMenu};
-}
-
 function buildAppBarMenu(pathname) {
     return buildAppBarMenuFromDocs(getDocuments(), pathname);
 }
@@ -493,7 +482,6 @@ function section_from_pathname(pathname){
 export {
     process_toc_list,
     buildNavigationMenus,
-    buildNavigationMenusWithContents,
     buildAppBarMenu,
     buildSectionMenu,
     buildSectionMenuFromSourceEntries,

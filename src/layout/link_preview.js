@@ -52,6 +52,9 @@ function isEligibleAnchor(anchor) {
 	if (!anchor.closest('.article-slot')) {
 		return false;
 	}
+	if (anchor.closest('[data-link-preview="off"]')) {
+		return false; // shell navigation stays predictable and navigates directly
+	}
 	if (anchor.classList.contains('external')) {
 		return false;
 	}

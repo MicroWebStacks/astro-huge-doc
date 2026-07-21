@@ -29,6 +29,7 @@ import {join, posix} from 'path';
 import {config} from '../../config.js';
 import {basePrefix, blobFileName, blobFileUrl} from './blob-files.js';
 import {log_debug} from './utils.js';
+import {relationRowsFromItems, transformStoredItemLinks, visitAstLinks} from './ast-links.js';
 
 // The parse pipeline (content-structure -> remark/jsdom, gray-matter) costs
 // >1 s of module loading; the walk-only startup must not pay it. It is
@@ -65,7 +66,8 @@ const ASSET_KEY_SEPARATOR = '::';
 // Version 4 adds link resolution outcomes (`ast.rel`: status/target_sid/raw)
 // used for unresolved-link rendering and the in-memory relations store, plus
 // OKF frontmatter columns (type/description/resource) on the document row.
-const RECORD_VERSION = 4;
+// Version 5 also resolves link nodes nested in complex table AST.
+const RECORD_VERSION = 5;
 // Alt text marking the synthetic image appended for a frontmatter `image:`
 // path; the item is dropped after collection, only its asset/blob remain.
 const META_IMAGE_ALT = 'mws-meta-image';
@@ -137,33 +139,7 @@ function storeRelationsForDoc(doc, rows, provenance) {
 }
 
 function updateRelationsForDoc(doc, items) {
-    const rows = [];
-    let currentHeading = null;
-    for (const item of items ?? []) {
-        if (item?.type === 'heading') {
-            currentHeading = item.slug ?? null;
-            continue;
-        }
-        if (item?.type !== 'link') {
-            continue;
-        }
-        const ast = safeParseAst(item.ast);
-        const rel = ast?.rel;
-        if (!rel) {
-            continue;
-        }
-        rows.push({
-            source_sid: doc.sid,
-            target_sid: rel.target_sid ?? null,
-            target_raw: rel.raw ?? '',
-            fragment: rel.fragment ?? null,
-            link_text: item.body_text ?? null,
-            source_heading: currentHeading,
-            status: rel.status ?? null,
-            external: Boolean(rel.external)
-        });
-    }
-    storeRelationsForDoc(doc, rows, 'parsed');
+    storeRelationsForDoc(doc, relationRowsFromItems(doc, items), 'parsed');
 }
 
 function updateRelationsFromScan(doc, rows) {
@@ -234,6 +210,35 @@ function classifyScannedHref(doc, rawHref, documentsByPath) {
         return {target_sid: null, status: 'asset', external: false, fragment};
     }
     return {target_sid: null, status: 'unresolved', external: false, fragment};
+}
+
+function classifyStoredLinkAst(ast, doc, documentsByPath) {
+    const rawUrl = String(ast?.url ?? '');
+    if (!rawUrl) return false;
+    const classified = classifyScannedHref(doc, rawUrl, documentsByPath);
+    if (!classified) return false;
+    ast.rel = {
+        status: classified.status,
+        target_sid: classified.target_sid,
+        raw: rawUrl,
+        fragment: classified.fragment,
+        ...(classified.external ? {external: true} : {})
+    };
+
+    const {pathPart} = splitHref(rawUrl);
+    if (classified.status === 'resolved' && pathPart) {
+        let decodedPath = pathPart;
+        try { decodedPath = decodeURIComponent(pathPart); } catch { /* exact authored fallback */ }
+        const targetPath = decodedPath.startsWith('/')
+            ? posix.normalize(decodedPath.replace(/^\/+/, ''))
+            : posix.normalize(posix.join(posix.dirname(doc.path), decodedPath));
+        const target = candidateDocument(documentsByPath, targetPath);
+        if (target) {
+            const suffix = rawUrl.slice(pathPart.length);
+            ast.url = `${basePrefix(config.base)}/${target.url}${suffix}`;
+        }
+    }
+    return true;
 }
 
 function scanMarkdownRelations(doc, markdown, documentsByPath) {
@@ -917,57 +922,8 @@ async function parseDocumentRecord(doc, rawText, hash) {
         ensureTree().documents.map((candidate) => [candidate.path, candidate])
     );
     for (const item of payload.items ?? []) {
-        if (item?.type !== 'link' || !item.ast) {
-            continue;
-        }
-        try {
-            const ast = JSON.parse(item.ast);
-            const rawUrl = String(ast?.url ?? '');
-            if (!rawUrl) {
-                continue;
-            }
-            if (rawUrl.startsWith('#')) {
-                ast.rel = {status: 'resolved', target_sid: doc.sid, raw: rawUrl, fragment: rawUrl.slice(1)};
-                item.ast = JSON.stringify(ast);
-                continue;
-            }
-            if (rawUrl.startsWith('//') || /^[a-z][a-z\d+.-]*:/i.test(rawUrl)) {
-                ast.rel = {status: 'external', external: true, raw: rawUrl};
-                item.ast = JSON.stringify(ast);
-                continue;
-            }
-            const match = rawUrl.match(/^([^?#]*)(.*)$/);
-            const pathPart = match?.[1] ?? rawUrl;
-            const suffix = match?.[2] ?? '';
-            let decodedPath = pathPart;
-            try {
-                decodedPath = decodeURIComponent(pathPart);
-            } catch {
-                // Leave malformed percent escapes untouched; no target match.
-            }
-            const fragment = suffix.includes('#') ? suffix.slice(suffix.indexOf('#') + 1) : null;
-            // Root-absolute references check the content root first (DD-3);
-            // relative ones resolve against the source file.
-            const targetPath = decodedPath.startsWith('/')
-                ? posix.normalize(decodedPath.replace(/^\/+/, ''))
-                : posix.normalize(posix.join(posix.dirname(doc.path), decodedPath));
-            const target = candidateDocument(documentsByPath, targetPath);
-            if (target) {
-                ast.url = `${basePrefix(config.base)}/${target.url}${suffix}`;
-                ast.rel = {status: 'resolved', target_sid: target.sid, raw: rawUrl, fragment};
-            } else if (decodedPath.startsWith('/') && existsSync(join(config.collect.rootdir ?? '', 'public', targetPath))) {
-                // DD-3 fallback: root-absolute target absent from the content
-                // root but present under public/ keeps its authored href.
-                ast.rel = {status: 'public', raw: rawUrl, fragment};
-            } else if (targetPath !== '..' && !targetPath.startsWith('../') && existsSync(join(contentDir(), ...targetPath.split('/')))) {
-                ast.rel = {status: 'asset', raw: rawUrl, fragment};
-            } else {
-                ast.rel = {status: 'unresolved', raw: rawUrl, fragment};
-            }
-            item.ast = JSON.stringify(ast);
-        } catch {
-            // Preserve an unrecognized AST payload exactly as collected.
-        }
+        const transformed = transformStoredItemLinks(item, (link) => classifyStoredLinkAst(link, doc, documentsByPath));
+        if (transformed !== item?.ast) item.ast = transformed;
     }
 
     // Content-addressed blob files for this page only (no rm -rf, additive).
@@ -1513,6 +1469,10 @@ export {
     relationIndexStatus,
     controlRelationIndex,
     scanMarkdownRelations,
+    classifyStoredLinkAst,
+    visitAstLinks,
+    relationRowsFromItems,
+    transformStoredItemLinks,
     getLastPageLoad,
     getWalkHistory
 };

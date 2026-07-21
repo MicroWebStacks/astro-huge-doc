@@ -6,7 +6,7 @@ import AppBar from './AppBar.astro';
 import SideMenu from './SideMenu.astro';
 import LinkPreviewOverlay from '@/components/linkpreview/LinkPreviewOverlay.astro';
 import LiteRelationIndexer from './LiteRelationIndexer.astro';
-import { process_toc_list, buildAppBarMenu, buildNavigationMenusWithContents, findKnowledgeLog } from "./layout_utils";
+import { process_toc_list, buildAppBarMenu, buildNavigationMenus, findKnowledgeLog } from "./layout_utils";
 import { extensionPreviewEnabled } from '@/libs/extension-preview.js';
 import { config } from '@/config';
 
@@ -31,10 +31,9 @@ const liveReload = extensionPreviewEnabled()
 // fetched after first paint and starts as a closed skeleton; static/full
 // deployments keep their complete server-rendered navigation.
 const navigation = liveReload
-	? {appBarMenu: buildAppBarMenu(Astro.url.pathname), sectionMenu: [], contentsMenu: []}
-	: await buildNavigationMenusWithContents(Astro.url.pathname)
+	? {appBarMenu: buildAppBarMenu(Astro.url.pathname), sectionMenu: []}
+	: buildNavigationMenus(Astro.url.pathname)
 const pages_menu_items = navigation.sectionMenu ?? []
-const contents_menu_items = navigation.contentsMenu ?? []
 const appbar_menu = navigation.appBarMenu ?? []
 // Reserved log.md (OKF plan DD-8): the app bar links to the knowledge log
 // only when the validation gate passes; otherwise it is a normal page.
@@ -165,12 +164,12 @@ const liveReloadPolling = liveReload && Boolean(process.env.MICROWEBSTACKS_LAUNC
 			</header>
 			<main>
 				<div id="wide-nav" class="scroll">
-					<SideMenu items={pages_menu_items} contentsItems={contents_menu_items} category="pages_menu" initialOpen={false} loading={liveReload}/>
+					<SideMenu items={pages_menu_items} category="pages_menu" initialOpen={false} loading={liveReload}/>
 				</div>
 				<div id="resize-left" class="nav-resize active"/>
 				<article class="content scroll">
 					<div id="mobile-nav">
-						<SideMenu items={pages_menu_items} contentsItems={contents_menu_items} category="pages_menu" initialOpen={false} loading={liveReload}/>
+						<SideMenu items={pages_menu_items} category="pages_menu" initialOpen={false} loading={liveReload}/>
 					</div>
 					<div class="article-slot">
 						<slot/>
@@ -407,9 +406,10 @@ main{
 	flex: 0 0 auto;
 }
 .article-slot :global(.relations-footer){
-	/* A flex auto margin collapses to zero on long articles, letting the
-	   footer border run directly into the last markdown block. */
-	margin-top: var(--space-7);
+	/* Consume any spare height on short pages so the footer reaches the
+	   viewport edge. On long pages the auto margin resolves to zero and the
+	   footer continues naturally after the document. */
+	margin-top: auto;
 }
 
 /* --- Page chrome bands ---------------------------------------------------
@@ -508,27 +508,18 @@ main{
 }
 
 /* --- Hover-preview loading indicator (OP-001) -----------------------------
-   Absolute-positioned like .external::after (Link.astro) so it never shifts
-   surrounding text. reduced-motion is handled globally by tokens.css. */
+   Paint-only underline: it acknowledges hover intent without creating
+   scrollable overflow or changing the trigger's geometry. reduced-motion is
+   handled globally by tokens.css. */
 .article-slot :global(a.link-preview-loading){
-	position: relative;
+	background-image: linear-gradient(var(--front-blue), var(--front-blue));
+	background-position: left bottom;
+	background-repeat: no-repeat;
+	background-size: 35% 2px;
+	animation: link-preview-loading-pulse 0.8s ease-in-out infinite alternate;
 }
-.article-slot :global(a.link-preview-loading::after){
-	content: "";
-	position: absolute;
-	top: 50%;
-	right: -1.1em;
-	width: 0.75em;
-	height: 0.75em;
-	margin-top: -0.375em;
-	border-radius: 50%;
-	border: 2px solid currentColor;
-	border-top-color: transparent;
-	opacity: 0.65;
-	animation: link-preview-spin 0.7s linear infinite;
-}
-@keyframes link-preview-spin {
-	to { transform: rotate(360deg); }
+@keyframes link-preview-loading-pulse {
+	to { background-size: 100% 2px; }
 }
 
 </style>

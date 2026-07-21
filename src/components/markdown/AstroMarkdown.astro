@@ -55,13 +55,13 @@ function paragraphStyle(node){
             return <MarkdownImage item={item} />;
         }
         if (item.type === 'table') {
-            return <DataTable item={item} />;
+            return <DataTable item={item} data={data} />;
         }
         if (item.type === 'code') {
             return <Code item={item} />;
         }
         if (item.type === 'link') {
-            return <Link item={item}  />;
+            return <Link item={{...item, doc_sid:item.doc_sid ?? data?.sid, version_id:item.version_id ?? data?.version_id}} />;
         }
         if (item.type === 'textDirective') {
             return <Directive name={item.ast?.name} attributes={item.ast?.attributes ?? {}} />;

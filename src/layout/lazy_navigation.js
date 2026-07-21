@@ -32,11 +32,7 @@ function renderList(items, level = 1, forceVisible = false) {
         entry.dataset.nodeKey = item.nodeKey ?? item.link ?? item.label ?? '';
         entry.classList.toggle('active', Boolean(item.active));
         entry.classList.toggle('parent', Boolean(item.items?.length));
-        entry.classList.toggle('synthesized', Boolean(item.synthesized));
         entry.classList.toggle('expanded', Boolean(item.items?.length && activeBranch));
-        if (item.synthesized) {
-            entry.title = 'Added from the file tree; not explicitly linked in index.md';
-        }
 
         if (item.items?.length) {
             const icon = document.createElement('span');
@@ -82,53 +78,26 @@ function depthControls() {
     return controls;
 }
 
-function menuSourceToggle() {
-    const toggle = document.createElement('div');
-    toggle.className = 'menu-source-toggle';
-    toggle.setAttribute('role', 'group');
-    toggle.setAttribute('aria-label', 'Navigation source');
-    toggle.innerHTML = '<button type="button" data-menu-source="contents" aria-pressed="true">Contents</button><button type="button" data-menu-source="files" aria-pressed="false">Files</button>';
-    return toggle;
-}
-
-function treeContainer(source, items) {
-    const container = document.createElement('div');
-    container.className = 'menu-tree';
-    container.dataset.menuTree = source;
-    container.dataset.maxDepth = String(maxDepth(items));
-    container.hidden = source === 'files';
-    if (items.length > 0) {
-        container.append(renderList(items));
-    } else {
-        const empty = document.createElement('p');
-        empty.className = 'lazy-menu-empty';
-        empty.textContent = source === 'contents' ? 'No authored index navigation in this section.' : 'No pages in this section.';
-        container.append(empty);
-    }
-    return container;
-}
-
-function populate(nav, items, contentsItems) {
+function populate(nav, items) {
     nav.querySelector('.menu-skeleton')?.remove();
     nav.querySelector('.lazy-menu-error')?.remove();
-    nav.querySelectorAll('.menu-tree, .depth-controls').forEach((node) => node.remove());
-    const hasContents = contentsItems.length > 0;
-    const depth = Math.max(maxDepth(items), maxDepth(contentsItems));
+    nav.querySelector('.depth-controls')?.remove();
+    const depth = maxDepth(items);
     nav.dataset.maxLevel = String(depth);
     nav.setAttribute('aria-busy', 'false');
     nav.classList.remove('loading');
 
-    const title = nav.querySelector('.menu-title');
-    if (title) {
-        title.replaceChildren(...(hasContents ? [menuSourceToggle()] : [document.createTextNode('Pages')]));
-    }
     if (depth > 1) {
         nav.append(depthControls());
     }
-    if (hasContents) nav.append(treeContainer('contents', contentsItems));
-    const filesTree = treeContainer('files', items);
-    filesTree.hidden = hasContents;
-    nav.append(filesTree);
+    if (items.length > 0) {
+        nav.append(renderList(items));
+    } else {
+        const empty = document.createElement('p');
+        empty.className = 'lazy-menu-empty';
+        empty.textContent = 'No pages in this section.';
+        nav.append(empty);
+    }
     nav.dispatchEvent(new CustomEvent('microwebstacks:navigation-ready'));
 }
 
@@ -147,34 +116,24 @@ async function loadNavigation() {
     if (menus.length === 0) {
         return;
     }
-    const fetchSource = async (source) => {
-        const endpoint = new URL('/__lite/navigation', window.location.origin);
-        endpoint.searchParams.set('pathname', window.location.pathname);
-        endpoint.searchParams.set('source', source);
+    const endpoint = new URL('/__lite/navigation', window.location.origin);
+    endpoint.searchParams.set('pathname', window.location.pathname);
+    try {
         const response = await fetch(endpoint, {cache: 'no-store'});
-        if (!response.ok) throw new Error(`${source} navigation request returned ${response.status}`);
+        if (!response.ok) throw new Error(`navigation request returned ${response.status}`);
         const contentType = response.headers.get('content-type') ?? '';
         if (!contentType.includes('application/json')) {
-            throw new Error(`${source} navigation answered with '${contentType || 'no content type'}' instead of JSON - run-mode mismatch`);
+            throw new Error(`navigation request answered with '${contentType || 'no content type'}' instead of JSON - run-mode mismatch`);
         }
-        return response.json();
-    };
-    try {
-        const [filesResult, contentsResult] = await Promise.allSettled([fetchSource('files'), fetchSource('contents')]);
-        if (filesResult.status !== 'fulfilled') throw filesResult.reason;
-        const payload = filesResult.value;
+        const payload = await response.json();
         const items = Array.isArray(payload.items) ? payload.items : [];
-        const contentsItems = contentsResult.status === 'fulfilled' && Array.isArray(contentsResult.value.items)
-            ? contentsResult.value.items
-            : [];
         // Last-result record for the runtime info surface (runtime_info.js).
         window.__mwsNavigationStatus = {
             ok: true,
-            ms: Math.max(payload.ms ?? 0, contentsResult.status === 'fulfilled' ? contentsResult.value.ms ?? 0 : 0),
-            contents: contentsResult.status === 'fulfilled',
+            ms: payload.ms ?? null,
             at: new Date().toISOString()
         };
-        menus.forEach((nav) => populate(nav, items, contentsItems));
+        menus.forEach((nav) => populate(nav, items));
     } catch (error) {
         window.__mwsNavigationStatus = {ok: false, error: error.message, at: new Date().toISOString()};
         console.warn(`[lite] navigation unavailable: ${error.message}`);

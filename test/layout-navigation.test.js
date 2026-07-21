@@ -30,3 +30,21 @@ test('home source-entry menu contains only loose rendered root files', () => {
     assert.equal(menu[0].active, true);
     assert.equal(menu.some((item) => item.nodeKey === 'section'), false);
 });
+
+test('pages navigation folds index.md into its directory landing node and keeps sibling files', () => {
+    const sourceEntries = [
+        {path: 'knowledge', parent_path: '', name: 'knowledge', entry_type: 'dir', document_url: 'knowledge', document_title: 'Knowledge'},
+        {path: 'knowledge/release.md', parent_path: 'knowledge', name: 'release.md', entry_type: 'file', document_url: 'knowledge/release', document_title: 'Release'},
+        {path: 'knowledge/readme.md', parent_path: 'knowledge', name: 'readme.md', entry_type: 'file', document_url: 'knowledge/readme', document_title: 'README'}
+    ];
+    const menu = buildSectionMenuFromSourceEntries(sourceEntries, '/knowledge/readme', '/');
+    assert.equal(menu.length, 1);
+    assert.equal(menu[0].label, 'Knowledge');
+    assert.equal(menu[0].link, '/knowledge');
+    assert.equal(menu[0].parent, true);
+    assert.deepEqual(menu[0].items.map((entry) => entry.link), [
+        '/knowledge/readme',
+        '/knowledge/release'
+    ]);
+    assert.equal(menu[0].items[0].active, true);
+});

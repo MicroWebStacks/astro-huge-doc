@@ -16,3 +16,12 @@ tags: [navigation, fixtures]
 
 These fixtures give the relation resolver examples of local, root-absolute,
 fragment, external, and unresolved targets.
+
+## Links inside tables
+
+| Kind | Link |
+|---|---|
+| External label | [Open Knowledge Foundation](https://okfn.org/) |
+| Bare URL | https://okfn.org/ |
+| Internal concept | [Frontmatter examples](./frontmatter-examples.md) |
+| Unresolved concept | [Missing concept](./missing-concept.md) |
