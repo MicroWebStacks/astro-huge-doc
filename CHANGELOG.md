@@ -3,6 +3,42 @@
 Release notes for the `@microwebstacks/md-render` npm package. The VS Code
 extension has a separate changelog at `packages/vscode-extension/CHANGELOG.md`.
 
+## 0.0.18 - 2026-07-21
+
+### Added
+
+- Added rich previews for internal page links, with delayed hover/focus cards,
+  a larger modal view, warm iframe caching, URL state, and click-through
+  navigation.
+- Added knowledge-document identity and relation support: stable slug-based
+  routes, typed frontmatter, resolved and unresolved links, backlinks,
+  breadcrumbs, sibling navigation, and optional knowledge-log presentation.
+- Added full-profile Explore pages for document types and tags, together with
+  source diagnostics for malformed frontmatter, duplicate identities, and
+  unresolved links.
+- Added a bounded background relation index for the lite preview, including
+  progress, pause, resume, and stop controls.
+- Added safe rich-link rendering in Markdown table cells while retaining
+  plain-text sorting and export behavior.
+
+### Changed
+
+- Standardized the Pages navigation across full, static, and lite modes. A
+  directory landing page is represented by its directory node, while sibling
+  Markdown files remain directly reachable.
+- Details blocks now size to the prose column by default and expand only as
+  needed for unwrapped overflowing code, up to the available article width.
+- Concept metadata, breadcrumbs, and relation controls now use dedicated
+  shell surfaces so authored Markdown remains visually distinct.
+
+### Fixed
+
+- Invalidated stale lite page-cache records after directive and table-link
+  schema changes, so affected pages are reparsed automatically.
+- Fixed collapsed details blocks rendering their code outside the disclosure.
+- Fixed internal links inside rich Markdown tables and improved internal-link
+  resolution and presentation throughout the rendered site.
+
 ## 0.0.17 - 2026-07-18
 
 ### Fixed

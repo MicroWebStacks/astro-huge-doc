@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.0.22 - 2026-07-21
+
+- Internal page links now offer a delayed rich preview on hover or keyboard
+  focus, with a larger modal view, warm caching, URL state, and click-through
+  navigation (engine 0.0.18).
+- Added knowledge-document features including stable slug-based routes, typed
+  metadata, breadcrumbs, backlinks, sibling navigation, type/tag exploration,
+  source diagnostics, and an optional knowledge-log timeline (engine 0.0.18).
+- The Pages rail now uses one consistent directory-and-file tree across site
+  and extension modes, including directory landing pages (engine 0.0.18).
+- The preview builds a bounded background relation index after first render
+  and exposes progress, pause, resume, and stop controls (engine 0.0.18).
+- Markdown tables now render safe rich links while preserving plain-text
+  sorting and export behavior (engine 0.0.18).
+- Details panels size naturally around prose and wide unwrapped code, and
+  stale cached records are reparsed automatically (engine 0.0.18).
+
 ## 0.0.21 - 2026-07-18
 
 - Fixed a crash where a single document with malformed YAML front matter
