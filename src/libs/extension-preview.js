@@ -16,7 +16,7 @@ import {readFileSync, readdirSync, statSync} from 'node:fs';
 import {stat} from 'node:fs/promises';
 import {join} from 'node:path';
 import {config} from '../../config.js';
-import {buildSectionMenuFromSourceEntries, firstDocumentUrl} from '../layout/source_navigation.js';
+import {buildDocLink, buildSectionMenuFromSourceEntries, firstDocumentUrl} from '../layout/source_navigation.js';
 
 function extensionPreviewEnabled() {
     return process.env.MICROWEBSTACKS_EXTENSION_MODE === 'true';
@@ -229,6 +229,44 @@ async function navigationPayload(pathname) {
     return {items, ms};
 }
 
+async function sourceRoutePayload(sourcePath) {
+    if (typeof sourcePath !== 'string' || sourcePath.length === 0 || sourcePath.includes('\\')) {
+        return {found: false, reason: 'invalid-path'};
+    }
+    const normalized = sourcePath.replace(/^\.\//, '');
+    if (
+        normalized.startsWith('/')
+        || normalized.split('/').some((segment) => !segment || segment === '.' || segment === '..')
+        || !normalized.toLowerCase().endsWith('.md')
+    ) {
+        return {found: false, reason: 'invalid-path'};
+    }
+
+    let entries;
+    try {
+        const snapshot = JSON.parse(readFileSync(join(config.collect.json_dir, 'filetree.json'), 'utf8'));
+        entries = snapshot.source_entries ?? [];
+    } catch {
+        const {getSourceEntries} = await import('./structure-db.js');
+        entries = getSourceEntries();
+    }
+    const entry = entries.find((candidate) => (
+        candidate.entry_type === 'file'
+        && candidate.path === normalized
+        && candidate.document_url !== null
+        && candidate.document_url !== undefined
+    ));
+    if (!entry) {
+        return {found: false, reason: 'not-found'};
+    }
+    return {
+        found: true,
+        sourcePath: entry.path,
+        documentUrl: entry.document_url,
+        route: buildDocLink(entry.document_url, config.base)
+    };
+}
+
 async function indexStatusPayload() {
     const {relationIndexStatus} = await import('./structure-db.js');
     return typeof relationIndexStatus === 'function'
@@ -242,4 +280,4 @@ async function indexControlPayload(action) {
     return controlRelationIndex(action);
 }
 
-export {extensionPreviewEnabled, versionPayload, navigationPayload, runtimePayload, statsPayload, indexStatusPayload, indexControlPayload};
+export {extensionPreviewEnabled, versionPayload, navigationPayload, sourceRoutePayload, runtimePayload, statsPayload, indexStatusPayload, indexControlPayload};

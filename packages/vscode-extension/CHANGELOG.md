@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Preview now opens the rendered route for the active `.md` file, follows
+  supported editor changes, and can be locked from the preview-panel toolbar.
+- Preview servers, panels, watchers, and lifecycle operations are isolated per
+  workspace folder, including scoped restarts after configuration changes.
+- Closing a preview panel now disposes its workspace preview session.
+- Removed the redundant **Markdown Site Preview: Open in Browser** command;
+  preview is provided only in the embedded VS Code panel.
+
 ## 0.0.22 - 2026-07-21
 
 - Internal page links now offer a delayed rich preview on hover or keyboard

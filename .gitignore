@@ -1,4 +1,5 @@
 .env
+.vscode-test/
 .vscode/
 .astro/
 dist/

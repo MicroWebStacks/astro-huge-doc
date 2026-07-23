@@ -36,7 +36,7 @@ process.env.MICROWEBSTACKS_STORE_PATH = join(benchRoot, 'store');
 
 process.env.MICROWEBSTACKS_LAUNCHER = 'vscode-extension@0.0.0-test';
 
-const {extensionPreviewEnabled, navigationPayload, versionPayload, runtimePayload, statsPayload} =
+const {extensionPreviewEnabled, navigationPayload, sourceRoutePayload, versionPayload, runtimePayload, statsPayload} =
     await import('../src/libs/extension-preview.js');
 
 test('the gate follows MICROWEBSTACKS_EXTENSION_MODE per call, not at import', () => {
@@ -60,6 +60,31 @@ test('navigation payload prefers the persisted filetree.json snapshot', async ()
     // 'snapshot-only.md' exists only in the snapshot, proving the snapshot
     // (not a live walk of contentDir) answered.
     assert.deepEqual(payload.items.map((item) => item.nodeKey), ['README.md', 'snapshot-only.md']);
+});
+
+test('source route payload resolves only canonical Markdown source entries', async () => {
+    writeFileSync(join(jsonDir, 'filetree.json'), JSON.stringify({
+        source_entries: [
+            {path: 'README.md', entry_type: 'file', document_url: ''},
+            {path: 'guides/setup.md', entry_type: 'file', document_url: 'guides/setup'},
+            {path: 'guides/café notes.md', entry_type: 'file', document_url: 'guides/cafe-notes'},
+            {path: 'component.mdx', entry_type: 'file', document_url: null}
+        ]
+    }));
+
+    assert.deepEqual(await sourceRoutePayload('README.md'), {
+        found: true, sourcePath: 'README.md', documentUrl: '', route: '/'
+    });
+    assert.deepEqual(await sourceRoutePayload('guides/setup.md'), {
+        found: true, sourcePath: 'guides/setup.md', documentUrl: 'guides/setup', route: '/guides/setup'
+    });
+    assert.deepEqual(await sourceRoutePayload('guides/café notes.md'), {
+        found: true, sourcePath: 'guides/café notes.md', documentUrl: 'guides/cafe-notes', route: '/guides/cafe-notes'
+    });
+    assert.deepEqual(await sourceRoutePayload('missing.md'), {found: false, reason: 'not-found'});
+    for (const invalid of [null, '', '../secret.md', '/absolute.md', 'guides\\setup.md', 'component.mdx', 'notes.markdown', 'guides//setup.md']) {
+        assert.deepEqual(await sourceRoutePayload(invalid), {found: false, reason: 'invalid-path'});
+    }
 });
 
 test('navigation payload falls back to the live backend without a snapshot', async () => {

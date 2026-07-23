@@ -48,16 +48,22 @@
         "icon": "$(globe)"
       },
       {
-        "command": "microwebstacks.openDocsInBrowser",
-        "title": "Markdown Site Preview: Open in Browser"
-      },
-      {
         "command": "microwebstacks.restartDocsPreviewServer",
         "title": "Markdown Site Preview: Restart Server"
       },
       {
         "command": "microwebstacks.stopDocsPreviewServer",
         "title": "Markdown Site Preview: Stop Server"
+      },
+      {
+        "command": "microwebstacks.internal.lockDocsPreview",
+        "title": "Lock Preview",
+        "icon": "$(unlock)"
+      },
+      {
+        "command": "microwebstacks.internal.unlockDocsPreview",
+        "title": "Unlock Preview",
+        "icon": "$(lock)"
       }
     ],
     "keybindings": [
@@ -68,10 +74,32 @@
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "microwebstacks.internal.lockDocsPreview",
+          "when": "false"
+        },
+        {
+          "command": "microwebstacks.internal.unlockDocsPreview",
+          "when": "false"
+        }
+      ],
       "editor/title": [
         {
           "command": "microwebstacks.previewDocs",
           "when": "editorLangId == markdown",
+          "group": "navigation"
+        }
+      ],
+      "webview/title": [
+        {
+          "command": "microwebstacks.internal.lockDocsPreview",
+          "when": "webviewId == microwebstacksDocsPreview && !microwebstacks.previewLocked",
+          "group": "navigation"
+        },
+        {
+          "command": "microwebstacks.internal.unlockDocsPreview",
+          "when": "webviewId == microwebstacksDocsPreview && microwebstacks.previewLocked",
           "group": "navigation"
         }
       ]
@@ -81,6 +109,7 @@
       "properties": {
         "microwebstacks.preview.engineSource": {
           "type": "string",
+          "scope": "resource",
           "enum": [
             "auto",
             "local",
@@ -96,16 +125,19 @@
         },
         "microwebstacks.preview.enginePath": {
           "type": "string",
+          "scope": "resource",
           "default": "",
           "description": "Path to an astro-huge-doc repository checkout used as the engine. Highest priority in every engineSource mode. Only needed when the extension cannot infer the engine path."
         },
         "microwebstacks.preview.docsRoot": {
           "type": "string",
+          "scope": "resource",
           "default": "",
           "description": "Optional path to the documentation root inside the workspace. Defaults to manifest render.folder when set, otherwise output.content, otherwise the workspace folder."
         },
         "microwebstacks.preview.krokiServer": {
           "type": "string",
+          "scope": "resource",
           "default": "http://localhost:18000",
           "markdownDescription": "Base URL of the Kroki-compatible server used for BlockDiag and explicitly Kroki-routed diagram languages. Mermaid and PlantUML render client-side in the preview with no external setup. Use a local Docker Kroki (`http://localhost:18000`), the public service (`https://kroki.io`), or your organization's internal endpoint. Leave blank to fall back to the workspace `.env` or environment."
         }

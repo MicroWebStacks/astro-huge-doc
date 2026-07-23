@@ -402,15 +402,16 @@ for a complete reference workflow including the Pages deploy jobs.
 
 The repository includes a first-pass desktop VS Code extension in
 `packages/vscode-extension`. It previews Markdown documentation from the opened
-workspace through the existing `astro-huge-doc` SSR renderer and opens the same
-localhost preview in an external browser on demand.
+workspace through the existing `astro-huge-doc` SSR renderer in an embedded VS
+Code panel. It follows active `.md` files and can be locked from the panel
+toolbar; `.mdx` is not treated as a supported document type.
 
 Configuration for extension mode is documented in `Usage -> configuration`.
 This section covers install and run only.
 
 The extension follows VS Code storage conventions:
 
-- Markdown, MDX, assets, and optional `manifest.yaml` are read from the opened
+- Markdown, supporting assets, and optional `manifest.yaml` are read from the opened
   workspace.
 - Generated preview databases and cache files are stored in VS Code
   workspace-scoped extension storage, not in the workspace and not in the

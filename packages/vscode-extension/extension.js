@@ -12,14 +12,14 @@ const extensionPackage = require('./package.json');
 
 const COMMANDS = {
   preview: 'microwebstacks.previewDocs',
-  browser: 'microwebstacks.openDocsInBrowser',
   restart: 'microwebstacks.restartDocsPreviewServer',
-  stop: 'microwebstacks.stopDocsPreviewServer'
+  stop: 'microwebstacks.stopDocsPreviewServer',
+  lock: 'microwebstacks.internal.lockDocsPreview',
+  unlock: 'microwebstacks.internal.unlockDocsPreview'
 };
 
 const WATCHED_EXTENSIONS = new Set([
   '.md',
-  '.mdx',
   '.yaml',
   '.yml',
   '.json',
@@ -34,12 +34,8 @@ const WATCHED_EXTENSIONS = new Set([
 ]);
 
 let output;
-let serverProcess = null;
-let serverState = null;
-let previewPanel = null;
-let fileWatcher = null;
-let refreshTimer = null;
-let operation = Promise.resolve();
+let extensionContext = null;
+const sessions = new Map();
 const BUILD_META_FILE = 'build-meta.json';
 const BOX_WIDTH = 98;
 const BUNDLED_ENGINE_DIR = 'bundled-engine';
@@ -236,21 +232,41 @@ function logPreviewSummary(runtime) {
 }
 
 function activate(context) {
+  extensionContext = context;
   output = vscode.window.createOutputChannel('MicroWebStacks Docs');
   context.subscriptions.push(output);
-  context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.preview, () => enqueue(() => previewDocs(context))));
-  context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.browser, () => enqueue(() => openDocsInBrowser(context))));
-  context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.restart, () => enqueue(() => restartDocsPreviewServer(context))));
-  context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.stop, () => enqueue(() => stopDocsPreviewServer(true))));
+  context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.preview, () => previewDocs(context)));
+  context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.restart, () => restartDocsPreviewServer(context)));
+  context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.stop, () => stopDocsPreviewServer(true)));
+  context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.lock, () => setActivePreviewLocked(true)));
+  context.subscriptions.push(vscode.commands.registerCommand(COMMANDS.unlock, () => setActivePreviewLocked(false)));
+  if (context.extensionMode !== vscode.ExtensionMode.Production) {
+    context.subscriptions.push(vscode.commands.registerCommand('microwebstacks.internal.testSessionSnapshots', getSessionSnapshots));
+    context.subscriptions.push(vscode.commands.registerCommand('microwebstacks.internal.testDisposePanel', disposeTestPanel));
+  }
+  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor((editor) => followActiveEditor(editor)));
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => handleConfigurationChange(event)));
+  context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders((event) => {
+    for (const folder of event.removed) {
+      const session = sessions.get(folder.uri.toString());
+      if (session) {
+        enqueueSession(session, () => disposeSession(session));
+      }
+    }
+  }));
+  return undefined;
 }
 
-function deactivate() {
-  return stopDocsPreviewServer(false);
+async function deactivate() {
+  const active = [...sessions.values()];
+  await Promise.all(active.map((session) => enqueueSession(session, () => disposeSession(session))));
+  killActiveChildren();
+  extensionContext = null;
 }
 
-function enqueue(task) {
-  operation = operation.then(task, task);
-  return operation;
+function enqueueSession(session, task) {
+  session.operation = session.operation.then(task, task);
+  return session.operation;
 }
 
 function log(message) {
@@ -261,15 +277,78 @@ function showOutput() {
   output.show(true);
 }
 
-function getWorkspaceFolder() {
+function activeSupportedWorkspaceFolder() {
   const activeUri = vscode.window.activeTextEditor?.document?.uri;
-  if (activeUri) {
+  if (activeUri && path.extname(activeUri.fsPath).toLowerCase() === '.md') {
     const folder = vscode.workspace.getWorkspaceFolder(activeUri);
     if (folder) {
       return folder;
     }
   }
-  return vscode.workspace.workspaceFolders?.[0] ?? null;
+  return null;
+}
+
+async function selectWorkspaceFolder() {
+  const active = activeSupportedWorkspaceFolder();
+  if (active) {
+    return active;
+  }
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  if (folders.length === 1) {
+    return folders[0];
+  }
+  if (folders.length === 0) {
+    return null;
+  }
+  const picked = await vscode.window.showQuickPick(
+    folders.map((folder) => ({label: folder.name, description: folder.uri.fsPath, folder})),
+    {placeHolder: 'Select the workspace folder to preview'}
+  );
+  return picked?.folder ?? null;
+}
+
+function getOrCreateSession(workspaceFolder) {
+  const key = workspaceFolder.uri.toString();
+  let session = sessions.get(key);
+  if (!session) {
+    session = {
+      key,
+      workspaceFolder,
+      serverProcess: null,
+      state: null,
+      panel: null,
+      watcher: null,
+      refreshTimer: null,
+      operation: Promise.resolve(),
+      locked: false,
+      currentRoute: '/',
+      disposing: false,
+      configRestartQueued: false,
+      configSnapshot: configurationSnapshot(workspaceFolder)
+    };
+    sessions.set(key, session);
+  }
+  return session;
+}
+
+function getSessionSnapshots() {
+  return [...sessions.values()].map((session) => ({
+    key: session.key,
+    workspace: session.workspaceFolder.uri.fsPath,
+    serverRunning: Boolean(session.serverProcess),
+    panelOpen: Boolean(session.panel),
+    watcherOpen: Boolean(session.watcher),
+    locked: session.locked,
+    currentRoute: session.currentRoute,
+    port: session.state?.port ?? null,
+    docsRoot: session.state?.docsRoot ?? null,
+    storageRoot: session.state?.storageRoot ?? null
+  }));
+}
+
+function disposeTestPanel(workspacePath) {
+  const session = [...sessions.values()].find((candidate) => candidate.workspaceFolder.uri.fsPath === workspacePath);
+  session?.panel?.dispose();
 }
 
 function exists(filePath) {
@@ -1001,8 +1080,8 @@ async function hydrateBundledEngine(context) {
 // Resolves the engine root. The local workspace checkout remains the guaranteed
 // dev fallback, and installed VSIX builds can hydrate a bundled engine before
 // trying any registry install path.
-async function resolveEngine(context) {
-  const config = vscode.workspace.getConfiguration('microwebstacks.preview');
+async function resolveEngine(context, workspaceFolder) {
+  const config = vscode.workspace.getConfiguration('microwebstacks.preview', workspaceFolder.uri);
   const source = config.get('engineSource') || 'auto';
 
   const configured = config.get('enginePath');
@@ -1050,8 +1129,8 @@ async function resolveEngine(context) {
   throw new Error(`Engine ${ENGINE_PACKAGE}@${ENGINE_VERSION} was installed but could not be located at ${installed}.`);
 }
 
-function resolveDocsRoot(workspaceRoot, manifestPath) {
-  const configured = vscode.workspace.getConfiguration('microwebstacks.preview').get('docsRoot');
+function resolveDocsRoot(workspaceRoot, manifestPath, workspaceFolder) {
+  const configured = vscode.workspace.getConfiguration('microwebstacks.preview', workspaceFolder.uri).get('docsRoot');
   if (configured) {
     return {
       path: path.isAbsolute(configured) ? configured : path.join(workspaceRoot, configured),
@@ -1074,17 +1153,22 @@ function workspaceKey(workspaceFolder) {
   return crypto.createHash('sha256').update(workspaceFolder.uri.toString()).digest('hex').slice(0, 16);
 }
 
-async function buildRuntime(context) {
-  const workspaceFolder = getWorkspaceFolder();
-  if (!workspaceFolder) {
-    throw new Error('Open a workspace folder before starting the docs preview.');
-  }
+function configurationSnapshot(workspaceFolder) {
+  const config = vscode.workspace.getConfiguration('microwebstacks.preview', workspaceFolder.uri);
+  return JSON.stringify({
+    engineSource: config.get('engineSource') || 'auto',
+    enginePath: config.get('enginePath') || '',
+    docsRoot: config.get('docsRoot') || '',
+    krokiServer: config.get('krokiServer') || ''
+  });
+}
 
-  const engine = await resolveEngine(context);
+async function buildRuntime(context, workspaceFolder) {
+  const engine = await resolveEngine(context, workspaceFolder);
   const engineRoot = engine.root;
   const workspaceRoot = workspaceFolder.uri.fsPath;
   const manifestPath = path.join(workspaceRoot, 'manifest.yaml');
-  const docsRoot = resolveDocsRoot(workspaceRoot, manifestPath);
+  const docsRoot = resolveDocsRoot(workspaceRoot, manifestPath, workspaceFolder);
   if (!context.storageUri) {
     throw new Error('VS Code did not provide workspace-scoped extension storage for this window.');
   }
@@ -1137,7 +1221,7 @@ async function getFreePort() {
 }
 
 function createRuntimeEnv(runtime, port) {
-  const krokiServer = (vscode.workspace.getConfiguration('microwebstacks.preview').get('krokiServer') || '').trim();
+  const krokiServer = (vscode.workspace.getConfiguration('microwebstacks.preview', runtime.workspaceFolder.uri).get('krokiServer') || '').trim();
   return minimalChildEnv({
     ...(krokiServer ? {MICROWEBSTACKS_KROKI_SERVER: krokiServer} : {}),
     // The previewed workspace's .env must not clobber this explicit runtime
@@ -1180,7 +1264,7 @@ async function touchStamps(state, {tree}) {
   }
 }
 
-async function startServer(runtime, port, env) {
+async function startServer(session, runtime, port, env) {
   const runner = await resolveNodeRunner(runtime);
   log(`Starting preview server on http://127.0.0.1:${port}/`);
   log(`Node runtime: ${runner.execPath}`);
@@ -1189,22 +1273,23 @@ async function startServer(runtime, port, env) {
     env: {...env, ...runner.extraEnv}
   });
   child.on('exit', (code, signal) => {
-    if (serverProcess === child) {
+    if (session.serverProcess === child) {
       log(`Preview server exited (code: ${code}, signal: ${signal}).`);
-      serverProcess = null;
-      serverState = null;
+      session.serverProcess = null;
+      session.state = null;
+      enqueueSession(session, () => disposeSession(session));
     }
   });
-  serverProcess = child;
+  session.serverProcess = child;
 }
 
-async function waitForServer(url, {timeoutMs = 120000, progress} = {}) {
+async function waitForServer(session, url, {timeoutMs = 120000, progress} = {}) {
   const startedAt = Date.now();
   const deadline = startedAt + timeoutMs;
   let lastError = null;
   let lastReportedAt = 0;
   while (Date.now() < deadline) {
-    if (!serverProcess) {
+    if (!session.serverProcess) {
       throw new Error('Preview server exited before it became reachable. Check the MicroWebStacks Docs output channel.');
     }
     try {
@@ -1269,51 +1354,79 @@ function requestUrl(url, timeoutMs = 2000) {
   });
 }
 
-async function ensureServer(context) {
-  if (serverProcess && serverState) {
-    return serverState;
+function requestJson(url, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const request = http.get(url, (response) => {
+      let body = '';
+      response.setEncoding('utf8');
+      response.on('data', (chunk) => { body += chunk; });
+      response.on('end', () => {
+        if ((response.statusCode ?? 500) >= 400) {
+          reject(new Error(`HTTP ${response.statusCode} from ${url}`));
+          return;
+        }
+        try {
+          resolve(JSON.parse(body));
+        } catch (error) {
+          reject(new Error(`Invalid JSON from ${url}: ${error.message}`));
+        }
+      });
+    });
+    request.setTimeout(timeoutMs, () => request.destroy(new Error('request timed out')));
+    request.on('error', reject);
+  });
+}
+
+async function ensureServer(context, session) {
+  if (session.serverProcess && session.state) {
+    return session.state;
   }
   return vscode.window.withProgress(
     {location: vscode.ProgressLocation.Notification, title: 'MicroWebStacks Docs'},
     async (progress) => {
       progress.report({message: 'resolving engine (first run may hydrate the bundled engine or download the pinned fallback)…'});
-      const runtime = await buildRuntime(context);
+      const runtime = await buildRuntime(context, session.workspaceFolder);
       const port = await getFreePort();
       const env = createRuntimeEnv(runtime, port);
       progress.report({message: 'starting preview server…'});
       const startedAt = Date.now();
       // No upfront indexing: the lazy backend walks the tree and parses pages
       // on demand. Startup cost is server boot + one page, not the whole site.
-      await startServer(runtime, port, env);
+      await startServer(session, runtime, port, env);
       const browserUrl = `http://127.0.0.1:${port}/`;
       // Readiness means "the server answers HTTP", probed on a cheap
       // middleware endpoint. Never gate startup on rendering `/`: on a large
       // cold workspace that first render exceeds any reasonable probe budget
       // (this failed as a hard timeout on big first runs).
-      await waitForServer(`${browserUrl}__lite/runtime`, {progress});
+      await waitForServer(session, `${browserUrl}__lite/runtime`, {progress});
+      const runtimePayload = await requestJson(`${browserUrl}__lite/runtime`);
+      if (typeof runtimePayload.docsRoot === 'string' && runtimePayload.docsRoot) {
+        runtime.docsRoot = path.resolve(runtimePayload.docsRoot);
+      }
       log(`Preview server reachable in ${Date.now() - startedAt} ms (pages parse on demand).`);
       progress.report({message: 'rendering first page…'});
       await warmFirstPage(browserUrl);
-      serverState = {
+      session.state = {
         ...runtime,
         port,
         browserUrl,
         webviewUrl: `http://localhost:${port}/`,
         env
       };
-      ensureWatcher(context, serverState);
-      return serverState;
+      session.configSnapshot = configurationSnapshot(session.workspaceFolder);
+      ensureWatcher(session, session.state);
+      return session.state;
     }
   );
 }
 
-function ensureWatcher(context, state) {
-  if (fileWatcher) {
-    fileWatcher.dispose();
-    fileWatcher = null;
+function ensureWatcher(session, state) {
+  if (session.watcher) {
+    session.watcher.dispose();
+    session.watcher = null;
   }
   const pattern = new vscode.RelativePattern(state.docsRoot, '**/*');
-  fileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
+  session.watcher = vscode.workspace.createFileSystemWatcher(pattern);
   // The server stays alive across all workspace changes (lazy flow). Content
   // edits only bump reload.stamp: open pages reload themselves and the lazy
   // backend re-parses just the requested page when its content hash moved.
@@ -1326,8 +1439,8 @@ function ensureWatcher(context, state) {
       return;
     }
     pendingTreeChange = pendingTreeChange || isTreeEvent;
-    clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(() => {
+    clearTimeout(session.refreshTimer);
+    session.refreshTimer = setTimeout(() => {
       const treeChanged = pendingTreeChange;
       pendingTreeChange = false;
       const startedAt = Date.now();
@@ -1340,58 +1453,91 @@ function ensureWatcher(context, state) {
         });
     }, 300);
   };
-  fileWatcher.onDidCreate((uri) => onChange(uri, true));
-  fileWatcher.onDidChange((uri) => onChange(uri, false));
-  fileWatcher.onDidDelete((uri) => onChange(uri, true));
-  context.subscriptions.push(fileWatcher);
+  session.watcher.onDidCreate((uri) => onChange(uri, true));
+  session.watcher.onDidChange((uri) => onChange(uri, false));
+  session.watcher.onDidDelete((uri) => onChange(uri, true));
 }
 
 async function previewDocs(context) {
-  try {
-    const state = await ensureServer(context);
-    openPreviewPanel(context, state);
-  } catch (error) {
-    log(error.stack || error.message);
-    showOutput();
-    vscode.window.showErrorMessage(error.message);
+  const workspaceFolder = await selectWorkspaceFolder();
+  if (!workspaceFolder) {
+    if (!(vscode.workspace.workspaceFolders?.length)) {
+      vscode.window.showErrorMessage('Open a workspace folder before starting the docs preview.');
+    }
+    return;
   }
+  const session = getOrCreateSession(workspaceFolder);
+  return enqueueSession(session, async () => {
+    try {
+      const state = await ensureServer(context, session);
+      const route = await routeForUri(session, vscode.window.activeTextEditor?.document?.uri, {fallback: '/'});
+      openPreviewPanel(context, session, state, route);
+    } catch (error) {
+      handlePreviewError(error);
+      await disposeSession(session);
+    }
+  });
 }
 
-async function openDocsInBrowser(context) {
+function handlePreviewError(error) {
+  log(error.stack || error.message);
+  showOutput();
+  vscode.window.showErrorMessage(error.message);
+}
+
+function relativeMarkdownPath(state, uri) {
+  if (!uri || uri.scheme !== 'file' || path.extname(uri.fsPath).toLowerCase() !== '.md') {
+    return null;
+  }
+  const relative = path.relative(state.docsRoot, uri.fsPath);
+  if (!relative || path.isAbsolute(relative) || relative === '..' || relative.startsWith(`..${path.sep}`)) {
+    return null;
+  }
+  return relative.split(path.sep).join('/');
+}
+
+async function routeForUri(session, uri, {fallback = null} = {}) {
+  if (!session.state) {
+    return fallback;
+  }
+  const relative = relativeMarkdownPath(session.state, uri);
+  if (!relative) {
+    return fallback;
+  }
   try {
-    const state = await ensureServer(context);
-    await vscode.env.openExternal(vscode.Uri.parse(state.browserUrl));
+    const payload = await requestJson(
+      `${session.state.browserUrl}__lite/source-route?path=${encodeURIComponent(relative)}`
+    );
+    return payload.found && typeof payload.route === 'string' ? payload.route : fallback;
   } catch (error) {
-    log(error.stack || error.message);
-    showOutput();
-    vscode.window.showErrorMessage(error.message);
+    log(`Could not resolve preview route for ${relative}: ${error.message}`);
+    return fallback;
   }
 }
 
 async function restartDocsPreviewServer(context) {
-  try {
-    await stopDocsPreviewServer(false);
-    const state = await ensureServer(context);
-    updatePreviewPanel(state);
-    vscode.window.showInformationMessage('MicroWebStacks docs preview server restarted.');
-  } catch (error) {
-    log(error.stack || error.message);
-    showOutput();
-    vscode.window.showErrorMessage(error.message);
+  const workspaceFolder = await selectWorkspaceFolder();
+  if (!workspaceFolder) {
+    return;
   }
+  const session = sessions.get(workspaceFolder.uri.toString());
+  if (!session?.panel) {
+    vscode.window.showInformationMessage('Open a Markdown Site Preview before restarting its server.');
+    return;
+  }
+  return enqueueSession(session, () => restartSession(context, session, {notify: true}));
 }
 
 async function stopDocsPreviewServer(showMessage) {
-  clearTimeout(refreshTimer);
-  refreshTimer = null;
-  if (fileWatcher) {
-    fileWatcher.dispose();
-    fileWatcher = null;
+  const workspaceFolder = await selectWorkspaceFolder();
+  if (!workspaceFolder) {
+    return;
   }
-  const hadServer = Boolean(serverProcess);
-  serverProcess = null;
-  serverState = null;
-  killActiveChildren();
+  const session = sessions.get(workspaceFolder.uri.toString());
+  const hadServer = Boolean(session?.serverProcess);
+  if (session) {
+    await enqueueSession(session, () => disposeSession(session));
+  }
   if (hadServer) {
     log('Stopped preview server.');
   }
@@ -1400,15 +1546,63 @@ async function stopDocsPreviewServer(showMessage) {
   }
 }
 
-function openPreviewPanel(context, state) {
-  if (previewPanel) {
-    previewPanel.reveal(vscode.ViewColumn.Beside);
-    updatePreviewPanel(state);
+async function stopSessionRuntime(session) {
+  clearTimeout(session.refreshTimer);
+  session.refreshTimer = null;
+  session.watcher?.dispose();
+  session.watcher = null;
+  const child = session.serverProcess;
+  session.serverProcess = null;
+  session.state = null;
+  if (child) {
+    activeChildren.delete(child);
+    child.kill();
+  }
+}
+
+async function disposeSession(session) {
+  if (session.disposing) {
     return;
   }
-  previewPanel = vscode.window.createWebviewPanel(
+  session.disposing = true;
+  const panel = session.panel;
+  session.panel = null;
+  if (panel) {
+    panel.dispose();
+  }
+  await stopSessionRuntime(session);
+  sessions.delete(session.key);
+  session.disposing = false;
+  updateLockContext();
+}
+
+async function restartSession(context, session, {notify = false} = {}) {
+  try {
+    await stopSessionRuntime(session);
+    const state = await ensureServer(context, session);
+    updatePreviewPanel(session, state, session.currentRoute);
+    if (notify) {
+      vscode.window.showInformationMessage('MicroWebStacks docs preview server restarted.');
+    }
+    return true;
+  } catch (error) {
+    handlePreviewError(error);
+    await disposeSession(session);
+    return false;
+  }
+}
+
+function openPreviewPanel(context, session, state, route) {
+  if (session.panel) {
+    session.panel.reveal(vscode.ViewColumn.Beside);
+    updatePreviewPanel(session, state, route);
+    updateLockContext();
+    return;
+  }
+  session.locked = false;
+  session.panel = vscode.window.createWebviewPanel(
     'microwebstacksDocsPreview',
-    'MicroWebStacks Docs',
+    `Markdown Site Preview: ${session.workspaceFolder.name}`,
     vscode.ViewColumn.Beside,
     {
       enableScripts: true,
@@ -1416,17 +1610,114 @@ function openPreviewPanel(context, state) {
       portMapping: [{webviewPort: state.port, extensionHostPort: state.port}]
     }
   );
-  previewPanel.onDidDispose(() => {
-    previewPanel = null;
+  session.panel.onDidDispose(() => {
+    session.panel = null;
+    if (!session.disposing) {
+      enqueueSession(session, () => disposeSession(session));
+    }
   }, null, context.subscriptions);
-  updatePreviewPanel(state);
+  session.panel.onDidChangeViewState(() => {
+    updateLockContext();
+  }, null, context.subscriptions);
+  updatePreviewPanel(session, state, route);
+  updateLockContext();
 }
 
-function updatePreviewPanel(state) {
-  if (!previewPanel) {
+function updatePreviewPanel(session, state, route = session.currentRoute) {
+  if (!session.panel || !state) {
     return;
   }
-  previewPanel.webview.html = renderWebviewHtml(state.webviewUrl, state.port, previewPanel.webview.cspSource);
+  const normalizedRoute = typeof route === 'string' && route.startsWith('/') ? route : '/';
+  session.currentRoute = normalizedRoute;
+  updatePreviewPanelTitle(session);
+  session.panel.webview.options = {
+    ...session.panel.webview.options,
+    enableScripts: true,
+    portMapping: [{webviewPort: state.port, extensionHostPort: state.port}]
+  };
+  const targetUrl = new URL(normalizedRoute.replace(/^\//, ''), state.webviewUrl).toString();
+  session.panel.webview.html = renderWebviewHtml(targetUrl, state.port, session.panel.webview.cspSource);
+}
+
+function updatePreviewPanelTitle(session) {
+  if (session.panel) {
+    session.panel.title = `Markdown Site Preview: ${session.workspaceFolder.name}`;
+  }
+}
+
+async function followActiveEditor(editor) {
+  if (!editor || path.extname(editor.document.uri.fsPath).toLowerCase() !== '.md') {
+    return;
+  }
+  const folder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+  const session = folder ? sessions.get(folder.uri.toString()) : null;
+  if (!session?.panel || session.locked) {
+    return;
+  }
+  await enqueueSession(session, async () => {
+    const route = await routeForUri(session, editor.document.uri);
+    if (route && route !== session.currentRoute) {
+      updatePreviewPanel(session, session.state, route);
+    }
+  });
+}
+
+function activePreviewSession() {
+  return [...sessions.values()].find((session) => session.panel?.active)
+    ?? [...sessions.values()].find((session) => session.panel?.visible)
+    ?? (() => {
+      const folder = activeSupportedWorkspaceFolder();
+      return folder ? sessions.get(folder.uri.toString()) : null;
+    })()
+    ?? null;
+}
+
+async function setActivePreviewLocked(locked) {
+  const session = activePreviewSession();
+  if (!session?.panel) {
+    return;
+  }
+  session.locked = locked;
+  updatePreviewPanelTitle(session);
+  updateLockContext();
+  if (!locked) {
+    await followActiveEditor(vscode.window.activeTextEditor);
+  }
+}
+
+function updateLockContext() {
+  const session = activePreviewSession();
+  vscode.commands.executeCommand('setContext', 'microwebstacks.previewLocked', Boolean(session?.locked));
+}
+
+function handleConfigurationChange(event) {
+  if (!event.affectsConfiguration('microwebstacks.preview')) {
+    return;
+  }
+  for (const session of sessions.values()) {
+    if (!event.affectsConfiguration('microwebstacks.preview', session.workspaceFolder.uri)) {
+      continue;
+    }
+    const next = configurationSnapshot(session.workspaceFolder);
+    if (next === session.configSnapshot) {
+      continue;
+    }
+    session.configSnapshot = next;
+    if (session.configRestartQueued) {
+      continue;
+    }
+    session.configRestartQueued = true;
+    enqueueSession(session, async () => {
+      try {
+        const restarted = await restartSession(extensionContext, session);
+        if (restarted) {
+          vscode.window.showInformationMessage(`Markdown Site Preview restarted for ${session.workspaceFolder.name} after a configuration change.`);
+        }
+      } finally {
+        session.configRestartQueued = false;
+      }
+    });
+  }
 }
 
 function renderWebviewHtml(url, port, cspSource) {
@@ -1474,10 +1765,9 @@ module.exports = {
 // engine extraction/activation internals so a harness can exercise AD-003's
 // failure scenarios (bad manifest, digest mismatch, corrupt tar, missing
 // runtime files, wrong version, missing vendored deps, failure cleanup)
-// directly, without a real VS Code host. Never set in a real activated
-// extension - opt-in only, and does not change activate()/deactivate().
-if (process.env.MWS_TEST_INTERNALS === '1') {
-  module.exports.__testInternals = {
+// directly, without a separate transport. It is an internal diagnostic API;
+// no command or webview surface exposes it to rendered content.
+module.exports.__testInternals = {
     hasBundledEnginePackage,
     hydrateBundledEngine,
     installEngine,
@@ -1492,6 +1782,7 @@ if (process.env.MWS_TEST_INTERNALS === '1') {
     getEnginePrefix,
     getBundledEnginePrefix,
     getInstalledEngineRoot,
-    getBundledInstalledEngineRoot
+    getBundledInstalledEngineRoot,
+    getSessionSnapshots,
+    disposePanel: disposeTestPanel
   };
-}

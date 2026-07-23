@@ -205,4 +205,4 @@ function buildSectionMenuFromSourceEntries(sourceEntries, pathname, base = '/', 
     return roots;
 }
 
-export {buildSectionMenuFromSourceEntries, firstDocumentUrl};
+export {buildDocLink, buildSectionMenuFromSourceEntries, firstDocumentUrl};

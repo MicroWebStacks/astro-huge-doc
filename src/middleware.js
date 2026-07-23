@@ -4,7 +4,7 @@ import {basename, join} from 'node:path';
 import {config} from '../config.js';
 import {file_mime} from './libs/utils.js';
 import {resolveBlobsSourceDir} from './libs/blob-files.js';
-import {extensionPreviewEnabled, navigationPayload, runtimePayload, statsPayload, versionPayload, indexStatusPayload, indexControlPayload} from './libs/extension-preview.js';
+import {extensionPreviewEnabled, navigationPayload, sourceRoutePayload, runtimePayload, statsPayload, versionPayload, indexStatusPayload, indexControlPayload} from './libs/extension-preview.js';
 
 const blobsDir = resolveBlobsSourceDir(config);
 
@@ -50,6 +50,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
         }
         if (pathname === '/__lite/navigation') {
             return jsonResponse(await navigationPayload(url.searchParams.get('pathname') ?? '/'));
+        }
+        if (pathname === '/__lite/source-route') {
+            return jsonResponse(await sourceRoutePayload(url.searchParams.get('path')));
         }
         if (pathname === '/__lite/runtime') {
             return jsonResponse(runtimePayload({dev: import.meta.env.DEV}));

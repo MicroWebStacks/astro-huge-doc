@@ -47,7 +47,8 @@ run it locally (see below) and even your diagrams stay home.
 
 1. Open a folder that contains your Markdown documentation.
 2. Run **Markdown Site Preview: Open Preview** from the Command Palette (`Ctrl+Shift+P`).
-3. Browse the rendered docs. Use **Markdown Site Preview: Open in Browser** to view them in your external browser.
+3. Browse in the VS Code panel. The preview follows active `.md` files; use
+   the panel-toolbar lock icon to keep the current page fixed.
 
 The workspace folder is the documentation root by default. Other commands:
 **Markdown Site Preview: Restart Server** and **Markdown Site Preview: Stop Server**.
@@ -61,7 +62,8 @@ The workspace folder is the documentation root by default. Other commands:
 
 Mermaid and PlantUML render client-side with zero external setup. BlockDiag and
 explicitly Kroki-routed languages need a reachable server at the configured
-URL. After changing a setting, run **Markdown Site Preview: Restart Server**.
+URL. Relevant setting changes automatically restart only the affected live
+workspace preview. The manual restart command remains available when needed.
 
 PlantUML can be routed back to Kroki in `manifest.yaml` for content that relies
 on unsupported local includes or optional sprite bundles:
