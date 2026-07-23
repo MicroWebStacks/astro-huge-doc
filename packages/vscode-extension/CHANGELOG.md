@@ -1,14 +1,22 @@
 # Changelog
 
-## Unreleased
+## 0.0.23 - 2026-07-23
 
 - Preview now opens the rendered route for the active `.md` file, follows
   supported editor changes, and can be locked from the preview-panel toolbar.
+- Fixed the preview lock/unlock action not appearing in the panel title
+  toolbar, and stabilized its position with consistently prefixed labels.
+- Added preview-local Back and Forward arrows beside the breadcrumb. Their
+  per-workspace rendered-route history spans active-editor following and links
+  opened inside the preview without entering VS Code's source-editor history.
 - Preview servers, panels, watchers, and lifecycle operations are isolated per
   workspace folder, including scoped restarts after configuration changes.
 - Closing a preview panel now disposes its workspace preview session.
 - Removed the redundant **Markdown Site Preview: Open in Browser** command;
   preview is provided only in the embedded VS Code panel.
+- Mobile navigation drawers now close reliably after selecting a destination,
+  and starting the background link index no longer fails with HTTP 403
+  (engine 0.0.19).
 
 ## 0.0.22 - 2026-07-21
 

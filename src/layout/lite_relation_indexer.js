@@ -14,7 +14,11 @@ async function requestStatus() {
 }
 
 async function control(action) {
-    const response = await fetch(`/__lite/index-control?action=${encodeURIComponent(action)}`, {method: 'POST', cache: 'no-store'});
+    const response = await fetch(`/__lite/index-control?action=${encodeURIComponent(action)}`, {
+        method: 'POST',
+        cache: 'no-store',
+        headers: {'content-type': 'application/json'}
+    });
     if (!response.ok) throw new Error(`index ${action} returned ${response.status}`);
     return response.json();
 }

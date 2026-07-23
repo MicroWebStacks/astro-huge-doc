@@ -2,7 +2,7 @@
   "name": "markdown-site-preview",
   "displayName": "Markdown Site Preview",
   "description": "Browse your whole Markdown documentation like a website — Mermaid/PlantUML diagrams, tables, file tree and outline navigation.",
-  "version": "0.0.22",
+  "version": "0.0.23",
   "icon": "icon.png",
   "galleryBanner": {
     "color": "#1E1B4B",
@@ -19,7 +19,7 @@
     "site",
     "kroki"
   ],
-  "engineVersion": "0.0.18",
+  "engineVersion": "0.0.19",
   "publisher": "microwebstacks",
   "private": false,
   "license": "MIT",
@@ -57,12 +57,12 @@
       },
       {
         "command": "microwebstacks.internal.lockDocsPreview",
-        "title": "Lock Preview",
+        "title": "Preview Lock",
         "icon": "$(unlock)"
       },
       {
         "command": "microwebstacks.internal.unlockDocsPreview",
-        "title": "Unlock Preview",
+        "title": "Preview Unlock",
         "icon": "$(lock)"
       }
     ],
@@ -89,17 +89,15 @@
           "command": "microwebstacks.previewDocs",
           "when": "editorLangId == markdown",
           "group": "navigation"
-        }
-      ],
-      "webview/title": [
+        },
         {
           "command": "microwebstacks.internal.lockDocsPreview",
-          "when": "webviewId == microwebstacksDocsPreview && !microwebstacks.previewLocked",
+          "when": "activeWebviewPanelId == 'microwebstacksDocsPreview' && !microwebstacks.previewLocked",
           "group": "navigation"
         },
         {
           "command": "microwebstacks.internal.unlockDocsPreview",
-          "when": "webviewId == microwebstacksDocsPreview && microwebstacks.previewLocked",
+          "when": "activeWebviewPanelId == 'microwebstacksDocsPreview' && microwebstacks.previewLocked",
           "group": "navigation"
         }
       ]

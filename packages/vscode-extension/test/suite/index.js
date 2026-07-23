@@ -89,6 +89,26 @@ async function run() {
       assert.equal((await snapshots()).find((item) => item.workspace === oneRoot).currentRoute, '/guides/install');
       await vscode.commands.executeCommand('microwebstacks.internal.unlockDocsPreview');
       await waitFor(async () => (await snapshots()).find((item) => item.workspace === oneRoot && item.currentRoute === '/guides/setup'), 'unlock catch-up navigation');
+      await vscode.commands.executeCommand(
+        'microwebstacks.internal.testPreviewMessage',
+        oneRoot,
+        {type: 'microwebstacks.previewHistory', action: 'back'}
+      );
+      await waitFor(async () => (await snapshots()).find((item) => (
+        item.workspace === oneRoot
+        && item.currentRoute === '/guides/install'
+        && item.historyIndex === 1
+      )), 'preview-local history back');
+      await vscode.commands.executeCommand(
+        'microwebstacks.internal.testPreviewMessage',
+        oneRoot,
+        {type: 'microwebstacks.previewHistory', action: 'forward'}
+      );
+      await waitFor(async () => (await snapshots()).find((item) => (
+        item.workspace === oneRoot
+        && item.currentRoute === '/guides/setup'
+        && item.historyIndex === 2
+      )), 'preview-local history forward');
       await openFile('one/docs/component.mdx');
       await new Promise((resolve) => setTimeout(resolve, 300));
       assert.equal((await snapshots()).find((item) => item.workspace === oneRoot).currentRoute, '/guides/setup');

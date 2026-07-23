@@ -60,3 +60,16 @@ focused tests, production build, and CI runtime reporting are in place.
 - The unrelated broad Node suite remains partially blocked in this checkout
   by the pre-existing incomplete `glob` installation; focused tests and the
   production build complete successfully.
+
+## Post-closure correction — 2026-07-23
+
+- Corrected the lock/unlock title action contribution after runtime inspection
+  showed that VS Code did not render it. Webview panels use the
+  `editor/title` menu with the `activeWebviewPanelId` context key; the original
+  implementation incorrectly used `webview/title` with `webviewId`.
+- Added a manifest regression test that rejects the invalid menu location and
+  verifies both state-dependent actions target the
+  `microwebstacksDocsPreview` panel.
+- Renamed the mutually exclusive actions to `Preview Lock` and
+  `Preview Unlock`, giving them a shared sort prefix so toggling state does not
+  move the title-bar icon.

@@ -38,6 +38,8 @@ A menu with a single level renders no cluster.
   drawer may be open at a time.
 - A mobile drawer has a backdrop, can be dismissed by that backdrop or Escape,
   and returns focus to its trigger when dismissed.
+- Activating a link in either mobile drawer closes the drawer before navigation
+  and persists the closed state so the destination page is not obscured.
 - Closed mobile drawers must not consume document space or create horizontal
   overflow.
 - App-bar navigation controls provide at least a 44 by 44 CSS-pixel target on

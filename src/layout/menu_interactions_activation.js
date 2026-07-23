@@ -3,7 +3,7 @@
 // aria-expanded so the icon styling and the persisted preference stay in sync.
 function configure_toggle(btn, nav_el, storageKey, options = {}){
     if(!btn || !nav_el){ return; }
-    const scopedStorageKey = `${nav_el.getAttribute("data-state-key") || "microwebstacks:default"}:${storageKey}:open`;
+    const scopedStorageKey = toggle_storage_key(nav_el, storageKey);
 
     function notify_visibility(open){
         nav_el.dispatchEvent(new CustomEvent("microwebstacks:nav-visibility", {
@@ -40,6 +40,10 @@ function configure_toggle(btn, nav_el, storageKey, options = {}){
         localStorage.setItem(scopedStorageKey, open ? "true" : "false");
         e.preventDefault();
     });
+}
+
+function toggle_storage_key(nav_el, storageKey){
+    return `${nav_el.getAttribute("data-state-key") || "microwebstacks:default"}:${storageKey}:open`;
 }
 
 // The thin handles between nav and content keep only the drag-to-resize role.
@@ -115,14 +119,15 @@ function menu_interactions_activation(){
 
     function closeMobileMenus({restoreFocus = false} = {}){
         if(!mobileQuery.matches){ return; }
-        for(const [button, nav, wrapper] of [
-            [leftButton, mobile_pages_nav, document.getElementById('mobile-nav')],
-            [rightButton, toc_nav, document.getElementById('toc-nav-div')]
+        for(const [button, nav, wrapper, storageKey] of [
+            [leftButton, mobile_pages_nav, document.getElementById('mobile-nav'), 'mobile_left_open'],
+            [rightButton, toc_nav, document.getElementById('toc-nav-div'), 'mobile_right_open']
         ]){
             if(nav){
                 nav.classList.remove('open')
                 nav.classList.add('closed')
                 nav.style.width = '0px'
+                localStorage.setItem(toggle_storage_key(nav, storageKey), 'false')
                 nav.dispatchEvent(new CustomEvent('microwebstacks:nav-visibility', {detail:{open:false}}))
             }
             button?.setAttribute('aria-expanded', 'false')
@@ -156,6 +161,16 @@ function menu_interactions_activation(){
             onApply: mobileApply(document.getElementById('toc-nav-div'), leftButton, mobile_pages_nav, document.getElementById('mobile-nav'))
         })
         backdrop?.addEventListener('click', ()=>closeMobileMenus({restoreFocus:true}))
+        for(const nav of [mobile_pages_nav, toc_nav]){
+            // Delegate from the nav so links added by lazy navigation receive
+            // the same close behavior as server-rendered links.
+            nav?.addEventListener('click', (event)=>{
+                const link = event.target.closest?.('a[href]')
+                if(link && nav.contains(link)){
+                    closeMobileMenus()
+                }
+            })
+        }
         document.addEventListener('keydown', (event)=>{
             if(event.key === 'Escape' && document.body.classList.contains('mobile-nav-open')){
                 closeMobileMenus({restoreFocus:true})

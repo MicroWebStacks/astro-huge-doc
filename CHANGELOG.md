@@ -3,6 +3,27 @@
 Release notes for the `@microwebstacks/md-render` npm package. The VS Code
 extension has a separate changelog at `packages/vscode-extension/CHANGELOG.md`.
 
+## 0.0.19 - 2026-07-23
+
+### Added
+
+- Added a canonical source-route endpoint for extension previews so active
+  Markdown editors can be resolved to their rendered routes.
+- Added preview-local Back and Forward controls to the breadcrumb band. The
+  controls retain rendered-route history across editor-follow navigation and
+  are available on the Home route so forward history remains reachable.
+
+### Changed
+
+- Mobile Pages and On this page drawers now close after navigation, including
+  links added by lazy menu loading, and persist their closed state before the
+  destination loads.
+
+### Fixed
+
+- Fixed link-index start requests being rejected with HTTP 403 by sending the
+  JSON content type required by Astro's origin-check middleware.
+
 ## 0.0.18 - 2026-07-21
 
 ### Added

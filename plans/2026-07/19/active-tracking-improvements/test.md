@@ -126,3 +126,30 @@ named per-OS artifact. The first Ubuntu baseline awaits the first CI run.
 The broad root `pnpm test` attempt remains partially blocked by the previously
 documented incomplete local `glob` package (`index.js` absent) in tests that
 import the live collector. Focused product assertions and the build pass.
+
+## Post-closure lock-toolbar correction — 2026-07-23
+
+Runtime screenshot inspection showed that the declared lock/unlock actions
+were absent from both the preview title bar and its overflow menu. Inspection
+of VS Code 1.129.1's built-in Markdown extension confirmed that webview-panel
+title actions use `menus.editor/title` gated by `activeWebviewPanelId`.
+
+```text
+node --test test/vscode-extension-manifest.test.js
+```
+
+Result: PASS — 3/3 tests. The new regression test verifies that no
+`webview/title` menu remains and that both lock states attach to
+`activeWebviewPanelId == 'microwebstacksDocsPreview'`. It also verifies the
+shared `Preview ` label prefix used to keep the mutually exclusive action in a
+stable sort position.
+
+```text
+corepack.cmd pnpm test:extension
+```
+
+Result: BLOCKED before the extension host started — this checkout currently
+lacks `@vscode/test-electron` in `node_modules`. No dependency installation was
+performed. The previously recorded extension-host suite already covers the
+lock/unlock command behavior; this correction changes only the manifest menu
+attachment.

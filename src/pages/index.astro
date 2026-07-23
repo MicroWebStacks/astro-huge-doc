@@ -2,6 +2,7 @@
 import Layout from "@/layout/Layout.astro"
 import AstroMarkdown from '@/components/markdown/AstroMarkdown.astro'
 import FrontmatterPanel from '@/components/markdown/FrontmatterPanel.astro'
+import Breadcrumb from '@/layout/Breadcrumb.astro'
 import RelationsFooter from '@/layout/RelationsFooter.astro'
 import {getEntry} from '@/libs/structure-db.js'
 
@@ -15,6 +16,7 @@ if(!found){
     {found&&
         <>
             <div class="page-chrome">
+                <Breadcrumb data={data} />
                 <FrontmatterPanel data={data} />
             </div>
             {/* Wrapper keeps markdown blocks in one flow-root: the layout's

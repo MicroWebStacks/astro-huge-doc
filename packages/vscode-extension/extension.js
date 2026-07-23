@@ -9,6 +9,13 @@ const net = require('net');
 const path = require('path');
 const zlib = require('zlib');
 const extensionPackage = require('./package.json');
+const {
+  movePreviewHistory,
+  normalizePreviewRoute,
+  previewHistoryState,
+  recordPreviewRoute
+} = require('./preview-history');
+const {renderWebviewHtml} = require('./preview-webview');
 
 const COMMANDS = {
   preview: 'microwebstacks.previewDocs',
@@ -243,6 +250,10 @@ function activate(context) {
   if (context.extensionMode !== vscode.ExtensionMode.Production) {
     context.subscriptions.push(vscode.commands.registerCommand('microwebstacks.internal.testSessionSnapshots', getSessionSnapshots));
     context.subscriptions.push(vscode.commands.registerCommand('microwebstacks.internal.testDisposePanel', disposeTestPanel));
+    context.subscriptions.push(vscode.commands.registerCommand(
+      'microwebstacks.internal.testPreviewMessage',
+      dispatchTestPreviewMessage
+    ));
   }
   context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor((editor) => followActiveEditor(editor)));
   context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => handleConfigurationChange(event)));
@@ -322,6 +333,8 @@ function getOrCreateSession(workspaceFolder) {
       operation: Promise.resolve(),
       locked: false,
       currentRoute: '/',
+      historyRoutes: [],
+      historyIndex: -1,
       disposing: false,
       configRestartQueued: false,
       configSnapshot: configurationSnapshot(workspaceFolder)
@@ -340,6 +353,8 @@ function getSessionSnapshots() {
     watcherOpen: Boolean(session.watcher),
     locked: session.locked,
     currentRoute: session.currentRoute,
+    historyRoutes: [...session.historyRoutes],
+    historyIndex: session.historyIndex,
     port: session.state?.port ?? null,
     docsRoot: session.state?.docsRoot ?? null,
     storageRoot: session.state?.storageRoot ?? null
@@ -349,6 +364,11 @@ function getSessionSnapshots() {
 function disposeTestPanel(workspacePath) {
   const session = [...sessions.values()].find((candidate) => candidate.workspaceFolder.uri.fsPath === workspacePath);
   session?.panel?.dispose();
+}
+
+function dispatchTestPreviewMessage(workspacePath, message) {
+  const session = [...sessions.values()].find((candidate) => candidate.workspaceFolder.uri.fsPath === workspacePath);
+  return session ? enqueueSession(session, () => handlePreviewMessage(session, message)) : undefined;
 }
 
 function exists(filePath) {
@@ -1619,16 +1639,23 @@ function openPreviewPanel(context, session, state, route) {
   session.panel.onDidChangeViewState(() => {
     updateLockContext();
   }, null, context.subscriptions);
+  session.panel.webview.onDidReceiveMessage((message) => {
+    enqueueSession(session, () => handlePreviewMessage(session, message));
+  }, null, context.subscriptions);
   updatePreviewPanel(session, state, route);
   updateLockContext();
 }
 
-function updatePreviewPanel(session, state, route = session.currentRoute) {
+function updatePreviewPanel(session, state, route = session.currentRoute, {recordHistory = true} = {}) {
   if (!session.panel || !state) {
     return;
   }
-  const normalizedRoute = typeof route === 'string' && route.startsWith('/') ? route : '/';
-  session.currentRoute = normalizedRoute;
+  const normalizedRoute = normalizePreviewRoute(route) ?? '/';
+  if (recordHistory) {
+    recordPreviewRoute(session, normalizedRoute);
+  } else {
+    session.currentRoute = normalizedRoute;
+  }
   updatePreviewPanelTitle(session);
   session.panel.webview.options = {
     ...session.panel.webview.options,
@@ -1636,7 +1663,40 @@ function updatePreviewPanel(session, state, route = session.currentRoute) {
     portMapping: [{webviewPort: state.port, extensionHostPort: state.port}]
   };
   const targetUrl = new URL(normalizedRoute.replace(/^\//, ''), state.webviewUrl).toString();
-  session.panel.webview.html = renderWebviewHtml(targetUrl, state.port, session.panel.webview.cspSource);
+  session.panel.webview.html = renderWebviewHtml(
+    targetUrl,
+    state.port,
+    session.panel.webview.cspSource,
+    previewHistoryState(session)
+  );
+}
+
+function postPreviewHistoryState(session) {
+  session.panel?.webview.postMessage({
+    type: 'microwebstacks.previewHistoryState',
+    ...previewHistoryState(session)
+  });
+}
+
+function handlePreviewMessage(session, message) {
+  if (!session.panel || !session.state || !message || typeof message !== 'object') {
+    return;
+  }
+  if (message.type === 'microwebstacks.previewRoute') {
+    recordPreviewRoute(session, message.route);
+    postPreviewHistoryState(session);
+    return;
+  }
+  if (message.type !== 'microwebstacks.previewHistory'
+    || (message.action !== 'back' && message.action !== 'forward')) {
+    return;
+  }
+  const route = movePreviewHistory(session, message.action === 'back' ? -1 : 1);
+  if (route) {
+    updatePreviewPanel(session, session.state, route, {recordHistory: false});
+  } else {
+    postPreviewHistoryState(session);
+  }
 }
 
 function updatePreviewPanelTitle(session) {
@@ -1718,42 +1778,6 @@ function handleConfigurationChange(event) {
       }
     });
   }
-}
-
-function renderWebviewHtml(url, port, cspSource) {
-  const escapedUrl = escapeHtml(url);
-  const escapedCspSource = escapeHtml(cspSource);
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src http://localhost:${port} http://127.0.0.1:${port}; style-src 'unsafe-inline' ${escapedCspSource};">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MicroWebStacks Docs</title>
-  <style>
-    html, body, iframe {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      border: 0;
-      overflow: hidden;
-      background: var(--vscode-editor-background);
-    }
-  </style>
-</head>
-<body>
-  <iframe src="${escapedUrl}" title="Markdown Site Preview"></iframe>
-</body>
-</html>`;
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 module.exports = {
