@@ -1667,7 +1667,8 @@ function updatePreviewPanel(session, state, route = session.currentRoute, {recor
     targetUrl,
     state.port,
     session.panel.webview.cspSource,
-    previewHistoryState(session)
+    previewHistoryState(session),
+    session.locked
   );
 }
 
@@ -1678,13 +1679,24 @@ function postPreviewHistoryState(session) {
   });
 }
 
-function handlePreviewMessage(session, message) {
+function postPreviewLockState(session) {
+  session.panel?.webview.postMessage({
+    type: 'microwebstacks.previewLockState',
+    locked: Boolean(session.locked)
+  });
+}
+
+async function handlePreviewMessage(session, message) {
   if (!session.panel || !session.state || !message || typeof message !== 'object') {
     return;
   }
   if (message.type === 'microwebstacks.previewRoute') {
     recordPreviewRoute(session, message.route);
     postPreviewHistoryState(session);
+    return;
+  }
+  if (message.type === 'microwebstacks.previewLock') {
+    await applyPreviewLocked(session, Boolean(message.locked));
     return;
   }
   if (message.type !== 'microwebstacks.previewHistory'
@@ -1732,17 +1744,21 @@ function activePreviewSession() {
     ?? null;
 }
 
-async function setActivePreviewLocked(locked) {
-  const session = activePreviewSession();
+async function applyPreviewLocked(session, locked) {
   if (!session?.panel) {
     return;
   }
   session.locked = locked;
   updatePreviewPanelTitle(session);
   updateLockContext();
+  postPreviewLockState(session);
   if (!locked) {
     await followActiveEditor(vscode.window.activeTextEditor);
   }
+}
+
+async function setActivePreviewLocked(locked) {
+  await applyPreviewLocked(activePreviewSession(), locked);
 }
 
 function updateLockContext() {

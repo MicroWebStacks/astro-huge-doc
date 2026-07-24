@@ -1,6 +1,6 @@
 # OKF Support — Plan
 
-Status: Stages 1–3 implemented (see [implementation.md](implementation.md)); Stage 4 graph/beyond work remains
+Status: Stages 1–4 implemented (see [implementation.md](implementation.md)), closed 2026-07-24. Multi-bundle stays postponed per DD-7; no further "beyond" work is scoped.
 Inputs: [handoff.md](handoff.md) (product/spec handoff), [deep-research-report.md](deep-research-report.md) (ecosystem research)
 Scope: content parser (`packages/content-structure`), rendering engine (`packages/md-render`), VS Code extension (lite profile), demo site (`src/`)
 

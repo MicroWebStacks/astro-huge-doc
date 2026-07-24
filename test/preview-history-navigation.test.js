@@ -103,12 +103,93 @@ test('rendered-page controls announce routes, relay actions, and apply availabil
     }
 });
 
+test('app-bar lock toggle relays clicks and applies pushed lock state', async () => {
+    const sent = [];
+    const windowListeners = new Map();
+    const attrs = new Map([['aria-pressed', 'false']]);
+    const listeners = new Map();
+    const toggle = {
+        getAttribute: (name) => attrs.get(name) ?? null,
+        setAttribute: (name, value) => attrs.set(name, String(value)),
+        addEventListener(type, listener) {
+            listeners.set(type, listener);
+        },
+        click() {
+            listeners.get('click')?.();
+        }
+    };
+    const parentWindow = {postMessage: (message) => sent.push(message)};
+    const currentWindow = {
+        parent: parentWindow,
+        addEventListener(type, listener) {
+            windowListeners.set(type, listener);
+        }
+    };
+    const previousWindow = globalThis.window;
+    const previousDocument = globalThis.document;
+    globalThis.window = currentWindow;
+    globalThis.document = {
+        querySelector(selector) {
+            return selector === '[data-preview-lock-toggle]' ? toggle : null;
+        }
+    };
+
+    try {
+        await import(`../src/layout/preview_lock.js?test=${Date.now()}`);
+
+        toggle.click();
+        assert.deepEqual(sent, [{type: 'microwebstacks.previewLock', locked: true}]);
+
+        windowListeners.get('message')({
+            source: parentWindow,
+            data: {type: 'microwebstacks.previewLockState', locked: true}
+        });
+        assert.equal(toggle.getAttribute('aria-pressed'), 'true');
+        assert.match(toggle.getAttribute('title'), /Unlock preview/);
+
+        sent.length = 0;
+        toggle.click();
+        assert.deepEqual(sent, [{type: 'microwebstacks.previewLock', locked: false}]);
+    } finally {
+        globalThis.window = previousWindow;
+        globalThis.document = previousDocument;
+    }
+});
+
+test('app-bar lock toggle hides itself when not embedded in the webview iframe', async () => {
+    const attrs = new Map();
+    const toggle = {
+        getAttribute: (name) => attrs.get(name) ?? null,
+        setAttribute: (name, value) => attrs.set(name, String(value)),
+        addEventListener() {}
+    };
+    const selfWindow = {};
+    selfWindow.parent = selfWindow;
+    const previousWindow = globalThis.window;
+    const previousDocument = globalThis.document;
+    globalThis.window = selfWindow;
+    globalThis.document = {
+        querySelector(selector) {
+            return selector === '[data-preview-lock-toggle]' ? toggle : null;
+        }
+    };
+
+    try {
+        await import(`../src/layout/preview_lock.js?test=${Date.now()}`);
+        assert.equal(attrs.get('hidden'), '');
+    } finally {
+        globalThis.window = previousWindow;
+        globalThis.document = previousDocument;
+    }
+});
+
 test('webview relay accepts a port-mapped iframe origin and returns state', () => {
     const html = renderWebviewHtml(
         'http://localhost:4321/log',
         4321,
         'vscode-webview://test',
-        {canGoBack: true, canGoForward: false}
+        {canGoBack: true, canGoForward: false},
+        false
     );
     const script = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/)?.[1];
     assert.ok(script, 'expected the webview relay script');
@@ -155,14 +236,30 @@ test('webview relay accepts a port-mapped iframe origin and returns state', () =
             targetOrigin: '*'
         }
     );
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(frameMessages.shift())),
+        {
+            message: {
+                type: 'microwebstacks.previewLockState',
+                locked: false
+            },
+            targetOrigin: '*'
+        }
+    );
 
     windowListeners.get('message')({
         source: frameWindow,
         origin: 'vscode-webview://mapped-localhost-origin',
         data: {type: 'microwebstacks.previewHistory', action: 'back'}
     });
+    windowListeners.get('message')({
+        source: frameWindow,
+        origin: 'vscode-webview://mapped-localhost-origin',
+        data: {type: 'microwebstacks.previewLock', locked: true}
+    });
     assert.deepEqual(vscodeMessages, [
-        {type: 'microwebstacks.previewHistory', action: 'back'}
+        {type: 'microwebstacks.previewHistory', action: 'back'},
+        {type: 'microwebstacks.previewLock', locked: true}
     ]);
 
     windowListeners.get('message')({
@@ -180,6 +277,24 @@ test('webview relay accepts a port-mapped iframe origin and returns state', () =
                 type: 'microwebstacks.previewHistoryState',
                 canGoBack: false,
                 canGoForward: true
+            },
+            targetOrigin: '*'
+        }
+    );
+
+    windowListeners.get('message')({
+        source: null,
+        data: {
+            type: 'microwebstacks.previewLockState',
+            locked: true
+        }
+    });
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(frameMessages.shift())),
+        {
+            message: {
+                type: 'microwebstacks.previewLockState',
+                locked: true
             },
             targetOrigin: '*'
         }

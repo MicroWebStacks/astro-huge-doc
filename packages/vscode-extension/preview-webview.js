@@ -10,7 +10,7 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;');
 }
 
-function renderWebviewHtml(url, port, cspSource, historyState) {
+function renderWebviewHtml(url, port, cspSource, historyState, locked) {
   const escapedUrl = escapeHtml(url);
   const escapedCspSource = escapeHtml(cspSource);
   const nonce = crypto.randomBytes(16).toString('base64');
@@ -18,6 +18,10 @@ function renderWebviewHtml(url, port, cspSource, historyState) {
     type: 'microwebstacks.previewHistoryState',
     canGoBack: Boolean(historyState?.canGoBack),
     canGoForward: Boolean(historyState?.canGoForward)
+  });
+  const initialLockState = JSON.stringify({
+    type: 'microwebstacks.previewLockState',
+    locked: Boolean(locked)
   });
   return `<!doctype html>
 <html lang="en">
@@ -44,15 +48,23 @@ function renderWebviewHtml(url, port, cspSource, historyState) {
     const vscode = acquireVsCodeApi();
     const frame = document.getElementById('preview-frame');
     let historyState = ${initialHistoryState};
+    let lockState = ${initialLockState};
     const sendHistoryState = () => {
       frame.contentWindow?.postMessage(historyState, '*');
     };
-    frame.addEventListener('load', sendHistoryState);
+    const sendLockState = () => {
+      frame.contentWindow?.postMessage(lockState, '*');
+    };
+    frame.addEventListener('load', () => {
+      sendHistoryState();
+      sendLockState();
+    });
     window.addEventListener('message', (event) => {
       if (event.source === frame.contentWindow) {
         const message = event.data;
         if (message?.type === 'microwebstacks.previewRoute'
-          || message?.type === 'microwebstacks.previewHistory') {
+          || message?.type === 'microwebstacks.previewHistory'
+          || message?.type === 'microwebstacks.previewLock') {
           vscode.postMessage(message);
         }
         return;
@@ -60,6 +72,9 @@ function renderWebviewHtml(url, port, cspSource, historyState) {
       if (event.data?.type === 'microwebstacks.previewHistoryState') {
         historyState = event.data;
         sendHistoryState();
+      } else if (event.data?.type === 'microwebstacks.previewLockState') {
+        lockState = event.data;
+        sendLockState();
       }
     });
   </script>

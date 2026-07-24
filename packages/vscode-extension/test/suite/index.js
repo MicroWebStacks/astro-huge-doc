@@ -83,11 +83,19 @@ async function run() {
       assert.ok(one.serverRunning && one.panelOpen && one.watcherOpen);
       await openFile('one/docs/guides/install.md');
       await waitFor(async () => (await snapshots()).find((item) => item.workspace === oneRoot && item.currentRoute === '/guides/install'), 'follow navigation');
-      await vscode.commands.executeCommand('microwebstacks.internal.lockDocsPreview');
+      await vscode.commands.executeCommand(
+        'microwebstacks.internal.testPreviewMessage',
+        oneRoot,
+        {type: 'microwebstacks.previewLock', locked: true}
+      );
       await openFile('one/docs/guides/setup.md');
       await new Promise((resolve) => setTimeout(resolve, 300));
       assert.equal((await snapshots()).find((item) => item.workspace === oneRoot).currentRoute, '/guides/install');
-      await vscode.commands.executeCommand('microwebstacks.internal.unlockDocsPreview');
+      await vscode.commands.executeCommand(
+        'microwebstacks.internal.testPreviewMessage',
+        oneRoot,
+        {type: 'microwebstacks.previewLock', locked: false}
+      );
       await waitFor(async () => (await snapshots()).find((item) => item.workspace === oneRoot && item.currentRoute === '/guides/setup'), 'unlock catch-up navigation');
       await vscode.commands.executeCommand(
         'microwebstacks.internal.testPreviewMessage',

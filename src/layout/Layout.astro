@@ -160,7 +160,7 @@ const liveReloadPolling = liveReload && Boolean(process.env.MICROWEBSTACKS_LAUNC
 	<body >
 		<div class="appbar-nav_content-footer">
 			<header>
-				<AppBar menu={appbar_menu} showLeftToggle={liveReload || pages_menu_items.length > 0} showRightToggle={toc_menu_items.visible} showRuntimeInfo={liveReload} exploreEnabled={config.profile !== 'lite'} logPage={logPage} />
+				<AppBar menu={appbar_menu} showLeftToggle={liveReload || pages_menu_items.length > 0} showRightToggle={toc_menu_items.visible} showRuntimeInfo={liveReload} showPreviewLock={liveReload} exploreEnabled={config.profile !== 'lite'} logPage={logPage} />
 			</header>
 			<main>
 				<div id="wide-nav" class="scroll">
@@ -526,6 +526,7 @@ main{
 
 <script src="./menu_interactions_activation.js" />
 {liveReload && <script src="./preview_history.js" />}
+{liveReload && <script src="./preview_lock.js" />}
 {liveReload && <script src="./lazy_navigation.js" />}
 {liveReload && <script src="./runtime_info.js" />}
 <script src="./link_preview.js" />

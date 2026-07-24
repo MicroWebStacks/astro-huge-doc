@@ -20,22 +20,19 @@ test('extension exposes one embedded preview surface and hides lock internals fr
     assert.equal(hidden.get('microwebstacks.internal.unlockDocsPreview'), 'false');
 });
 
-test('preview lock actions attach to the active webview panel editor title', () => {
+test('preview lock has no native VS Code button — it is a webview app-bar control only', () => {
     assert.equal(manifest.contributes.menus['webview/title'], undefined);
 
     const titleActions = new Map(
         manifest.contributes.menus['editor/title'].map((entry) => [entry.command, entry])
     );
-    assert.equal(
-        titleActions.get('microwebstacks.internal.lockDocsPreview')?.when,
-        "activeWebviewPanelId == 'microwebstacksDocsPreview' && !microwebstacks.previewLocked"
-    );
-    assert.equal(
-        titleActions.get('microwebstacks.internal.unlockDocsPreview')?.when,
-        "activeWebviewPanelId == 'microwebstacksDocsPreview' && microwebstacks.previewLocked"
-    );
-    assert.equal(titleActions.get('microwebstacks.internal.lockDocsPreview')?.group, 'navigation');
-    assert.equal(titleActions.get('microwebstacks.internal.unlockDocsPreview')?.group, 'navigation');
+    assert.equal(titleActions.get('microwebstacks.internal.lockDocsPreview'), undefined);
+    assert.equal(titleActions.get('microwebstacks.internal.unlockDocsPreview'), undefined);
+    assert.equal([...titleActions.keys()].length, 1);
+    assert.equal(titleActions.get('microwebstacks.previewDocs')?.group, 'navigation');
+
+    // Commands stay registered (internal test/programmatic surface) but are
+    // reachable only via the in-page app-bar toggle's postMessage bridge.
     assert.equal(commandEntries.get('microwebstacks.internal.lockDocsPreview')?.title, 'Preview Lock');
     assert.equal(commandEntries.get('microwebstacks.internal.unlockDocsPreview')?.title, 'Preview Unlock');
 });

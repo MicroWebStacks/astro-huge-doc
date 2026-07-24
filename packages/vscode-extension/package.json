@@ -89,16 +89,6 @@
           "command": "microwebstacks.previewDocs",
           "when": "editorLangId == markdown",
           "group": "navigation"
-        },
-        {
-          "command": "microwebstacks.internal.lockDocsPreview",
-          "when": "activeWebviewPanelId == 'microwebstacksDocsPreview' && !microwebstacks.previewLocked",
-          "group": "navigation"
-        },
-        {
-          "command": "microwebstacks.internal.unlockDocsPreview",
-          "when": "activeWebviewPanelId == 'microwebstacksDocsPreview' && microwebstacks.previewLocked",
-          "group": "navigation"
         }
       ]
     },
