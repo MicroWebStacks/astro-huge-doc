@@ -56,6 +56,23 @@ text, no warning banner, no console output.
   `ext: 'yaml'` and `params: 'gallery_dir'` — the collector-side pair to the
   renderer's fallback.
 
+## Measurements taken for planning (not tests)
+
+Recorded here so they are reproducible rather than re-derived. Method and
+conclusions are in `plan.md` under `OP-005`.
+
+| Measurement | Value |
+| --- | --- |
+| `dist` (full/static) | 349.8 MB / 1301 files |
+| `dist/blobs` | 240.8 MB / 619 — 370 referenced, 249 (0.5 MB) not |
+| `dist/images` | 86.8 MB / 327 — 8 distinct `/images/` refs across 115 pages |
+| `public/images` byte-identical to a blob | 189 files / 58.9 MB |
+| `public/images` matching no blob | 138 files / 28.0 MB |
+| `content.json` | 1.71 MB, **zero blob bytes** (no `payload` field on 619 rows) |
+| `dataset/json/pages/*.json` (lite) | 1.96 MB total, largest 0.15 MB, zero blob bytes |
+| `dataset/blobs` sidecar tree | 217.5 MB / 973 files, accumulates across runs; 104 files / 198.4 MB duplicate the served dir |
+| Content markdown filenames | 73 total: 57 already plain, 15 contain `_`, 0 uppercase, 0 spaces |
+
 ## Known gaps (not Phase 0 scope)
 
 - 13 thin pages in the full artifact: landing pages whose `yaml cards` uids do

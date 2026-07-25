@@ -2,7 +2,11 @@
 
 ## Progress
 
-[##----] Phase 0/5 Done - both static targets build; parity work (Phases 1-5) not started.
+[##----] Phase 0/5 Done - both static targets build; Phases 1-5 planned and decided, no code started.
+
+Phase 1+ carries no implementation yet. The rulings that shape it (`R-6`..`R-15`),
+the two remaining open points (`OP-011`, `OP-012`), and the handover notes all
+live in `plan.md`.
 
 ## Phase 0 — make the site build (complete)
 

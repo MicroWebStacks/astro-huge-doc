@@ -11,21 +11,27 @@
 
 The goal is that `astro build --config astro.config.static.mjs` on this repo
 produces a static artifact that can replace the live site on GitHub Pages.
-Today it does not: the build **aborts**, and once unblocked the rendered
-output diverges from the live site in URLs, page identity, several markdown
-features, and static-mode runtime behaviour.
+
+**Status: Phase 0 is done — the build no longer aborts** (full 115 pages, lite
+76 pages, both exit 0). What remains is that the rendered output still diverges
+from the live site in page identity, several markdown features, asset
+completeness, and static-mode runtime behaviour.
 
 ## Goal And Objectives
 
 1. `astro build --config astro.config.static.mjs` completes with zero errors on
-   the full HomeSmartMesh content set.
-2. Every URL the live site serves is served by the static artifact (or 301s to
-   it), so existing inbound links and bookmarks keep working.
+   the full HomeSmartMesh content set. ✔ **met by Phase 0**
+2. Every document is reachable at a url derived from its file path by one shared
+   rule. Matching the live site's urls is **explicitly not a goal** — see `R-7`;
+   the content is migrated to the new scheme instead of the scheme bending to
+   the content.
 3. Every markdown feature used by the content renders as it does live — no raw
    directive text, no empty galleries, no dropped 3D models or spreadsheets.
 4. The published pages carry no SSR-only runtime calls, no console 404s, and no
    visible "index unavailable" chrome.
-5. The site can be deployed from CI with the existing reusable render action.
+5. The site can be deployed from CI with the existing reusable render action, at
+   either a root or a sub-path `base`.
+6. Every non-publish profile still renders every page without failing (`R-11`).
 
 ## Maintainer Rulings (2026-07-25)
 
@@ -41,8 +47,10 @@ These constrain everything below and are not open for re-litigation:
   page or abort a build. Galleries were the worked example, but see `R-5`:
   fallback is the floor for what lite may do, never a target to aim at.
 - **R-4 — Phase 0 comes first and is real work.** No further phase planning is
-  trustworthy until the site builds and pages can actually be compared. Phases
-  1-5 below are provisional and will be re-derived from a working build.
+  trustworthy until the site builds and pages can actually be compared. *(Phase
+  0 is now complete; Phases 1, 3, 4 and 5 were re-derived against the working
+  build in rounds 2-3. Phase 2's feature counts still come from the
+  broken-build survey — see the note above Phase 1.)*
 - **R-5 — Phase 0 removes nothing that already worked.** Lite rendered
   galleries before this packet, so it must render them after. Phase 0 is the
   minimum change that makes the build succeed; any capability reduction is out
@@ -81,6 +89,25 @@ the note below the table.
   must render every page without failing, omitting features rather than
   breaking (`OP-001`).
 
+### Round 3 (2026-07-25, asset storage and the slug rule)
+
+- **R-12 — The slug rule is lite's existing `slugSegment`, shared.** Lowercase,
+  strip diacritics, collapse every run of non-alphanumeric characters to a
+  single dash, trim leading/trailing dashes, fall back to `page` if nothing
+  remains. Underscores therefore become dashes. This is applied at *derivation*
+  time; files are **not** renamed (`OP-010`).
+- **R-13 — Blob storage stays; the artifact ships only what it references.**
+  `OP-005` Option A. Option B (serve source files in place) is rejected on
+  measurement: it would grow the artifact. Option C (hotlink GitHub) is
+  rejected outright.
+- **R-14 — The JSON backend writes blob bytes straight to the flat served
+  directory**, bypassing the date-sharded sidecar tree it currently stages
+  through. The sidecar stays for sqlite, where it is load-bearing (`WP-25`,
+  `OP-013`).
+- **R-15 — `external_storage_kb` becomes sqlite-only** in scope or in name. It
+  has no effect on any JSON dataset's size, and presenting it as a global knob
+  is how it came to be misunderstood (`OP-014`).
+
 **Consequence — parity is no longer url parity.** `R-1` set the publish target;
 `R-6`/`R-7` now say our urls are *deliberately* allowed to differ from
 <https://homesmartmesh.github.io/>. So the measured "34/73 divergent urls" stops
@@ -94,9 +121,13 @@ and assets the live site shows, at whatever url our scheme produces.
   manifest completeness, static-mode runtime guards, publish chrome, Pages
   deployment, a repeatable parity check.
 - Out (non-goals):
-  - Changing the lite/VS Code extension identity contract (see `DD-001`).
+  - Changing lite's identity contract. Under `R-6` it becomes the *universal*
+    rule — full adopts lite's behaviour, not the other way round (`DD-001`).
+  - Matching the live site's urls (`R-7`).
   - Redesigning the UI to pixel-match the live theme (colours, spacing, dark
-    default are cosmetic and deliberately diverged — see `OP-006`).
+    default are cosmetic and deliberately diverged).
+  - Serving assets from their source paths, or from GitHub — measured and
+    rejected as `OP-005` Options B and C.
   - Fixing content-side dead links that are already broken on the live site
     (`/docs/**`, `/networks/**`, `/frameworks/chip/`) — see `OP-007`.
   - Porting `swiper` and `pz_gallery` components: zero usages in this content.
@@ -107,19 +138,22 @@ Evidence gathered by building/serving this repo and diffing against the live
 site page-by-page with a headless browser. Working artifacts under
 `.tmp/parity-2026-07-25/` (throwaway).
 
+**This table is the pre-Phase-0 survey.** Rows marked ✔ were fixed by Phase 0;
+everything unmarked is still true and is Phase 1+ scope. Asset sizes were
+re-measured after Phase 0 and are in `OP-005`.
+
 | Measurement | Result |
 | --- | --- |
-| Static build, `DOCS_PROFILE=full DOCS_BACKEND=json DOCS_OUTPUT=static` | **fails** at `microcontrollers/esp32/fire-beetle` — `TypeError: Cannot read properties of null (reading 'gallery')` (`src/components/markdown/code/Code.astro:57`) |
-| Same build with a one-line null guard | passes, 115 pages, 42 s, 345 MB output |
+| Static build, `DOCS_PROFILE=full DOCS_BACKEND=json DOCS_OUTPUT=static` | ✔ **was** failing at `microcontrollers/esp32/fire-beetle` — `TypeError: Cannot read properties of null (reading 'gallery')`. Now exit 0, 115 pages. |
 | Documents in the content set | 73 |
-| Document URLs that differ from the live site's URL | **34 / 73** |
+| Document URLs that differ from the live site's URL | **34 / 73** — reclassified by `R-7` from a defect count to the content migration list |
 | `yaml cards` uid references in content | 45 unique; **7 resolve, 38 dangle** |
 | Pages rendering "thin" (< 400 chars of body) on full/json | 16, of which 8 are section landing pages emptied by dangling cards |
 | `:iframe[]` directives | 2 (both render as raw attribute text) |
 | Remote `.glb` links | 12 (render as plain links; live renders `<model-viewer>`) |
 | `.xlsx` links | 2 (render as plain links; live renders a table) |
 | `/data/*.zip|hex` download buttons | 16 (all 404 locally; all 200 live) |
-| `yaml gallery` / `yaml gallery_dir` blocks | 8 / 1 (the `gallery_dir` one is the build blocker) |
+| `yaml gallery` / `yaml gallery_dir` blocks | ✔ 8 / 1 — both forms now expand in both profiles |
 | Console errors on every static page | `GET /__lite/navigation` 404, `GET /__lite/index-control?action=start` 404, plus a visible "Link index unavailable" status bar |
 
 ### Root cause groupings
@@ -302,8 +336,8 @@ delete the divergence rather than bridge it, and to fix the content.
 
 | WP | Work | Notes |
 | --- | --- | --- |
-| WP-03 | Make filename-derived identity the only rule in the full profile: `get_slug` returns the slugified filename, `frontmatter.slug` is ignored, `title` becomes display-only. Slugify names with spaces/specials (`DD-001`). | Deletes code rather than adding it. Lite already behaves this way. |
-| WP-04 | Extract one url/slug/uid derivation module imported by collect, `getStaticPaths`, the catch-all route, link rewriting, **and the lite tree walk**, so all five cannot drift (`DD-003`). | Closes root cause C, and is what makes `R-6` structurally true rather than a convention. |
+| WP-03 | Make filename-derived identity the only rule in the full profile: `get_slug` returns `slugSegment(filename)`, `frontmatter.slug` is ignored, `title` becomes display-only (`R-12`, `DD-001`). | Deletes code rather than adding it. Lite already behaves this way; full currently serves the raw filename. |
+| WP-04 | Extract one url/slug/uid derivation module imported by collect, `getStaticPaths`, the catch-all route, link rewriting, **and the lite tree walk**, so all five cannot drift (`DD-003`). Run *reference* strings through the same `slugSegment` so `esp32_remote` and `esp32-remote` resolve alike. | Closes root cause C, makes `R-6` structurally true rather than a convention, and shrinks the WP-07 worklist to genuinely-wrong references. |
 | WP-05 | Resolve `yaml cards` uids against the new canonical uid. Report every unresolved uid as a build-time list — this is the content migration worklist, not a runtime fallback (`R-7`, `DD-004`). | 38/45 dangle today; each becomes a content edit. |
 | WP-06 | Rewrite internal markdown links through the resolved target document's served url, never the raw filename. Unresolved links are reported, not silently emitted as 404 hrefs. | Same worklist mechanism as WP-05. |
 | WP-07 | **Content migration**: apply the WP-05/WP-06 worklists to the HomeSmartMesh source — rename files whose desired url differs from their name, update card uids and internal links, remove `frontmatter.slug`. | Upstream content edit, in the content repo, not here. The one WP whose output is not code. |
@@ -333,6 +367,7 @@ where the live site renders a component.
 | WP-13 | Extend `manifest.yaml` fetch to `public/data`, `public/favicon.svg`, `public/favicon.png`, `public/.nojekyll`. | Closes 16 download-button 404s. `.nojekyll` is required for GitHub Pages to serve `_astro/`. |
 | WP-14 | Ship `public/**` only for paths the built HTML actually references (`OP-005`, Option A). Add an artifact-composition report to the build. | **−86.8 MB of 349.8 MB (−25%)** on measured numbers, with no change to what any page renders. |
 | WP-21 | Prune blobs that no emitted page references. | Measured at 249 files / **0.5 MB** — negligible, so this is hygiene, not a size lever. Do it with WP-14 or not at all. |
+| WP-25 | JSON backend writes blob bytes straight to the flat served dir, bypassing the date-sharded sidecar tree it currently stages through (`OP-013`). Keep the sidecar for sqlite, where it is load-bearing. | Removes 198.4 MB of local duplication and the unbounded cross-run accumulation. No effect on the artifact. Also makes `external_storage_kb` honestly sqlite-only. |
 | WP-23 | Write the asset-path resolution rule into a spec and make one module implement it: a root-absolute path resolves against the **content root**, falling back to `public/` only when the file exists there (`R-8`, `OP-007`). Report content that resolves to neither. | No spec covers this today — `specification/` has no absolute-path rule at all, and `structure-db-lazy.js` carries its own `DD-3` comment about resolving against `public/`. 199 of 264 image assets are root-absolute, so this rule decides most of them. |
 
 Exit: every asset the live site serves resolves; artifact size understood and
@@ -375,10 +410,62 @@ regressions against the recorded baseline.
 | OP-007 | What does a root-absolute asset path mean? | One meaning: the content root, falling back to `public/` if the file exists there. Not currently in any spec — WP-23 writes it into one. Content that assumed otherwise is fixed as content. | **Resolved** — `R-8` |
 | OP-008 | Deploy as a user site (base `/`) or a project site with a base prefix? | Support both. `base` is an input, defaulting to `/`; the static config already reads `site`/`base` from env, so this is a test-and-document task, not a build change. | **Resolved** — `R-9` |
 | OP-009 | Does the fetched content snapshot match what the live site was built from? | Uses the same fetcher against the same url, so yes by construction. No separate verification WP. | **Resolved** — maintainer |
-| OP-010 | What exactly does "slugify a filename" do? | Undecided — see below. Determines every url in the site, and therefore the whole WP-07 content worklist. | **Open — next** |
-| OP-011 | Do the graph button and `explore/` pages ship on the public site? | Undecided. `R-10` covered the breadcrumb/metadata and footer bars but not these two. | Open |
-| OP-012 | How is the Phase 1 code/content split sequenced across two repos? | Undecided. Between WP-06 and WP-07 the published site is worse than today. | Open |
-| OP-013 | Do the local blob duplicates (`dataset/blobs` external tree, 217.5 MB, accumulating across runs) get pruned, and by what? | Undecided. Costs developer disk only, never artifact size. Low urgency. | Open |
+| OP-010 | What exactly does "slugify a filename" do? | Adopt lite's existing `slugSegment` as the one shared rule. See the correction below: this needs **no file renames**. | **Resolved** — `R-12` |
+| OP-011 | Do the graph button and `explore/` pages ship on the public site? | **Undecided.** `R-10` covered the breadcrumb/metadata and footer bars but said nothing about these two. Both are features the live site does not have, so shipping them is an improvement, not a parity risk — but it is a product call, not a technical one. | **Open — blocks WP-16** |
+| OP-012 | How is the Phase 1 code/content split sequenced across two repos? | **Undecided.** Between WP-06 and WP-07 the published site is worse than today. Candidate approaches under the table below. | **Open — blocks Phase 1 merge** |
+| OP-013 | Do the local blob duplicates (`dataset/blobs` sidecar tree, 217.5 MB, accumulating across runs) get pruned? | `WP-25`: the JSON backend writes straight to the flat served dir and never stages through the sidecar, so the duplication stops being *created* rather than being cleaned up after. | **Resolved** — `R-14` |
+| OP-014 | Should `external_storage_kb` become sqlite-only in name and effect? | Yes — scope it to the sqlite writer, or rename it to say what it does. | **Resolved** — `R-15` |
+
+### OP-010 — the rule, and a correction
+
+The rule is already written and already shipping in lite:
+[`slugSegment`, `structure-db-lazy.js:447`](../../../../src/libs/structure-db-lazy.js#L447)
+— lowercase → strip diacritics → collapse every run of `[^a-z0-9]+` to one dash
+→ trim dashes → fall back to `page`. WP-04 lifts it into the shared derivation
+module and the full profile starts using it.
+
+**Correction to an earlier assessment in this packet.** It was previously stated
+here that adopting dashes "costs 15 file renames plus every card uid and
+internal link pointing at them". That was wrong, and the error matters because
+it inflated the apparent cost of the right answer. Slugification happens when
+the url is *derived*, not by renaming anything: `esp32_remote.md` stays
+`esp32_remote.md` on disk and is served at `/microcontrollers/esp32/esp32-remote`.
+Renaming is optional cosmetics, not migration work.
+
+What the content genuinely must fix is narrower: **references** that spell a
+target the old way (`yaml cards` uids, internal links). Even that shrinks if
+reference resolution runs the reference through `slugSegment` too, so
+`esp32_remote` and `esp32-remote` resolve to the same document — which WP-04
+gets for free by owning both sides. The residual worklist is then only genuinely
+ambiguous or genuinely wrong references.
+
+Two facts that make this decision easy rather than balanced:
+
+- Lite already produces `thread-sensortag`; only the full profile produces the
+  raw `thread_sensortag`. So this is full adopting lite's behaviour, not a new
+  third rule — and it is exactly what `R-6` asks for.
+- The **live site also serves `thread-sensortag`**. The dash form is what
+  existing inbound links already point at, so on the 15 underscore files the new
+  scheme happens to agree with the live site rather than diverging from it.
+
+The lossy-vs-strict sub-question is settled by the same code: `slugSegment` is
+lossy-safe (anything unmappable becomes a dash), and `DD-004`'s duplicate-slug
+guard is what catches a collision. Consistent with lite, and already tested
+there.
+
+### OP-012 — candidate sequencings (for the decision, not a recommendation)
+
+1. **Content-first.** Fix references upstream so they resolve under *both* the
+   old and new rule, then land the code. Safest; possible only where a
+   reference can be spelled compatibly.
+2. **Branch-and-cut.** Land the code behind a content branch, migrate content on
+   that branch, publish from it, then fast-forward. One switch-over moment.
+3. **Accept the trough.** Land code, publish broken landing pages for as long as
+   the content rework takes. Cheapest, and defensible only because
+   `R-7` already accepts a break.
+
+If reference resolution slugifies both sides (see `OP-010`), option 1 covers
+most of the worklist and the choice gets much less consequential.
 
 ### OP-005 — asset duplication: measured, with options
 
@@ -454,28 +541,49 @@ also cover `:button[]{}` download hrefs (16 `/data/**` links), `<a href>`,
 client JS. Scanning the **built HTML** rather than the source markdown catches
 all but the last. Fail closed: if the scan cannot classify a file, ship it.
 
-#### What the external-storage threshold actually does
+#### No JSON file in this system contains blob bytes
 
-Worth stating plainly, because the phrase "large ones stay in place" describes
-something the code has never done. `external_storage_kb: 512` chooses **where a
-copy of the bytes is written**, not whether a copy is made:
+Verified, because an earlier draft of this section got it wrong and the
+conclusion matters:
 
-| Blob size | Payload location | Also written to the served dir? |
+| File | Size | Blob bytes inside? |
 | --- | --- | --- |
-| ≤ 512 KB | inline, inside `content.json` / the sqlite BLOB column | yes |
-| > 512 KB | sidecar file at `blobs/<year>/<month>/<hash[0:2]>/<hash>` | yes |
+| `dataset/json/content.json` | **1.71 MB** | **none** — 619 `blob_store` rows, no `payload` field at all, while `sum(size)` = 240.8 MB |
+| `dataset/json/pages/*.json` (lite) | **1.96 MB** total, largest 0.15 MB | **none** |
+| `dataset/json/blobs/<hash>.<ext>` | 240.8 MB / 619 files | this is where every byte lives |
 
-Neither branch references the original file. The threshold exists to keep the
-dataset *loadable* — `content.json` is 1.7 MB precisely because the 240 MB of
-images are not inline in it. That is the whole benefit, and it is a real one.
+The JSON writer strips payloads by construction —
+[`structure_json.js:163`](../../../../packages/content-structure/src/structure_json.js#L163),
+*"Blob bytes live on disk (content-addressed); keep only metadata."* Payloads
+are held in memory during collect, written out as files, then dropped from the
+dataset. **A JSON dataset cannot grow with image size**, whatever the threshold
+is set to.
 
-Measured on this working tree: the external tree is 973 files / 217.5 MB (it is
-date-sharded and content-addressed, so it accumulates across collect runs rather
-than being overwritten), of which 104 files / 198.4 MB are byte-identical to the
-flat served dir. So locally the bytes exist two or three times. **Only the flat
-served dir (`dataset/json/blobs`, 240.8 MB) is copied into `dist`**, so this
-duplication costs disk during development and nothing at publish time. It is
-worth a cleanup task, but it is not an artifact-size problem.
+#### What `external_storage_kb` actually controls, per backend
+
+The knob does two different jobs depending on the writer, and only one of them
+is the job its name suggests:
+
+| Backend | ≤ threshold | > threshold | Does the threshold affect the dataset file's size? |
+| --- | --- | --- | --- |
+| **sqlite** | payload inlined into the `blob_store.payload` BLOB column ([`structure_db.js:1286`](../../../../packages/content-structure/src/structure_db.js#L1286)) | sidecar file `blobs/<year>/<month>/<hash[0:2]>/<hash>`, `path` recorded | **Yes** — this is what 512 KB was tuned for |
+| **json** (full and lite) | payload held **in memory** during collect, then stripped | staged to the same sidecar tree, then also written flat | **No — zero effect** |
+
+So for JSON the threshold is a **peak-memory vs. staging-disk** control, nothing
+more. Setting it to 16 KB would not shrink `content.json` by a single byte,
+because `content.json` holds no bytes; it would push nearly all 619 blobs
+through the sidecar tree, growing that tree from 217.5 MB toward 240 MB, in
+exchange for lower peak memory during collect. On this content set collect peaks
+harmlessly and finishes in ~7 s, so there is nothing to buy.
+
+Neither branch, in either backend, references the original source file. Both
+copy. That is why `OP-005` Option B was not a small change.
+
+Measured local duplication: the sidecar tree is 973 files / 217.5 MB — it is
+date-sharded and content-addressed, so it *accumulates across collect runs*
+rather than being overwritten — of which 104 files / 198.4 MB are byte-identical
+to the flat served dir. **Only the flat served dir is copied into `dist`**, so
+this costs developer disk and nothing at publish time (`OP-013`, `WP-25`).
 
 #### Where blob storage earns its keep
 
@@ -556,14 +664,15 @@ WP-15; if it fights Astro's static analysis, keep the warning and move on.
 - **Phase 1 spans two repos and cannot half-land.** WP-03..WP-06 change the
   code here; WP-07 changes the content upstream. Between them the site is
   *more* broken than today — the 38 dangling card uids stay dangling and the
-  34 url changes take effect. Sequence the merge so the content rework is ready
-  before the identity change publishes, or publish from a content branch.
+  34 url changes take effect. `OP-012` is the open decision; slugifying both
+  sides of a reference (`OP-010`) shrinks the trough considerably.
 - **Lite regression risk.** WP-03/WP-04 touch shared collector code and WP-04
   now explicitly folds the lite tree walk into the shared module. The
   extension's startup path and `pnpm bench:lite` numbers must be re-checked
   before closing Phase 1 (see `[[project-extension-performance]]`).
-- **DD-002's literal wording would delete the OKF frontmatter columns.** See
-  the correction under DD-002; implement the restatement, not the sentence.
+- **DD-002 is about startup, not about parsing.** Implement the confirmed rule
+  under DD-002; a literal "lite never reads frontmatter" would delete the OKF
+  columns shipped by `2026-07/19/okf-support`.
 - **`content-structure` is now in-repo** (`packages/content-structure`), so
   these changes land here rather than in the frozen 2.2.4 sibling repo — but
   they also affect the VS Code engine, so they ship together.
@@ -598,3 +707,91 @@ packet as a whole.
     recorded baseline.
 11. A GitHub Pages deployment from the workflow serves the artifact, verified at
     both `base = /` and a sub-path base (`R-9`).
+
+---
+
+## Handover (2026-07-25)
+
+Work paused here deliberately. Everything below is what a fresh reader needs.
+
+### State
+
+**Phase 0 complete and verified.** Phases 1-5 are planned, decided, and **not
+started** — no Phase 1+ code exists.
+
+| Check | Result |
+| --- | --- |
+| `pnpm test` | 86/86 |
+| `pnpm collect` (repo `.env`, lite) | pass, ~7 s, no warnings |
+| Full static build | exit 0, 115 pages |
+| Lite static build | exit 0, 76 pages |
+| `pnpm check:plans` | pass |
+
+All Phase 0 code is committed:
+
+| Commit | Contents |
+| --- | --- |
+| `961227a` | Phase 0 — shared classifier, renderer fallback, sharp allowlist |
+| `48a5871` | the `R-5` revert — `expand_galleries` removed, lite renders galleries again |
+
+Only this packet and `plans/open.md` are uncommitted, and they are documentation
+of the decisions above. There is no half-finished code in the tree.
+
+### Reproducing the builds
+
+```bash
+pnpm collect                                                          # rebuild the dataset first; the collector changed
+MICROWEBSTACKS_DOTENV_OVERRIDE=false DOCS_PROFILE=full DOCS_BACKEND=json \
+  DOCS_OUTPUT=static npx astro build --config astro.config.static.mjs # publish target
+DOCS_OUTPUT=static npx astro build --config astro.config.static.mjs   # lite, must also pass
+```
+
+Both write to the same `dist/`, so the second overwrites the first — measure one
+before building the other.
+
+### Two traps that already cost time here
+
+1. **The lite parse cache is not invalidated by a collector change.** Records in
+   `dataset/json/pages/` are keyed by content hash, so after changing collector
+   behaviour you must bump `RECORD_VERSION` in `src/libs/structure-db-lazy.js`
+   *and* delete the directory locally, or you will measure the old behaviour and
+   believe it.
+2. **The repo `.env` sets `DOCS_PROFILE=lite`.** `pnpm collect` run with repo
+   defaults still writes the dataset the *full* static publish reads. Never make
+   collector output depend on the profile — see the reversed `DD-0.4`.
+
+### What to pick up next
+
+Phase 1, once `OP-012` is answered. Start at `WP-04` (the shared derivation
+module) rather than `WP-03`: WP-04 is what makes `R-6` structural, and if
+reference resolution slugifies both sides it shrinks WP-07's content worklist
+before that worklist is generated.
+
+Before Phase 2, re-count its feature usages against the working artifact — those
+numbers are the only ones in this plan still inherited from the broken build.
+
+### Still open
+
+| ID | Question | Blocks |
+| --- | --- | --- |
+| `OP-011` | Do the graph button and `explore/` ship publicly? | `WP-16` |
+| `OP-012` | How to sequence the code/content split across two repos? | Phase 1 merge |
+
+Nothing else is undecided. Every other OP and DD in this document carries a
+resolution and the ruling that produced it.
+
+### Superseded — do not resurrect
+
+Reversals are recorded in place rather than deleted, so that a reader who
+remembers an earlier decision finds out it changed instead of finding nothing:
+
+- `WP-0.7` / `DD-0.4` — the `expand_galleries` opt-out. Withdrawn by `R-5`.
+- `OP-0.2`'s first reading — "lite ignores galleries". Superseded by `R-5`.
+- `OP-002`/`OP-004`'s original proposals — match live urls, alias legacy uids.
+  Superseded by `R-6`/`R-7`.
+- `OP-005` Options B and C — serve source in place; hotlink GitHub. Rejected on
+  measurement by `R-13`.
+- The claim that dash-slugs cost 15 file renames. Wrong; corrected under
+  `OP-010`.
+- The claim that small blobs are inlined into `content.json`. Wrong for JSON
+  (true only for sqlite); corrected under `OP-005`.
