@@ -39,11 +39,11 @@ const blockKind = codeBlockKind(language, asset?.params)
 const isLite = config.profile === 'lite'
 
 // A block only reaches its custom component when the collector actually
-// produced the data that component needs. When it did not — an unexpanded
-// gallery in lite, an empty or malformed gallery yaml, a model the profile
-// skipped — the block degrades to a plain highlighted yaml block. This is an
-// expected outcome, not an error: no warning, no error UI, and above all no
-// throw, because a single bad block used to abort the whole static build.
+// produced the data that component needs. When it did not — an empty or
+// malformed gallery yaml, a gallery directory that does not exist, a model
+// the profile skipped — the block degrades to a plain highlighted yaml block:
+// no warning, no error UI, and above all no throw, because a single bad block
+// used to abort the whole static build.
 const galleryModel = blockKind === 'gallery' ? item.ast?.gallery : null
 const yaml_gallery  = (blockKind === 'gallery') && Array.isArray(galleryModel) && galleryModel.length > 0
 const yaml_glb      = (blockKind === 'glb') && !isLite && Boolean(item.ast?.model)

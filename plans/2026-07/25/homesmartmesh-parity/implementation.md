@@ -29,27 +29,29 @@ It was simply unreachable behind the exact-match gate.
 | File | Change |
 | --- | --- |
 | `packages/content-structure/src/code_blocks.js` (new) | `codeBlockKind(language, meta)` — the single classifier for `gallery` / `glb` / `cards`, prefix-matched. Imported by both the collector and `Code.astro`. |
-| `packages/content-structure/src/md_utils.js` | `createCodeEntry` uses `codeBlockKind`; gallery expansion gated on `config.expand_galleries !== false`; debug-level note when a gallery is left unexpanded. |
+| `packages/content-structure/src/md_utils.js` | `createCodeEntry` uses `codeBlockKind`. Gallery expansion stays unconditional — every caller gets the same items. |
 | `packages/content-structure/index.js` | `SHARP_DECODABLE_EXT` allowlist; `collectImageMetadata` skips undecodable formats before calling sharp, at debug level. |
 | `src/components/markdown/code/Code.astro` | Uses `codeBlockKind`; each custom-yaml branch now requires the data it consumes to exist, otherwise the block falls through to `<Highlighter>`. Dead `yaml_glb && isLite` branch removed (the generic fallback covers it). |
-| `src/libs/structure-db-lazy.js` | Passes `expand_galleries: false` into its `collectDocument` call; `RECORD_VERSION` 6 → 7. |
-| `test/gallery-blocks.test.js` (new) | 9 regression tests. |
+| `src/libs/structure-db-lazy.js` | `RECORD_VERSION` 6 → 7: v6 records for `gallery_dir` pages predate the classifier fix and hold no gallery items. |
+| `test/gallery-blocks.test.js` (new) | 8 regression tests. |
 
 ### Decisions made during implementation
 
-- **`expand_galleries`, not `DOCS_PROFILE` (`DD-0.4`).** The first cut keyed
-  gallery expansion on the deployment profile. That was wrong: `pnpm collect`
-  writes `dataset/json/content.json`, which the full/static publish reads, and
-  the repo's own `.env` defaults to `DOCS_PROFILE=lite`. Collecting under that
-  default would have silently stripped every gallery from a published site.
-  The switch now belongs to the *parse call*, defaults to expanding, and only
-  `structure-db-lazy` (the extension's on-demand parse, where the directory
-  listing and per-image stat are the cost being avoided) opts out. Verified:
-  `pnpm collect` under the lite `.env` still exports 639 assets / 393 images.
-- **`warn` vs info (`OP-0.1`).** An unexpanded gallery is expected, so it logs
-  at `debug`. Malformed gallery yaml and an unreadable gallery directory keep
-  their `warn` — those are authoring faults, not expected fallbacks. Neither
-  path renders error UI and neither throws.
+- **No `expand_galleries` flag (`R-5`, reversing `DD-0.4`).** An intermediate
+  version of this work had the lite lazy parse skip gallery expansion, on the
+  reading that `R-3` licensed it. It does not: lite already rendered galleries,
+  so skipping them was a capability reduction, and Phase 0 removes nothing that
+  worked. The flag, its plumbing and its tests are gone; expansion is
+  unconditional. The footgun found while building it is still worth recording —
+  any future switch here must not be keyed on `DOCS_PROFILE`, because
+  `pnpm collect` writes the `content.json` that the full/static publish reads
+  while the repo `.env` defaults to `DOCS_PROFILE=lite`, so collecting with
+  repo defaults would have silently stripped every gallery from a published
+  site.
+- **`warn` vs info (`OP-0.1`).** Malformed gallery yaml and an unreadable
+  gallery directory keep their `warn` — those are authoring faults. Neither
+  path renders error UI and neither throws; the renderer degrades them to a
+  highlighted yaml block.
 - **Renderer fallback is generic, not gallery-specific (`DD-0.2`).** Every
   custom-yaml branch now checks for the data it will consume. `Cards` was left
   as-is: it parses the fence body directly, already surfaces its own yaml
@@ -62,14 +64,14 @@ It was simply unreachable behind the exact-match gate.
 
 | Check | Result |
 | --- | --- |
-| `pnpm test` | **87/87** (was 78; +9 new) |
+| `pnpm test` | **86/86** (was 78; +8 new) |
 | `pnpm collect` (default lite `.env`) | pass, ~7 s, 73 docs / 3517 items / 639 assets / 393 images, **no warnings** |
-| Full static build (`DOCS_PROFILE=full DOCS_BACKEND=json DOCS_OUTPUT=static`) | **exit 0**, 115 pages, 60.7 s |
-| Lite static build (`DOCS_OUTPUT=static`, repo `.env`) | **exit 0**, 76 pages, 68.0 s |
+| Full static build (`DOCS_PROFILE=full DOCS_BACKEND=json DOCS_OUTPUT=static`) | **exit 0**, 115 pages, 61.5 s |
+| Lite static build (`DOCS_OUTPUT=static`, repo `.env`) | **exit 0**, 76 pages, 69.7 s |
 | Full artifact crawl, all 73 document URLs | 0 missing, **0 error pages**, 13 thin |
 | Lite artifact crawl, all 73 document URLs | **0 error pages**, 17 URL misses, 10 thin |
-| Gallery render (full): fire-beetle / 3dprinting / house / rovi | gallery container + 5 / 44 / 12 / 22 images |
-| Gallery render (lite): same pages | no gallery container; yaml code block with the standard code toolbar |
+| Gallery render, full: 3dprinting / house / rovi / fire-beetle | gallery container + 44 / 12 / 18 / 4 images |
+| Gallery render, lite: same pages | **identical** — 44 / 12 / 18 / 4 |
 
 The 13 thin pages (full) and the 17 lite URL misses are **pre-existing Phase 1
 scope** — dangling card uids and the dataset-url/route drift respectively — not
@@ -77,14 +79,17 @@ Phase 0 regressions. Both were present in the pre-Phase-0 survey.
 
 ### Deviations from the plan
 
-- Two work packages were added mid-flight: `WP-0.6` (sharp allowlist, from the
-  `OP-0.3` ruling that Phase 0 leaves no non-fatal warnings) and `WP-0.7` (the
-  `expand_galleries` gate, from the profile-keying footgun above).
-- The plan assumed lite would need a gallery fallback it did not previously
-  have. In fact lite *did* render galleries before this change; per the `OP-0.2`
-  ruling it now deliberately does not, in exchange for keeping the lazy parse
-  free of directory listing and per-image stat I/O. This is a deliberate
-  reduction in lite capability, not a regression escaping notice.
+- `WP-0.6` (sharp allowlist) was added mid-flight from the `OP-0.3` ruling that
+  Phase 0 leaves no non-fatal warnings.
+- `WP-0.7` was added, implemented, and then **withdrawn**. It made gallery
+  expansion opt-out so the lite lazy parse could skip it. That reduced a lite
+  capability that already worked, which `R-5` rules out of Phase 0 scope. The
+  code, the flag and its two tests were removed; nothing of it remains.
+- The plan assumed lite needed a gallery fallback it did not previously have.
+  It did not — lite rendered galleries all along, and still does. The fallback
+  is still worth having, but as the crash guard it was always meant to be: it
+  fires when a block genuinely yields no items (bad yaml, missing directory),
+  not as a profile-level opt-out.
 
 ## Discovery (pre-Phase 0)
 

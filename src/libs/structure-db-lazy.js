@@ -69,9 +69,9 @@ const ASSET_KEY_SEPARATOR = '::';
 // Version 5 also resolves link nodes nested in complex table AST.
 // Version 6 resolves root-absolute image paths against public/ (DD-3) and
 // stores the collected asset uid in meta_data.image.
-// Version 7 stops expanding `yaml gallery` / `yaml gallery_dir` blocks in the
-// lite profile (they render as highlighted yaml instead); v6 records still
-// carry the gallery items and would keep mounting the gallery.
+// Version 7 expands `yaml gallery_dir` blocks too (the collector used to match
+// the fence meta exactly, so only bare `yaml gallery` produced items); v6
+// records for gallery_dir pages carry none and would render as plain yaml.
 const RECORD_VERSION = 7;
 // Alt text marking the synthetic image appended for a frontmatter `image:`
 // path; the item is dropped after collection, only its asset/blob remain.
@@ -839,11 +839,7 @@ async function parseDocumentRecord(doc, rawText, hash) {
         base_dir: doc.base_dir,
         version_id: LAZY_VERSION_ID
     };
-    // expand_galleries=false: a gallery expansion lists a directory and stats
-    // every image, which the lazy per-page parse must not pay for. The block
-    // renders as highlighted yaml here; the full/static dataset export keeps
-    // the real gallery (see md_utils.js#createCodeEntry).
-    const result = await collectDocument({...config.collect, expand_galleries: false}, {entry, markdownText: body});
+    const result = await collectDocument(config.collect, {entry, markdownText: body});
     if (!result) {
         return null;
     }

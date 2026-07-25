@@ -5,10 +5,10 @@
  * renderer matched a prefix, so ```yaml gallery_dir produced no gallery items
  * yet still mounted <Gallery>, which dereferenced a null ast and aborted the
  * entire static build. The rules asserted here are (1) one shared classifier,
- * (2) both gallery forms expand identically in the dataset export, (3)
- * expand_galleries=false (the lite lazy parse) leaves them unexpanded but
- * still collects the fence as a highlightable code block, and (4) a malformed
- * block degrades instead of throwing.
+ * (2) both gallery forms expand identically for every caller — the dataset
+ * export and the lite on-demand parse share this code path, so lite renders
+ * galleries too, and (3) a block that yields no items degrades instead of
+ * throwing, and is still collected as a highlightable code block.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -61,11 +61,10 @@ function entryFor(dir) {
     };
 }
 
-function configFor(dir, expandGalleries) {
+function configFor(dir) {
     return {
         rootdir: dir,
         contentdir: dir,
-        expand_galleries: expandGalleries,
         folder_single_doc: false,
         file_link_ext: [],
         file_compress_ext: [],
@@ -79,11 +78,11 @@ function galleryItemsOf(result) {
     return codeBlock?.gallery_items ?? null;
 }
 
-async function collectBody(dir, body, expandGalleries) {
+async function collectBody(dir, body) {
     const originalCwd = process.cwd();
     try {
         process.chdir(dir);
-        return await collectDocument(configFor(dir, expandGalleries), {entry: entryFor(dir), markdownText: body});
+        return await collectDocument(configFor(dir), {entry: entryFor(dir), markdownText: body});
     } finally {
         process.chdir(originalCwd);
     }
@@ -92,31 +91,21 @@ async function collectBody(dir, body, expandGalleries) {
 const LIST_FORM = '```yaml gallery\n- ./shots/one.gif\n- ./shots/two.gif\n```\n';
 const DIR_FORM = '```yaml gallery_dir\ndir: ./shots/\n```\n';
 
-test('the dataset export expands the gallery list form', async () => {
+test('the gallery list form expands', async () => {
     const dir = makeWorkspace();
     try {
-        const items = galleryItemsOf(await collectBody(dir, LIST_FORM, true));
+        const items = galleryItemsOf(await collectBody(dir, LIST_FORM));
         assert.equal(items?.length, 2);
     } finally {
         rmSync(dir, {recursive: true, force: true});
     }
 });
 
-test('the dataset export expands the gallery_dir form to the same outcome', async () => {
+test('the gallery_dir form expands to the same outcome', async () => {
     const dir = makeWorkspace();
     try {
-        const items = galleryItemsOf(await collectBody(dir, DIR_FORM, true));
+        const items = galleryItemsOf(await collectBody(dir, DIR_FORM));
         assert.equal(items?.length, 2, 'dir form must list the directory and pick up both images');
-    } finally {
-        rmSync(dir, {recursive: true, force: true});
-    }
-});
-
-test('expand_galleries=false leaves both gallery forms unexpanded (lite parse)', async () => {
-    const dir = makeWorkspace();
-    try {
-        assert.equal(galleryItemsOf(await collectBody(dir, LIST_FORM, false)), null);
-        assert.equal(galleryItemsOf(await collectBody(dir, DIR_FORM, false)), null);
     } finally {
         rmSync(dir, {recursive: true, force: true});
     }
@@ -126,7 +115,7 @@ test('a malformed gallery block collects without throwing and yields no items', 
     const dir = makeWorkspace();
     try {
         const malformed = '```yaml gallery\n: : not yaml at all :\n```\n';
-        const items = galleryItemsOf(await collectBody(dir, malformed, true));
+        const items = galleryItemsOf(await collectBody(dir, malformed));
         assert.equal(items, null);
     } finally {
         rmSync(dir, {recursive: true, force: true});
@@ -137,17 +126,22 @@ test('a gallery pointing at a missing directory collects without throwing', asyn
     const dir = makeWorkspace();
     try {
         const missing = '```yaml gallery_dir\ndir: ./nope/\n```\n';
-        const items = galleryItemsOf(await collectBody(dir, missing, true));
+        const items = galleryItemsOf(await collectBody(dir, missing));
         assert.equal(items, null);
     } finally {
         rmSync(dir, {recursive: true, force: true});
     }
 });
 
-test('the code block is still collected as a normal asset when the gallery is not expanded', async () => {
+test('a gallery that yields no items is still collected as a highlightable code block', async () => {
     const dir = makeWorkspace();
     try {
-        const result = await collectBody(dir, DIR_FORM, false);
+        // This is the pair to the renderer's fallback: no gallery items, but
+        // the fence survives as a codeblock asset, so Code.astro has something
+        // to highlight instead of mounting <Gallery> on nothing.
+        const missing = '```yaml gallery_dir\ndir: ./nope/\n```\n';
+        const result = await collectBody(dir, missing);
+        assert.equal(galleryItemsOf(result), null);
         const codeAsset = (result?.assets ?? []).find((asset) => asset.type === 'codeblock');
         assert.ok(codeAsset, 'the fence must still exist as a codeblock asset so it can be highlighted');
         assert.equal(codeAsset.ext, 'yaml');
