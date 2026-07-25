@@ -6,6 +6,7 @@ import Gallery from '../../gallery/gallery.astro';
 import { config } from '@/config.js';
 import { getAssetInfoBlob_version } from '@/libs/structure-db';
 import { normalizeDiagramLanguage } from '@/libs/diagram-render.js';
+import { codeBlockKind } from 'content-structure/src/code_blocks.js';
 import DiagramCode from './DiagramCode.astro';
 
 export interface Props {
@@ -29,32 +30,41 @@ let language = assetLanguage || 'text'
 const params = asset?.params?asset.params.split(' '):[]
 const asset_uid = item.asset_uid
 
-const yaml_glb      = ((language == "yaml") && (asset?.params?.startsWith("glb")))
-const yaml_cards    = ((language == "yaml") && (asset?.params?.startsWith("cards")))
-const yaml_gallery  = ((language == "yaml") && (asset?.params?.startsWith("gallery")))
+// One shared classifier decides which custom component a ```yaml block wants
+// (see content-structure/src/code_blocks.js); this file must never re-derive
+// the rule, or it drifts from the collector again.
+const blockKind = codeBlockKind(language, asset?.params)
+
+// 3D / model-viewer is a full-only island (heavy deps, no native build in lite).
+const isLite = config.profile === 'lite'
+
+// A block only reaches its custom component when the collector actually
+// produced the data that component needs. When it did not — an unexpanded
+// gallery in lite, an empty or malformed gallery yaml, a model the profile
+// skipped — the block degrades to a plain highlighted yaml block. This is an
+// expected outcome, not an error: no warning, no error UI, and above all no
+// throw, because a single bad block used to abort the whole static build.
+const galleryModel = blockKind === 'gallery' ? item.ast?.gallery : null
+const yaml_gallery  = (blockKind === 'gallery') && Array.isArray(galleryModel) && galleryModel.length > 0
+const yaml_glb      = (blockKind === 'glb') && !isLite && Boolean(item.ast?.model)
+const yaml_cards    = (blockKind === 'cards')
 
 const is_diagram = Boolean(diagramLanguages[language])
 const custom_yaml = yaml_glb || yaml_cards || yaml_gallery
 const other_language = (!is_diagram && !custom_yaml)
 
-// 3D / model-viewer is a full-only island (heavy deps, no native build in lite).
-const isLite = config.profile === 'lite'
-
 ---
 {(is_diagram)&&
     <DiagramCode uid={asset_uid} code={code} language={language} params={params} meta={asset?.params} versionId={versionId} />
 }
-{yaml_glb && !isLite &&
+{yaml_glb &&
     <ModelViewerCode uid={asset_uid} code={code} model={item.ast.model}/>
-}
-{yaml_glb && isLite &&
-    <Highlighter uid={item.asset_uid} code={code} language={language} params={params} />
 }
 {yaml_cards &&
     <Cards code={code} />
 }
 {yaml_gallery &&
-    <Gallery model={item.ast.gallery} />
+    <Gallery model={galleryModel} />
 }
 {other_language&&
     <Highlighter uid={item.asset_uid} code={code} language={language} params={params} />

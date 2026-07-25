@@ -7,6 +7,7 @@ import remarkDirective from 'remark-directive'
 import remarkGfm from 'remark-gfm';
 import { JSDOM } from 'jsdom';
 import { shortMD5, get_config } from './collect.js';
+import { codeBlockKind } from './code_blocks.js';
 import { debug, warn } from './libs/log.js';
 import yaml from 'js-yaml'
 
@@ -350,8 +351,18 @@ async function createCodeEntry(node, state){
     const languageTag = language ? sanitizeTag(language) : null
     const metaRaw = typeof node.meta === 'string' ? node.meta : null
     const metaSlug = metaRaw ? sanitizeTag(metaRaw) : null
-    const isGallery = (languageTag === 'yaml') && (typeof metaRaw === 'string' && metaRaw.trim().toLowerCase() === 'gallery')
-    const isModel = (languageTag === 'yaml') && (typeof metaRaw === 'string' && metaRaw.trim().toLowerCase() === 'glb')
+    const blockKind = codeBlockKind(languageTag, metaRaw)
+    // Expanding a gallery means listing a directory and stat-ing every image.
+    // That is fine for the dataset export (`pnpm collect`, default true) but
+    // is exactly the per-parse I/O the lite profile's on-demand parse exists
+    // to avoid, so structure-db-lazy turns it off for its own calls. An
+    // unexpanded block carries no gallery items and the renderer degrades it
+    // to a highlighted yaml block. Deliberately NOT keyed on DOCS_PROFILE:
+    // the exported dataset must be profile-independent, or collecting under a
+    // lite .env would silently strip galleries from a full/static publish.
+    const galleriesEnabled = state.config?.expand_galleries !== false
+    const isGallery = (blockKind === 'gallery') && galleriesEnabled
+    const isModel = (blockKind === 'glb')
     state.codeCounter += 1
     const titleSlug = code_title_slug(node)
     const baseName = titleSlug ? `code-${state.codeCounter}-${titleSlug}` : `code-${state.codeCounter}`
@@ -386,6 +397,9 @@ async function createCodeEntry(node, state){
     state.assets.push(codeAsset)
     if(isGallery){
         await collectGalleryAssets(node, state, codeEntry)
+    }else if(blockKind === 'gallery'){
+        // Expected when the caller opted out, not a fault: debug level only.
+        debug(`   * gallery block left unexpanded (expand_galleries=false): ${uid}`)
     }
     if(isModel){
         const modelMap = await collectModelsAssets(node, state, codeEntry)

@@ -25,6 +25,13 @@ async function getSharp() {
     return sharpModule;
 }
 
+// Input formats sharp can decode. Anything outside this set (`.ico` is the one
+// this content actually uses) is skipped before sharp sees it, so an expected
+// gap does not surface as a warning. Extend this if sharp gains a decoder.
+const SHARP_DECODABLE_EXT = new Set([
+    'jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'tif', 'tiff', 'svg'
+]);
+
 function decodePathValue(pathValue){
     if(!pathValue){
         return pathValue
@@ -555,6 +562,15 @@ async function collectImageMetadata(assets, imageCatalog, existingImageKeys = ne
         }
         const existsOnDisk = await exists_abs(absPath)
         if(!existsOnDisk){
+            continue
+        }
+        // sharp decodes a fixed set of raster/vector formats. Content may
+        // legitimately reference others (favicons are the common case), and
+        // handing those to sharp only to catch the failure turns an expected
+        // situation into a warning. Skip them up front; a dimension-less image
+        // renders fine, it just gets no width/height hint.
+        if(!SHARP_DECODABLE_EXT.has(deriveImageExtension(asset))){
+            debug(`   * skipping image metadata for unsupported format '${asset.path ?? asset.uid}'`)
             continue
         }
         const sharp = await getSharp()
