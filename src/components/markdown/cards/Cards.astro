@@ -2,6 +2,7 @@
 import {getDocument, getEntry} from '@/libs/structure-db.js'
 import CardMeta from './CardsMeta.astro'
 import yaml from 'js-yaml'
+import {canonicalUid} from 'content-structure/src/identity.js'
 
 export interface Props {
   code: string;
@@ -28,11 +29,12 @@ try {
 // force-load it through getEntry before reading the document row. Plain
 // values come back unchanged from the sync backends, so the await is safe.
 const entries = await Promise.all(cards.map(async (card) => {
-    if (!card?.uid || !getDocument({uid: card.uid})) {
+    const uid = canonicalUid(card?.uid)
+    if (!uid || !getDocument({uid})) {
         return null;
     }
-    await getEntry({uid: card.uid});
-    return getDocument({uid: card.uid});
+    await getEntry({uid});
+    return getDocument({uid});
 }));
 const resolvedCards = entries
   .map((entry, index) => ({entry, config: cards[index]}))

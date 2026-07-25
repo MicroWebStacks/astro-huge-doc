@@ -30,6 +30,11 @@ import {config} from '../../config.js';
 import {basePrefix, blobFileName, blobFileUrl} from './blob-files.js';
 import {log_debug} from './utils.js';
 import {relationRowsFromItems, transformStoredItemLinks, visitAstLinks} from './ast-links.js';
+import {
+    canonicalDocumentPath,
+    identityForPath,
+    slugSegment
+} from 'content-structure/src/identity.js';
 
 // The parse pipeline (content-structure -> remark/jsdom, gray-matter) costs
 // >1 s of module loading; the walk-only startup must not pay it. It is
@@ -72,7 +77,12 @@ const ASSET_KEY_SEPARATOR = '::';
 // Version 7 expands `yaml gallery_dir` blocks too (the collector used to match
 // the fence meta exactly, so only bare `yaml gallery` produced items); v6
 // records for gallery_dir pages carry none and would render as plain yaml.
-const RECORD_VERSION = 7;
+// Version 8 moves document/reference identity to the shared path-only module;
+// cached link AST from v7 can retain an unresolved result for a spelling that
+// now resolves through canonical slug comparison.
+// Version 9 replaces the briefly tested dash-only document rule with gentle
+// normalization that preserves URL-unreserved filename characters and case.
+const RECORD_VERSION = 9;
 // Alt text marking the synthetic image appended for a frontmatter `image:`
 // path; the item is dropped after collection, only its asset/blob remain.
 const META_IMAGE_ALT = 'mws-meta-image';
@@ -171,7 +181,8 @@ const relationScanner = {
 };
 
 function headingSlug(text) {
-    return slugSegment(String(text ?? '').replace(/[*_`~[\]]/g, '').trim());
+    // Heading fragments are presentation slugs, not document identities.
+    return slugSegment(String(text ?? '').replace(/[*_`~[\]]/g, '').trim()).toLowerCase();
 }
 
 function splitHref(rawHref) {
@@ -182,11 +193,30 @@ function splitHref(rawHref) {
 
 function candidateDocument(documentsByPath, targetPath) {
     const normalized = posix.normalize(targetPath).replace(/^\.\//, '');
+    const extension = posix.extname(normalized).toLowerCase();
     const candidates = [normalized];
-    if (!/\.md$/i.test(normalized)) {
+    if (!extension) {
         candidates.push(`${normalized}.md`, posix.join(normalized, 'index.md'), posix.join(normalized, 'readme.md'));
     }
-    return candidates.map((candidate) => documentsByPath.get(candidate)).find(Boolean) ?? null;
+    return candidates.map((candidate) => documentsByPath.get(candidate)).find(Boolean)
+        ?? (extension === '' || extension === '.md'
+            ? documentsByPath.get(`canonical:${canonicalDocumentPath(normalized)}`)
+            : null)
+        ?? null;
+}
+
+function indexDocumentsByPath(documents) {
+    const result = new Map();
+    for (const doc of documents ?? []) {
+        if (doc?.path && !result.has(doc.path)) {
+            result.set(doc.path, doc);
+        }
+        const canonical = canonicalDocumentPath(doc?.path);
+        if (canonical && !result.has(`canonical:${canonical}`)) {
+            result.set(`canonical:${canonical}`, doc);
+        }
+    }
+    return result;
 }
 
 function classifyScannedHref(doc, rawHref, documentsByPath) {
@@ -399,7 +429,7 @@ function controlRelationIndex(action = 'start') {
     if (relationScanner.stopped) return relationIndexStatus();
     if (relationScanner.running || relationScanner.complete) return relationIndexStatus();
     relationScanner.documents = [...ensureTree().documents];
-    relationScanner.documentsByPath = new Map(relationScanner.documents.map((doc) => [doc.path, doc]));
+    relationScanner.documentsByPath = indexDocumentsByPath(relationScanner.documents);
     relationScanner.running = true;
     relationScanner.paused = false;
     relationScanner.stopped = false;
@@ -441,24 +471,6 @@ function statMtime(file) {
     }
 }
 
-/* Local slug rule (lite identity contract): lowercase, diacritics stripped,
-   runs of anything non-alphanumeric collapse to single dashes. Deliberately
-   self-contained — the walk must not load the parse pipeline's modules. */
-function slugSegment(name) {
-    const slug = String(name ?? '')
-        .trim()
-        .normalize('NFKD')
-        .replace(/[̀-ͯ]/g, '')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-    return slug || 'page';
-}
-
-function stripExtension(name) {
-    return String(name ?? '').replace(/\.[^.]+$/, '');
-}
-
 /* Landing-page selection, mirroring content-structure's get_url_type()
    (OKF plan DD-2/OP-6): per directory exactly one file takes the directory
    route, chosen by the priority list index.md > readme.md >
@@ -484,36 +496,6 @@ function levelFor(urlType, relPath) {
         return 1;
     }
     return urlType === 'file' ? 1 + dirDepth + 1 : 1 + dirDepth;
-}
-
-/* Lite identity contract: url = slugified relative path without extension,
-   label = filename (or folder name) without extension, verbatim. Frontmatter
-   is never read (deliberate divergence from the full profile). isLanding is
-   decided by the walk from the directory listing (pickLandingName). */
-function identityFor(relPath, isLanding) {
-    const segments = relPath.split('/');
-    const fileName = segments[segments.length - 1];
-    const dirSegments = segments.slice(0, -1);
-    const urlType = isLanding ? 'dir' : 'file';
-    let url;
-    let title;
-    if (urlType === 'dir') {
-        url = dirSegments.map(slugSegment).join('/');
-        title = dirSegments.length > 0 ? dirSegments[dirSegments.length - 1] : stripExtension(fileName);
-    } else {
-        url = [...dirSegments.map(slugSegment), slugSegment(stripExtension(fileName))].join('/');
-        title = stripExtension(fileName);
-    }
-    const slug = url === '' ? stripExtension(fileName) : url.split('/').pop();
-    return {url, title, slug, url_type: urlType};
-}
-
-function uidForUrl(url, slug) {
-    const segments = String(url ?? '').split('/').filter(Boolean);
-    if (segments.length > 0) {
-        return segments.join('.');
-    }
-    return String(slug ?? 'home').replaceAll('/', '.');
 }
 
 function shortMD5(text) {
@@ -582,7 +564,7 @@ function walkWorkspace() {
             let doc = null;
             if (!isDirectory && child.name.toLowerCase().endsWith('.md')) {
                 const isLanding = landingName !== null && child.name.toLowerCase() === landingName;
-                const identity = identityFor(relPath, isLanding);
+                const identity = identityForPath(relPath, isLanding);
                 const url = identity.url;
                 // Duplicate identity guard (OKF plan OP-4): first claimant of a
                 // url wins; later files are warned about and left un-routed —
@@ -591,7 +573,12 @@ function walkWorkspace() {
                     console.warn(`[lite] duplicate identity '${url || '/'}': '${relPath}' collides with '${usedUrls.get(url)}'; ignoring '${relPath}'`);
                 } else {
                     usedUrls.set(url, relPath);
-                    const uid = uidForUrl(url, identity.slug);
+                    const uid = identity.uid;
+                    const pathSegments = relPath.split('/');
+                    const fileName = pathSegments.at(-1) ?? '';
+                    const title = identity.url_type === 'dir' && pathSegments.length > 1
+                        ? pathSegments.at(-2)
+                        : fileName.replace(/\.[^.]+$/, '');
                     const level = levelFor(identity.url_type, relPath);
                     const orderKey = `${relDir || '.'}|${level}`;
                     const order = (orderTracker.get(orderKey) ?? 0) + 1;
@@ -603,7 +590,7 @@ function walkWorkspace() {
                         url,
                         url_type: identity.url_type,
                         slug: identity.slug,
-                        title: identity.title,
+                        title,
                         level,
                         order,
                         base_dir: relDir || '.'
@@ -916,7 +903,8 @@ async function parseDocumentRecord(doc, rawText, hash) {
             payload.items.splice(sentinelIndex, 1);
             // Point meta_data.image at the collected asset uid (as the full
             // profile does at collect time); consumers like cards must not
-            // re-derive the slugged uid, which lowercases file names.
+            // re-derive the asset uid from display text, which can differ from
+            // the exact URL-safe spelling preserved in document identity.
             if (sentinelAssetUid && typeof payload.row?.meta_data === 'string') {
                 try {
                     const meta = JSON.parse(payload.row.meta_data);
@@ -936,11 +924,9 @@ async function parseDocumentRecord(doc, rawText, hash) {
     // non-Markdown assets keep their original behavior. Each classified .md
     // link additionally carries its resolution outcome in `ast.rel`
     // (status/target_sid/raw) for unresolved-link rendering and the in-memory
-    // relations store (OKF plan TP-5/TP-8/RK-2). Matching is exact-case with
-    // URL-decoding only (OP-1).
-    const documentsByPath = new Map(
-        ensureTree().documents.map((candidate) => [candidate.path, candidate])
-    );
+    // relations store (OKF plan TP-5/TP-8/RK-2). Matching prefers the exact
+    // decoded source path, then the shared canonical document-path key.
+    const documentsByPath = indexDocumentsByPath(ensureTree().documents);
     for (const item of payload.items ?? []) {
         const transformed = transformStoredItemLinks(item, (link) => classifyStoredLinkAst(link, doc, documentsByPath));
         if (transformed !== item?.ast) item.ast = transformed;

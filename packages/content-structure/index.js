@@ -8,6 +8,9 @@ import { createBlobManager } from './src/blob_manager.js';
 import { computeVersionId } from './src/version_id.js';
 import { buildRelationRows } from './src/relations.js';
 import {resetDiagnostics, recordDiagnostic, getDiagnostics} from './src/diagnostics.js';
+import {codeBlockKind} from './src/code_blocks.js';
+import {canonicalUid} from './src/identity.js';
+import yaml from 'js-yaml';
 
 // sharp is loaded lazily and treated as optional: the JSON ("lite") profile
 // runs without it (image intrinsic dimensions are simply skipped). The SQLite
@@ -75,7 +78,9 @@ async function collect(config){
     // same url would silently overwrite each other; first wins, later ones are
     // ignored with a warning so links stay predictable.
     const claimedUrls = new Map()
+    const claimedUids = new Set()
     const relationSources = []
+    const cardReferences = []
 
     const originalCwd = process.cwd()
     try{
@@ -94,6 +99,7 @@ async function collect(config){
                 continue
             }
             claimedUrls.set(urlKey, entry.path)
+            claimedUids.add(entry.uid)
             assignDocumentOrder(entry, orderTracker)
             if(entry.version_id === undefined || entry.version_id === null){
                 entry.version_id = versionId
@@ -126,9 +132,61 @@ async function collect(config){
                 url_type: entry.url_type,
                 links: content?.links ?? []
             })
+            for(const code of content?.code ?? []){
+                if(codeBlockKind(code?.language, code?.meta) !== 'cards'){
+                    continue
+                }
+                try{
+                    const cards = yaml.load(code?.text ?? '')
+                    if(!Array.isArray(cards)){
+                        continue
+                    }
+                    for(const card of cards){
+                        if(card?.uid){
+                            cardReferences.push({
+                                sourcePath: entry.path,
+                                rawUid: String(card.uid),
+                                canonicalUid: canonicalUid(card.uid)
+                            })
+                        }
+                    }
+                }catch(_error){
+                    // Cards.astro owns the author-facing malformed-YAML error.
+                }
+            }
+        }
+        const reportedCardReferences = new Set()
+        for(const reference of cardReferences){
+            if(reference.canonicalUid && claimedUids.has(reference.canonicalUid)){
+                continue
+            }
+            const diagnosticKey = `${reference.sourcePath}\u0000${reference.canonicalUid}`
+            if(reportedCardReferences.has(diagnosticKey)){
+                continue
+            }
+            reportedCardReferences.add(diagnosticKey)
+            const message = `unresolved card uid '${reference.rawUid}' (canonical '${reference.canonicalUid || 'page'}')`
+            recordDiagnostic('unresolved_card_uid', reference.sourcePath, message)
+            warn(`(!) ${message} in '${reference.sourcePath}'`)
         }
         if(typeof writer.insertRelations === 'function'){
             const relationRows = await buildRelationRows({documents: relationSources, versionId})
+            const sourcePathBySid = new Map(relationSources.map((source) => [source.sid, source.path]))
+            const reportedDocumentLinks = new Set()
+            for(const relation of relationRows){
+                if(relation.status !== 'unresolved'){
+                    continue
+                }
+                const sourcePath = sourcePathBySid.get(relation.source_sid) ?? null
+                const diagnosticKey = `${sourcePath ?? ''}\u0000${relation.target_raw}`
+                if(reportedDocumentLinks.has(diagnosticKey)){
+                    continue
+                }
+                reportedDocumentLinks.add(diagnosticKey)
+                const message = `unresolved document link '${relation.target_raw}'`
+                recordDiagnostic('unresolved_document_link', sourcePath, message)
+                warn(`(!) ${message} in '${sourcePath ?? 'unknown'}'`)
+            }
             if(relationRows.length > 0){
                 writer.insertRelations(relationRows)
             }

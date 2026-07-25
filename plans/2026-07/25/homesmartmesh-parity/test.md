@@ -3,6 +3,51 @@
 Environment: Windows 11, Node 22, pnpm workspace, content set = HomeSmartMesh
 (73 documents, 199 MB) fetched per `manifest.yaml`.
 
+## Phase 1 Definition-of-Done run (2026-07-25)
+
+| # | Command / inspection | Actual |
+| --- | --- | --- |
+| 1 | `pnpm test` | **91/91 pass** |
+| 2 | Collect the unmodified content under the final identity rule | exit 0; 73 docs / 3517 items |
+| 3 | Inspect `content.json` identities from a clean pinned fetch | 73 unique URLs, 0 duplicate identities, 16 underscore URLs, 1 URL containing a dot |
+| 4 | Inspect persisted pre-migration diagnostics | 50 source-specific unresolved-card rows; 34 source-specific unresolved-document-link rows |
+| 5 | Full JSON/static build | **exit 0**, 115 pages, 64.24 s |
+| 6 | Lite static build | **exit 0**, 76 pages, 71.68 s; file walk reports all 73 documents |
+| 7 | Default SSR build | **exit 0**, 58.91 s |
+| 8 | `pnpm bench:lite -- --pages 1000` | 120 ms walk; 1 ms warm entry; 153 ms fresh-process cached entry; 1.81 s total to first page; 1.91 s cold SSR |
+| 9 | `pnpm check:plans` | pass |
+
+Focused fixtures prove that `Thread_SensorTag.md` retains its URL-safe spelling
+and case, underscore and dash spellings remain distinct, frontmatter
+`slug: custom-route` is ignored in favor of the filename, unsafe characters
+normalize consistently, and a `.js` link cannot fall through to a same-stem
+Markdown page.
+
+A later post-documentation rerun of the full suite was blocked before collection
+tests loaded because the local `glob@13.0.6` installation became unreadable and
+Node fell back to a nonexistent `glob/index.js`. The dependency-free identity
+suite still passes 3/3. This is a local `node_modules` state issue; the clean
+91/91 run above and the fetched-content collection/build evidence predate it.
+
+### HomeSmartMesh migration validation
+
+| Inspection | Actual |
+| --- | --- |
+| Audit the diagnostic arrays under the final rule | All 50 unresolved-card rows and all 34 unresolved-link rows classified and migrated |
+| Content change isolation | Branch `HomeSmartMesh/homesmartmesh.github.io@astro-huge-doc-migration`, commit `2a0385c`; mainline untouched |
+| Migration contents | No path renames; 21 modified Markdown files containing 3 frontmatter `slug` removals plus full-path card UID and stale-link repairs |
+| Fetch the exact pinned manifest branch into clean destinations | pass; archive resolves to `2a0385c` for content, public images, and public design |
+| Collect the freshly fetched branch | exit 0; 73 docs / 3517 items / 640 asset_info / 637 assets / 393 images; **0 unresolved card UIDs, 0 unresolved document links** |
+| Full JSON/static build from the fresh fetch | **exit 0**, 115 pages |
+| Legacy builder probe with exact `content-structure@1.1.10` | Collects 73 docs, but its short parent/title UIDs are incompatible with the new full-path UIDs; build later hits the pre-existing percent-encoded `Voronoi%20cells.jpg` route bug |
+| In-place fetch to the normal ignored `content/` destination | blocked by Windows `EBUSY` on `content/protocols/ultrawideband/DRTLS.webp`; clean-destination fetch above proves the branch and manifest |
+
+The pre-migration collect's 50 + 34 warnings were the migration worklist rather than
+collection failures. They are retained above as the before-state; the
+fresh-branch collect is the after-state and is clean. Vite's existing
+chunk-size/empty-chunk warnings and SSR `getStaticPaths` warnings remain
+later-phase scope.
+
 ## Phase 0 Definition-of-Done run (2026-07-25)
 
 | # | Command | Expected | Actual |

@@ -7,7 +7,7 @@ fetch:
   select: HomeSmartMesh/homesmartmesh.github.io
   github:
     - repo: MicroWebStacks/astro-big-doc
-      branch: main
+      branch: huge-doc-migration
       folders: [content]
       dest: content
     - repo: VectorMind/alm-ontology
@@ -17,15 +17,15 @@ fetch:
       branch: main
       dest: content
     - repo: HomeSmartMesh/homesmartmesh.github.io
-      branch: main
+      branch: astro-huge-doc-migration
       folders: [content]
       dest: content
     - repo: HomeSmartMesh/homesmartmesh.github.io
-      branch: main
+      branch: astro-huge-doc-migration
       folders: [public/images]
       dest: public/images
     - repo: HomeSmartMesh/homesmartmesh.github.io
-      branch: main
+      branch: astro-huge-doc-migration
       folders: [public/design]
       dest: public/design
 output:

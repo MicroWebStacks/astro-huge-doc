@@ -26,7 +26,7 @@ test('JSON collection persists malformed-frontmatter and duplicate-identity diag
     const jsonDir = join(outdir, 'json');
     try {
         await import('node:fs/promises').then(({mkdir}) => mkdir(contentdir, {recursive: true}));
-        writeFileSync(join(contentdir, 'A B.md'), '# First');
+        writeFileSync(join(contentdir, 'a b.md'), '# First');
         writeFileSync(join(contentdir, 'a-b.md'), '# Duplicate');
         writeFileSync(join(contentdir, 'broken.md'), '---\ntitle: Recovered\nbad: *\n---\n# Body');
         await collect({
@@ -72,4 +72,61 @@ description: "[not a link](./missing.md)"
     assert.deepEqual(rows.map((row) => row.status), ['resolved', 'resolved', 'external']);
     assert.deepEqual(rows.map((row) => row.source_heading), ['links', 'links', 'links']);
     assert.equal(rows.some((row) => row.target_raw === './missing.md'), false);
+});
+
+test('collection persists a canonical migration worklist for cards and links', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'identity-migration-worklist-'));
+    const contentdir = join(root, 'content');
+    const outdir = join(root, 'store');
+    const jsonDir = join(outdir, 'json');
+    try {
+        await import('node:fs/promises').then(({mkdir}) => mkdir(contentdir, {recursive: true}));
+        writeFileSync(join(contentdir, 'thread_sensortag.md'), '# Target');
+        writeFileSync(join(contentdir, 'source.md'), [
+            '# Source',
+            '',
+            '[Canonical spelling](./thread_sensortag.md)',
+            '[Missing](./missing_page.md)',
+            '',
+            '```yaml cards',
+            '- uid: thread_sensortag',
+            '- uid: missing_card',
+            '```'
+        ].join('\n'));
+
+        await collect({
+            rootdir: root,
+            contentdir,
+            outdir,
+            json_dir: jsonDir,
+            format: 'json',
+            folder_single_doc: false,
+            file_link_ext: [],
+            file_compress_ext: [],
+            external_storage_kb: 512,
+            inline_compression_kb: 32
+        });
+
+        const dataset = JSON.parse(readFileSync(join(jsonDir, 'content.json'), 'utf8'));
+        const diagnostics = dataset.diagnostics.map((entry) => ({
+            kind: entry.kind,
+            path: entry.path,
+            message: entry.message
+        }));
+        assert.deepEqual(diagnostics.map((entry) => entry.kind).sort(), [
+            'unresolved_card_uid',
+            'unresolved_document_link'
+        ]);
+        assert.ok(diagnostics.every((entry) => entry.path === 'source.md'));
+        assert.match(diagnostics.find((entry) => entry.kind === 'unresolved_card_uid').message, /missing_card/);
+        assert.match(diagnostics.find((entry) => entry.kind === 'unresolved_document_link').message, /missing_page/);
+
+        const relations = dataset.relations.map((entry) => [entry.target_raw, entry.status]);
+        assert.deepEqual(relations, [
+            ['./thread_sensortag.md', 'resolved'],
+            ['./missing_page.md', 'unresolved']
+        ]);
+    } finally {
+        rmSync(root, {recursive: true, force: true});
+    }
 });

@@ -98,7 +98,7 @@ test('directory links resolve to the landing document and extension-less links t
     }
 });
 
-test('matching is case-sensitive and URL-decoded (OP-1)', async () => {
+test('matching URL-decodes exact paths and canonicalizes document spellings', async () => {
     const {contentDir, rootDir} = makeFixture();
     try {
         mkdirSync(path.join(contentDir, 'docs'));
@@ -120,6 +120,7 @@ test('matching is case-sensitive and URL-decoded (OP-1)', async () => {
             docByPath
         });
         assert.notEqual(wrongCase.status, 'resolved');
+        assert.equal(wrongCase.target_sid, null);
     } finally {
         rmSync(contentDir, {recursive: true, force: true});
         rmSync(rootDir, {recursive: true, force: true});
@@ -139,4 +140,25 @@ test('targets escaping the content root are unresolved', async () => {
         rmSync(contentDir, {recursive: true, force: true});
         rmSync(rootDir, {recursive: true, force: true});
     }
+});
+
+test('document references preserve URL-safe underscores from target filenames', async () => {
+    const documents = [
+        {sid: 'source', path: 'guides/source.md', url_type: 'file', links: [
+            {url: './thread_sensortag.md', text: 'Target'},
+            {url: './Thread-SensorTag.md', text: 'Distinct dash spelling'},
+            {url: './thread-sensortag.js', text: 'Asset-like spelling'}
+        ]},
+        {sid: 'target', path: 'guides/thread_sensortag.md', url_type: 'file', links: []}
+    ];
+
+    const rows = await buildRelationRows({documents, versionId: 'test'});
+
+    assert.equal(rows.length, 3);
+    assert.equal(rows[0].status, 'resolved');
+    assert.equal(rows[0].target_sid, 'target');
+    assert.equal(rows[1].status, 'unresolved');
+    assert.equal(rows[1].target_sid, null);
+    assert.equal(rows[2].status, 'unresolved');
+    assert.equal(rows[2].target_sid, null);
 });

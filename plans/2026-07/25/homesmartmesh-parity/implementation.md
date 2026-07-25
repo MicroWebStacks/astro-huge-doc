@@ -2,11 +2,87 @@
 
 ## Progress
 
-[##----] Phase 0/5 Done - both static targets build; Phases 1-5 planned and decided, no code started.
+[###---] Phase 1/5 Done - shared path-only identity and migration reporting verified; awaiting maintainer review before Phase 2.
 
-Phase 1+ carries no implementation yet. The rulings that shape it (`R-6`..`R-15`),
-the two remaining open points (`OP-011`, `OP-012`), and the handover notes all
-live in `plan.md`.
+No Phase 2+ implementation has started. Every open point is resolved in
+`plan.md`. The content migration branch is now part of Phase 1 validation; only
+the external publishing-action cutover remains outside this packet (`R-17`).
+
+## Phase 1 — one identity rule and a downstream migration worklist (complete)
+
+### What changed
+
+| File | Change |
+| --- | --- |
+| `packages/content-structure/src/identity.js` (new) | Dependency-free owner of `slugSegment`, path → `{slug,url,uid}`, canonical document-reference keys, and canonical card UIDs. |
+| `packages/content-structure/src/collect.js` | Full collection derives identity only from the relative filename path. `frontmatter.slug` no longer affects slug, URL, or UID; titles remain display metadata. |
+| `src/libs/structure-db-lazy.js` | Lite imports the same identity functions for its file walk and canonical link matching. `RECORD_VERSION` 7 → 9 invalidates cached outcomes from both the old profile-local rule and the briefly tested aggressive shared rule. Heading anchors call the shared sanitizer separately and remain lowercase. |
+| `packages/content-structure/src/relations.js` | Markdown document references compare through the shared slug rule after exact-path lookup. Only extensionless and `.md` references get this fallback, so `foo.js` cannot accidentally resolve to `foo.md`. |
+| `src/components/markdown/cards/Cards.astro` | Authored card UIDs are canonicalized before lookup. Only unsafe characters normalize; URL-safe `_` and `-` remain distinct. |
+| `packages/content-structure/index.js` | Collection persists and prints a deduplicated, source-specific migration worklist for unresolved card UIDs and document links. |
+| `manifest.yaml` | All three HomeSmartMesh fetch entries temporarily pin `astro-huge-doc-migration`, keeping the breaking content shape off mainline while it is tested. |
+| `test/identity.test.js`, `test/okf-identity.test.js`, `test/okf-relations.test.js`, `test/okf-stage3.test.js` | Shared-rule, ignored-frontmatter-slug, canonical-reference, non-document-extension, and persisted-worklist coverage. |
+
+### Result on the HomeSmartMesh snapshot
+
+- 73 documents produce 73 unique URLs and UIDs; 16 URLs retain underscores,
+  one retains a dot, and there are zero duplicate-identity diagnostics.
+- Full and lite now preserve the exact URL-safe filename spelling:
+  `thread_sensortag.md` remains `thread_sensortag`; a dash spelling is a
+  different identity. This matches OKF's bundle-relative path identity and
+  standard GitHub filenames.
+- Every one of the 50 source-specific unresolved card-reference rows and 34
+  unresolved document-link rows exposed by the final rule was inspected. The
+  applied content migration has no path renames, removes three obsolete
+  frontmatter `slug` keys, and repairs full-path UIDs and stale links across 21
+  Markdown files.
+- The migration is committed and pushed as
+  `HomeSmartMesh/homesmartmesh.github.io@astro-huge-doc-migration`, commit
+  `2a0385c`. Collection from a fresh manifest fetch reports **zero unresolved
+  card UIDs and zero unresolved document links**.
+- Canonical fixture references resolve, while genuinely missing references
+  remain unresolved and render/report honestly.
+
+### Decisions made during implementation
+
+- Display titles stay profile-specific: full keeps the frontmatter title and
+  order metadata; lite keeps its filename/folder label without reading content
+  during startup. Only identity is shared.
+- Canonical comparison follows exact lookup and applies only to document-like
+  references. Asset extensions retain their own resolution path.
+- Document identity preserves URL-unreserved spelling and case. Heading
+  fragments remain independently lowercased, so heading behavior does not
+  dictate filename identity.
+- Migration diagnostics are deduplicated by `(source path, canonical target)`
+  for cards and `(source path, authored target)` for links. Relation rows still
+  retain every link occurrence for backlinks and context.
+- `getStaticPaths` and the catch-all route consume canonical URLs through the
+  backend document list; they do not re-derive paths locally.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| `pnpm test` | **91/91 pass** |
+| Pre-migration collect under the final identity rule | exit 0; 73 docs / 3517 items; 50 card + 34 link migration rows; zero duplicate identities |
+| Fresh manifest fetch of migration branch | commit `2a0385c`; all content, image, and design entries fetched successfully |
+| Collect freshly fetched migrated content | exit 0; 73 docs / 3517 items / 640 asset_info / 637 assets / 393 images; **0 card + 0 link diagnostics** |
+| Full JSON/static build from freshly fetched migration | **exit 0**, 115 pages |
+| Legacy `content-structure@1.1.10` compatibility probe | Collected all 73 documents but proved incompatible UID contracts (`esp32.*` vs `microcontrollers.esp32.*`); later failed on the pre-existing percent-encoded `/assets/3dprinting/Voronoi%20cells.jpg` route |
+| Full JSON/static build | **exit 0**, 115 pages |
+| Lite static build | **exit 0**, 76 pages; file walk finds all 73 documents |
+| Default SSR build | **exit 0** |
+| `pnpm bench:lite -- --pages 1000` | 1111 docs: 120 ms walk, 1 ms warm entry, 153 ms fresh-process cached entry, 1.81 s total to first page, 1.91 s cold SSR |
+
+The Vite chunk-size, empty-lite-model-viewer, unused `node:path` import, and
+dynamic-route `getStaticPaths` warnings are pre-existing later-phase scope; no
+Phase 1 identity warning or build failure remains.
+
+The normal in-place `pnpm fetch` could not replace
+`content/protocols/ultrawideband/DRTLS.webp` because another local process holds
+that file open on Windows (`EBUSY`). Fetching the exact same manifest entries
+into clean temporary destinations succeeded, so this is local working-copy
+state rather than a branch or archive failure.
 
 ## Phase 0 — make the site build (complete)
 

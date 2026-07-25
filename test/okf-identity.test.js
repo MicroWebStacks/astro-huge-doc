@@ -33,21 +33,23 @@ test('path segments are slugified for identity; title never affects the url', as
         const entries = await collectEntries(contentDir);
 
         assert.equal(entries.length, 1);
-        assert.equal(entries[0].url, 'my-folder/data-file');
+        assert.equal(entries[0].url, 'My-Folder/Data-File');
         assert.equal(entries[0].title, 'Completely Different Title');
     } finally {
         rmSync(contentDir, {recursive: true, force: true});
     }
 });
 
-test('frontmatter slug stays an explicit identity override', async () => {
+test('frontmatter slug is ignored; the filename remains the identity', async () => {
     const contentDir = makeContentDir('okf-identity-slug-');
     try {
         writeFileSync(path.join(contentDir, 'page one.md'), '---\nslug: custom-route\n---\n\n# Body');
 
         const entries = await collectEntries(contentDir);
 
-        assert.equal(entries[0].url, 'custom-route');
+        assert.equal(entries[0].url, 'page-one');
+        assert.equal(entries[0].slug, 'page-one');
+        assert.equal(entries[0].uid, 'page-one');
     } finally {
         rmSync(contentDir, {recursive: true, force: true});
     }

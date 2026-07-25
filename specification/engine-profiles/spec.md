@@ -53,20 +53,22 @@ Rules that follow:
 - Rendering code is shared across all three; anything that is *generation or
   storage* may be profile- or backend-specific.
 
-## Lite identity contract — filenames, not frontmatter
+## Document identity contract — filenames, not frontmatter
 
-The lite profile targets standard GitHub-style markdown repositories, where
-the file tree is the source of truth. It does not read frontmatter for
-identity:
+Both renderer profiles target OKF bundles and standard GitHub-style Markdown
+repositories, where the file tree is the source of truth:
 
 - A document's label is its filename without extension, verbatim (spaces and
-  original casing preserved).
-- A document's URL is its slugified relative path, without the file
-  extension.
-- Frontmatter titles and slug overrides are ignored in lite. This is a
-  deliberate divergence from the full profile (which keeps frontmatter/
-  title-derived slugs): the same workspace can produce different URLs in lite
-  and full, and lite deep links carry no cross-profile compatibility promise.
+  original casing preserved) in lite. Full may use frontmatter title and order
+  as display metadata.
+- A document's URL and UID derive from its relative path without the final
+  `.md`. Preserve RFC 3986 URL-unreserved ASCII characters (`A-Z`, `a-z`,
+  digits, `-`, `.`, `_`, `~`) and their case. Normalize only unsafe character
+  runs, such as spaces, to `-`.
+- URL-safe spellings are exact identity data: `thread_sensortag` and
+  `thread-sensortag` are distinct.
+- Frontmatter slug overrides are ignored in both profiles. Authors control
+  document identity by naming files.
 
 ## Extension performance contract
 

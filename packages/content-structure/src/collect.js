@@ -1,12 +1,13 @@
 import {globStream} from 'glob'
 import { readdir } from 'fs/promises';
-import { relative, resolve, join, sep, basename, dirname, parse, extname } from 'path';
+import { relative, resolve, join, sep, basename, dirname, extname } from 'path';
 import { load_text,exists,exists_public, load_yaml } from './utils.js';
-import { title_slug, buildDocumentContent } from './md_utils.js';
+import { buildDocumentContent } from './md_utils.js';
 import { createHash } from 'crypto';
 import {warn} from './libs/log.js'
 import { getStructureSchema } from './structure_db.js'
 import {parseMarkdownFrontmatter} from './frontmatter.js';
+import {identityForPath} from './identity.js';
 
 let config = {
     rootdir: process.cwd(),
@@ -25,46 +26,6 @@ const DOCUMENTS_TABLE_NAME = 'documents'
 
 let knownEntryFieldsPromise = null
 
-
-function slugPathSegment(value){
-    return title_slug(String(value ?? '')) || 'page'
-}
-
-function get_slug(data,path,url_type){
-    if(Object.hasOwn(data,"slug")){
-        return data.slug
-    }else if(url_type == "dir"){
-        return slugPathSegment(basename(dirname(path)))
-    }else{
-        return slugPathSegment(parse(path).name)
-    }
-}
-
-function buildDocumentUid(urlPath, slug, fallbackPath){
-    const normalizedUrl = normalizeUrlToUid(urlPath);
-    if(normalizedUrl){
-        return normalizedUrl;
-    }
-    if(slug){
-        return slug.replaceAll('/', '.');
-    }
-    const sanitizedPath = (fallbackPath ?? '').replace(/\.[^.]+$/, '').split('/').filter(Boolean).join('.');
-    if(sanitizedPath){
-        return sanitizedPath;
-    }
-    return shortMD5(fallbackPath ?? '');
-}
-
-function normalizeUrlToUid(urlPath){
-    if(!urlPath){
-        return null;
-    }
-    const segments = urlPath.split('/').filter(Boolean);
-    if(segments.length === 0){
-        return null;
-    }
-    return segments.join('.');
-}
 
 function shortMD5(text) {
     const hash = createHash('md5').update(text, 'utf8').digest('hex');
@@ -104,19 +65,6 @@ async function* get_all_files(ext_list){
     for await (const filePath of stream){
         const normalized = relative(config.contentdir,resolve(filePath)).split(sep).join('/')
         yield normalized
-    }
-}
-
-function entry_to_url(url_type,path,slug){
-    const slugifiedDirs = (dir) => dir === '.' || dir === ''
-        ? ''
-        : dir.split(/[\\/]/).filter(Boolean).map(slugPathSegment).join('/')
-    if(url_type == "dir"){
-        return slugifiedDirs(dirname(path))
-    }else{
-        const parsedPath = parse(path)
-        const dir = slugifiedDirs(parsedPath.dir)
-        return [dir, slug].filter(Boolean).join('/')
     }
 }
 
@@ -196,9 +144,7 @@ async function createMarkdownDocumentSource(file_path){
     const knownEntryFields = await getKnownEntryFieldSet()
     const {entryFields, modelFields} = partitionFrontmatter(data ?? {}, knownEntryFields)
 
-    const slug = get_slug(entryFields,file_path,url_type)
-    const url = entry_to_url(url_type,file_path,slug)
-    const uid = buildDocumentUid(url, slug, file_path)
+    const {slug, url, uid} = identityForPath(file_path, url_type === 'dir')
     const sid = shortMD5(uid)
     const level = entry_to_level(url_type,file_path)
     const base_dir = getDocumentBaseDir(file_path)
@@ -278,9 +224,7 @@ async function* collectSingleFolderDocuments(){
         }
         const markdownText = sections.join('\n\n')
         const url_type = 'dir'
-        const slug = get_slug({},primaryPath,url_type)
-        const url = entry_to_url(url_type,primaryPath,slug)
-        const uid = buildDocumentUid(url, slug, primaryPath)
+        const {slug, url, uid} = identityForPath(primaryPath, true)
         const sid = shortMD5(uid)
         const level = entry_to_level(url_type,primaryPath)
         const title = slug

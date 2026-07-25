@@ -12,10 +12,13 @@
 The goal is that `astro build --config astro.config.static.mjs` on this repo
 produces a static artifact that can replace the live site on GitHub Pages.
 
-**Status: Phase 0 is done — the build no longer aborts** (full 115 pages, lite
-76 pages, both exit 0). What remains is that the rendered output still diverges
-from the live site in page identity, several markdown features, asset
-completeness, and static-mode runtime behaviour.
+**Status: Phases 0 and 1 are done.** Both static targets build (full 115 pages,
+lite 76 pages), and one path-only identity rule now drives full and lite. The
+HomeSmartMesh migration worklist has been applied on branch
+`astro-huge-doc-migration`; a fresh manifest fetch produces zero unresolved
+card or document-link diagnostics and builds 115 pages. What remains is markdown
+feature parity, asset completeness, static-mode runtime behaviour, and
+deployment/regression guard work.
 
 ## Goal And Objectives
 
@@ -62,13 +65,15 @@ These constrain everything below and are not open for re-litigation:
 Rulings on the Phase 1+ open points. These **redefine what parity means** — see
 the note below the table.
 
-- **R-6 — Identity is the filename, everywhere.** One rule for lite, full, and
-  OKF: the url is the slugified relative file path, the label/title is for
-  display only and never enters a url. Filenames with spaces or special
-  characters are slugified. `frontmatter.slug` is **ignored** in every profile;
-  the `frontmatter.slug → title_slug(title) → filename` chain is not
-  reinstated. Authors control their urls by naming their files (`OP-002`,
-  `OP-003`, `DD-001`).
+- **R-6 — Website identity is the filename in both renderer profiles.** Lite and
+  full use the same website rule: the url is the slugified relative file path,
+  while the label/title is display-only. OKF itself supplies bundle-relative
+  path identity and does **not** require underscore-to-dash route
+  canonicalization. The renderer preserves URL-unreserved filename characters
+  and only normalizes unsafe characters such as spaces. `frontmatter.slug` is **ignored** in every
+  renderer profile; the `frontmatter.slug → title_slug(title) → filename`
+  chain is not reinstated. Authors control website urls by naming files
+  (`OP-002`, `OP-003`, `DD-001`).
 - **R-7 — Breaking url and uid compatibility is accepted.** The maintainer
   authors the HomeSmartMesh content and will rework it to match. No redirect
   map, no legacy uid alias index, no dual-resolution path. Where the new scheme
@@ -91,11 +96,15 @@ the note below the table.
 
 ### Round 3 (2026-07-25, asset storage and the slug rule)
 
-- **R-12 — The slug rule is lite's existing `slugSegment`, shared.** Lowercase,
-  strip diacritics, collapse every run of non-alphanumeric characters to a
-  single dash, trim leading/trailing dashes, fall back to `page` if nothing
-  remains. Underscores therefore become dashes. This is applied at *derivation*
-  time; files are **not** renamed (`OP-010`).
+- **R-12 — Website path normalization is gentle and OKF/GitHub-friendly.**
+  Preserve the RFC 3986 URL-unreserved ASCII set (`A-Z`, `a-z`, digits, `-`,
+  `.`, `_`, `~`) including case. Trim surrounding whitespace, strip diacritics
+  after NFKD normalization, collapse each remaining unsafe run (including
+  spaces) to one dash, trim boundary dashes, and fall back to `page` for an
+  empty, `.` or `..` segment. URL-safe spellings are distinct:
+  `thread_sensortag` does not alias `thread-sensortag`. HomeSmartMesh keeps its
+  original filenames; only broken references and obsolete frontmatter slugs
+  are migrated (`OP-010`).
 - **R-13 — Blob storage stays; the artifact ships only what it references.**
   `OP-005` Option A. Option B (serve source files in place) is rejected on
   measurement: it would grow the artifact. Option C (hotlink GitHub) is
@@ -108,12 +117,28 @@ the note below the table.
   has no effect on any JSON dataset's size, and presenting it as a global knob
   is how it came to be misunderstood (`OP-014`).
 
+### Round 4 (2026-07-25, public discovery surfaces)
+
+- **R-16 — The graph button and `explore/` pages ship publicly.** Both are
+  intentional improvements over the reference site, not extension-only
+  affordances. They must work in the full/json/static artifact without relying
+  on `/__lite/*` endpoints (`OP-011`).
+- **R-17 — Content migration is a validation bridge; publishing cutover remains
+  outside this packet.** This repository is a safe island for building and
+  validating the replacement builder. The HomeSmartMesh edits are isolated on
+  branch `astro-huge-doc-migration`, and this repository's manifest temporarily
+  pins that branch so the migrated content is exercised now. The later atomic
+  change to the publishing action and its content reference remains work in the
+  currently publishing repository, which does not yet use `astro-huge-doc`
+  (`OP-012`).
+
 **Consequence — parity is no longer url parity.** `R-1` set the publish target;
 `R-6`/`R-7` now say our urls are *deliberately* allowed to differ from
 <https://homesmartmesh.github.io/>. So the measured "34/73 divergent urls" stops
-being a defect count and becomes a **content migration list**. What remains
-under test is *render* parity: every page shows the same content, components,
-and assets the live site shows, at whatever url our scheme produces.
+being a defect count and became a **content migration list**, now applied and
+verified on the isolated content branch. What remains under test is *render*
+parity: every page shows the same content, components, and assets the live site
+shows, at whatever url our scheme produces.
 
 ## Scope
 
@@ -121,8 +146,8 @@ and assets the live site shows, at whatever url our scheme produces.
   manifest completeness, static-mode runtime guards, publish chrome, Pages
   deployment, a repeatable parity check.
 - Out (non-goals):
-  - Changing lite's identity contract. Under `R-6` it becomes the *universal*
-    rule — full adopts lite's behaviour, not the other way round (`DD-001`).
+  - Renaming otherwise URL-safe content paths to fit a renderer convention.
+    Both profiles instead adopt the gentle shared rule in `R-12`.
   - Matching the live site's urls (`R-7`).
   - Redesigning the UI to pixel-match the live theme (colours, spacing, dark
     default are cosmetic and deliberately diverged).
@@ -162,7 +187,7 @@ re-measured after Phase 0 and are in `OP-005`.
 `src/libs/structure-db-lazy.js` states the lite contract explicitly ("Frontmatter
 is never read"), and `packages/content-structure/src/collect.js#get_slug` dropped
 the `title_slug(title)` fallback that the legacy collector
-(`content-structure@1.1.10`) still has. Consequences, by profile:
+(`content-structure@1.1.10`) still has. Consequences before Phase 1, by profile:
 
 | Symptom | lite/json (lazy) | full/json + full/sqlite |
 | --- | --- | --- |
@@ -336,16 +361,19 @@ delete the divergence rather than bridge it, and to fix the content.
 
 | WP | Work | Notes |
 | --- | --- | --- |
-| WP-03 | Make filename-derived identity the only rule in the full profile: `get_slug` returns `slugSegment(filename)`, `frontmatter.slug` is ignored, `title` becomes display-only (`R-12`, `DD-001`). | Deletes code rather than adding it. Lite already behaves this way; full currently serves the raw filename. |
-| WP-04 | Extract one url/slug/uid derivation module imported by collect, `getStaticPaths`, the catch-all route, link rewriting, **and the lite tree walk**, so all five cannot drift (`DD-003`). Run *reference* strings through the same `slugSegment` so `esp32_remote` and `esp32-remote` resolve alike. | Closes root cause C, makes `R-6` structurally true rather than a convention, and shrinks the WP-07 worklist to genuinely-wrong references. |
+| WP-03 | Make filename-derived identity the only rule in the full profile: `get_slug` returns `slugSegment(filename)`, `frontmatter.slug` is ignored, `title` becomes display-only (`R-12`, `DD-001`). | Both profiles import the shared rule: full drops frontmatter identity and lite adopts gentle URL-safe-character preservation. |
+| WP-04 | Extract one url/slug/uid derivation module imported by collect, `getStaticPaths`, the catch-all route, link rewriting, **and the lite tree walk**, so all five cannot drift (`DD-003`). Exact source paths resolve first; canonical fallback normalizes unsafe characters but preserves URL-unreserved spelling, so `esp32_remote` and `esp32-remote` remain distinct. | Closes root cause C, makes `R-6` structurally true rather than a convention, and retains OKF/GitHub path identity. |
 | WP-05 | Resolve `yaml cards` uids against the new canonical uid. Report every unresolved uid as a build-time list — this is the content migration worklist, not a runtime fallback (`R-7`, `DD-004`). | 38/45 dangle today; each becomes a content edit. |
 | WP-06 | Rewrite internal markdown links through the resolved target document's served url, never the raw filename. Unresolved links are reported, not silently emitted as 404 hrefs. | Same worklist mechanism as WP-05. |
-| WP-07 | **Content migration**: apply the WP-05/WP-06 worklists to the HomeSmartMesh source — rename files whose desired url differs from their name, update card uids and internal links, remove `frontmatter.slug`. | Upstream content edit, in the content repo, not here. The one WP whose output is not code. |
 | WP-20 | Duplicate-slug guard: two files slugifying to the same url is an authoring error. First claimant wins, the loser is dropped with a `warn` naming both paths (`DD-004`). | Lite already has this (`structure-db-lazy.js:587`); WP-04 makes it shared. |
 
-Exit: every document url is derivable from its path by the single module; zero
-unresolved card uids or internal links; zero duplicate-slug warnings. **Not** an
-exit criterion any more: matching the live site's urls.
+Exit: every document url is derivable from its path by the single module;
+unresolved card uids and internal links are reported as a complete downstream
+migration worklist; canonical references resolve in focused fixtures; zero
+duplicate-slug warnings in the HomeSmartMesh snapshot. The worklist is applied
+and verified on the isolated migration branch; switching the publishing action
+remains outside this packet (`R-17`). **Not** an exit criterion any more:
+matching the live site's urls.
 
 ### Phase 2 — Missing markdown features
 
@@ -379,12 +407,13 @@ regression is visible rather than discovered.
 | WP | Work | Notes |
 | --- | --- | --- |
 | WP-15 | Guard `/__lite/*` clients (`lazy_navigation.js`, `lite_relation_indexer.js`) on `config.output !== 'static'` so the static artifact never issues them and never renders the "Link index unavailable" bar (`DD-006`). | Currently two console 404s + a visible failure bar on every published page. |
-| WP-16 | Make the breadcrumb+metadata area and the footer references+prev/next area **collapsible**, hidden by default, with sticky state — the existing indexing-status-bar pattern, reused (`R-10`, `OP-006`). No functionality is removed, in any profile. | Applies everywhere, not just to the published site: one behaviour, not a chrome profile. |
+| WP-16 | Make the breadcrumb+metadata area and the footer references+prev/next area **collapsible**, hidden by default, with sticky state — the existing indexing-status-bar pattern, reused (`R-10`, `OP-006`). Keep the graph button and `explore/` pages available on the public static site (`R-16`, `OP-011`). No functionality is removed, in any profile. | Applies everywhere, not just to the published site: one behaviour, not a chrome profile. The graph and Explore surfaces must use data emitted into the static artifact and must not call `/__lite/*`. |
 | WP-22 | Extract the collapsible-bar affordance (arrow control + persisted state) from the indexing status bar into a shared component before WP-16 consumes it three times. | Prerequisite for WP-16. Keeps the third copy from being written by hand. |
 | WP-17 | Head/branding parity: `<title>` (already correct on full), `<link rel="icon">` pointing at the fetched favicon, and a footer. Optionally add `description`/OG tags — the live site has none, so this is an improvement rather than parity. | |
 
 Exit: a published page has a clean console, no SSR-only requests, and no
-extension-only affordances.
+nonfunctional extension-only affordances; the graph button and `explore/`
+pages work from the static artifact.
 
 ### Phase 5 — Deployment and regression guard
 
@@ -402,70 +431,54 @@ regressions against the recorded baseline.
 | ID | Question | Resolution | Status |
 | --- | --- | --- | --- |
 | OP-001 | Which profile/backend is the publish target? | `DOCS_PROFILE=full DOCS_BACKEND=json DOCS_OUTPUT=static` for GitHub Pages. Every other profile must still render every page without failing, omitting features where it cannot render them (lite shows a gallery as a highlighted code block). | **Resolved** — `R-1`, `R-11` |
-| OP-002 | Match the live URL scheme exactly, or adopt our filename slugs? | Filename slugs, and break compatibility. Same author owns the content and will rework it. Title-slug is unified with lite and OKF; the author picks urls by naming files; title is a display label only. | **Resolved** — `R-6`, `R-7` |
+| OP-002 | Match the live URL scheme exactly, or adopt our filename paths? | Filename paths, and accept compatibility changes where the old title-derived identity differed. Both profiles use the gentle shared rule; OKF continues to identify entries by bundle-relative paths. The author picks website URLs by naming files; title is a display label only. | **Resolved** — `R-6`, `R-7` |
 | OP-003 | Does the lite filename-only identity contract change? | No — and now neither does full's. Both use filenames. The question dissolves: there is one contract, not two. | **Resolved** — `R-6` |
-| OP-004 | Legacy uid aliases — permanent feature or migration aid? | Neither. No alias index is built. A broken uid is a content bug and gets fixed in the content (WP-07). | **Resolved** — `R-7` |
+| OP-004 | Legacy uid aliases — permanent feature or migration aid? | Neither. No alias index is built. A broken uid is a content bug and is included in the downstream migration worklist. | **Resolved** — `R-7`, `R-17` |
 | OP-005 | Is 350 MB an acceptable Pages artifact, and can `blobs/` and `public/images` be de-duplicated? | **Option A**: blob store stays canonical, ship nothing unreferenced. 349.8 MB → ~241 MB. Option B (serve source in place) is rejected — it would make the artifact *larger*. See the use-case table below for where blob storage earns its keep. | **Resolved** — maintainer |
 | OP-006 | Which of breadcrumb / METADATA panel / footer refs / prev-next ship on the public site? | All of them, collapsed. Hidden by default behind a small arrow with sticky state, functionality unchanged, same pattern as the indexing status bar. | **Resolved** — `R-10` |
 | OP-007 | What does a root-absolute asset path mean? | One meaning: the content root, falling back to `public/` if the file exists there. Not currently in any spec — WP-23 writes it into one. Content that assumed otherwise is fixed as content. | **Resolved** — `R-8` |
 | OP-008 | Deploy as a user site (base `/`) or a project site with a base prefix? | Support both. `base` is an input, defaulting to `/`; the static config already reads `site`/`base` from env, so this is a test-and-document task, not a build change. | **Resolved** — `R-9` |
 | OP-009 | Does the fetched content snapshot match what the live site was built from? | Uses the same fetcher against the same url, so yes by construction. No separate verification WP. | **Resolved** — maintainer |
-| OP-010 | What exactly does "slugify a filename" do? | Adopt lite's existing `slugSegment` as the one shared rule. See the correction below: this needs **no file renames**. | **Resolved** — `R-12` |
-| OP-011 | Do the graph button and `explore/` pages ship on the public site? | **Undecided.** `R-10` covered the breadcrumb/metadata and footer bars but said nothing about these two. Both are features the live site does not have, so shipping them is an improvement, not a parity risk — but it is a product call, not a technical one. | **Open — blocks WP-16** |
-| OP-012 | How is the Phase 1 code/content split sequenced across two repos? | **Undecided.** Between WP-06 and WP-07 the published site is worse than today. Candidate approaches under the table below. | **Open — blocks Phase 1 merge** |
+| OP-010 | What exactly does "slugify a filename" do? | Preserve URL-unreserved filename characters and case; normalize only unsafe runs such as spaces. `_`, `.`, `~`, and `-` remain distinct literal path data. This follows OKF's path identity and ordinary GitHub filenames closely, and requires no HomeSmartMesh path renames. | **Resolved** — `R-12` |
+| OP-011 | Do the graph button and `explore/` pages ship on the public site? | Yes. Both ship as intentional public discovery features and must work in full/json/static without `/__lite/*` runtime dependencies. | **Resolved** — `R-16` |
+| OP-012 | How is the Phase 1 code/content split sequenced across two repos? | The content migration is isolated on `HomeSmartMesh/homesmartmesh.github.io@astro-huge-doc-migration`, and this manifest pins that branch for validation. The later one-commit publishing-action/content-reference cutover remains outside this packet. | **Resolved** — `R-17` |
 | OP-013 | Do the local blob duplicates (`dataset/blobs` sidecar tree, 217.5 MB, accumulating across runs) get pruned? | `WP-25`: the JSON backend writes straight to the flat served dir and never stages through the sidecar, so the duplication stops being *created* rather than being cleaned up after. | **Resolved** — `R-14` |
 | OP-014 | Should `external_storage_kb` become sqlite-only in name and effect? | Yes — scope it to the sqlite writer, or rename it to say what it does. | **Resolved** — `R-15` |
 
-### OP-010 — the rule, and a correction
+### OP-010 — gentle path normalization
 
-The rule is already written and already shipping in lite:
-[`slugSegment`, `structure-db-lazy.js:447`](../../../../src/libs/structure-db-lazy.js#L447)
-— lowercase → strip diacritics → collapse every run of `[^a-z0-9]+` to one dash
-→ trim dashes → fall back to `page`. WP-04 lifts it into the shared derivation
-module and the full profile starts using it.
+The official OKF v0.2 specification defines a Concept ID as the concept file's
+path within the bundle, minus `.md`; its link examples use exact relative
+paths. The renderer therefore preserves URL-unreserved filename characters
+and case instead of imposing a dash-only naming convention. `_`, `-`, `.`, and
+`~` are literal, distinct identity data. Only unsafe runs such as spaces are
+normalized to a dash, with the collision guard retained for the rare case
+where two unsafe names converge.
 
-**Correction to an earlier assessment in this packet.** It was previously stated
-here that adopting dashes "costs 15 file renames plus every card uid and
-internal link pointing at them". That was wrong, and the error matters because
-it inflated the apparent cost of the right answer. Slugification happens when
-the url is *derived*, not by renaming anything: `esp32_remote.md` stays
-`esp32_remote.md` on disk and is served at `/microcontrollers/esp32/esp32-remote`.
-Renaming is optional cosmetics, not migration work.
+The earlier aggressive rule was rejected before Phase 2. Under the final rule,
+`thread_sensortag.md` remains `/thread_sensortag/`, while
+`thread-sensortag.md` would be a different document. Heading-anchor
+normalization remains a separate, lowercase concern.
 
-What the content genuinely must fix is narrower: **references** that spell a
-target the old way (`yaml cards` uids, internal links). Even that shrinks if
-reference resolution runs the reference through `slugSegment` too, so
-`esp32_remote` and `esp32-remote` resolve to the same document — which WP-04
-gets for free by owning both sides. The residual worklist is then only genuinely
-ambiguous or genuinely wrong references.
+The HomeSmartMesh branch was corrected to retain every original content path.
+Its combined diff from main has no renames: 21 Markdown files are modified to
+remove three obsolete frontmatter `slug` keys and repair full-path card UIDs
+or genuinely stale document links. The final rule exposed 50 unresolved card
+rows and 34 unresolved link rows before those content edits; every row was
+inspected, and a fresh collection of the corrected branch reports zero of
+either kind.
 
-Two facts that make this decision easy rather than balanced:
+### OP-012 — scope boundary
 
-- Lite already produces `thread-sensortag`; only the full profile produces the
-  raw `thread_sensortag`. So this is full adopting lite's behaviour, not a new
-  third rule — and it is exactly what `R-6` asks for.
-- The **live site also serves `thread-sensortag`**. The dash form is what
-  existing inbound links already point at, so on the 15 underscore files the new
-  scheme happens to agree with the live site rather than diverging from it.
+There is no intermediate public deployment to coordinate in this repository.
+The content edits are committed on
+`HomeSmartMesh/homesmartmesh.github.io@astro-huge-doc-migration` at `2a0385c`,
+and `manifest.yaml` pins that branch for end-to-end validation. Mainline and
+the current public build remain untouched.
 
-The lossy-vs-strict sub-question is settled by the same code: `slugSegment` is
-lossy-safe (anything unmappable becomes a dash), and `DD-004`'s duplicate-slug
-guard is what catches a collision. Consistent with lite, and already tested
-there.
-
-### OP-012 — candidate sequencings (for the decision, not a recommendation)
-
-1. **Content-first.** Fix references upstream so they resolve under *both* the
-   old and new rule, then land the code. Safest; possible only where a
-   reference can be spelled compatibly.
-2. **Branch-and-cut.** Land the code behind a content branch, migrate content on
-   that branch, publish from it, then fast-forward. One switch-over moment.
-3. **Accept the trough.** Land code, publish broken landing pages for as long as
-   the content rework takes. Cheapest, and defensible only because
-   `R-7` already accepts a break.
-
-If reference resolution slugifies both sides (see `OP-010`), option 1 covers
-most of the worklist and the choice gets much less consequential.
+The later cutover is still one atomic change in the currently publishing
+repository: point its action at this proven builder and switch to the migrated
+content at the same time. Its action mechanics remain outside this packet.
 
 ### OP-005 — asset duplication: measured, with options
 
@@ -661,11 +674,11 @@ WP-15; if it fights Astro's static analysis, keep the warning and move on.
 
 - **WP-03 changes every URL.** `dataset/`, the html cache, and any stored
   relations keyed by url/uid must be rebuilt (`pnpm collect`), not migrated.
-- **Phase 1 spans two repos and cannot half-land.** WP-03..WP-06 change the
-  code here; WP-07 changes the content upstream. Between them the site is
-  *more* broken than today — the 38 dangling card uids stay dangling and the
-  34 url changes take effect. `OP-012` is the open decision; slugifying both
-  sides of a reference (`OP-010`) shrinks the trough considerably.
+- **The migration crosses a repository boundary.** WP-03..WP-06 change code
+  here. The resulting content edits are isolated and tested on the
+  `astro-huge-doc-migration` branch, which this manifest pins. Changing the
+  publishing action remains deliberately outside this packet (`R-17`); no
+  intermediate public deployment uses this experimental builder.
 - **Lite regression risk.** WP-03/WP-04 touch shared collector code and WP-04
   now explicitly folds the lite tree walk into the shared module. The
   extension's startup path and `pnpm bench:lite` numbers must be re-checked
@@ -690,8 +703,9 @@ packet as a whole.
 2. All 73 document URLs resolve in the artifact, each derived from its file path
    by the single derivation module (`R-6`). Matching the live site's urls is
    explicitly **not** required (`R-7`).
-3. 45/45 `yaml cards` uid references resolve, after the content rework; no
-   landing page renders an empty card grid. Zero duplicate-slug warnings.
+3. Canonical `yaml cards` uid references resolve in focused fixtures; every
+   unresolved HomeSmartMesh reference appears in the downstream migration
+   report. Zero duplicate-slug warnings.
 4. Zero pages contain raw directive text, an empty gallery, or a plain link
    where the live site renders `<model-viewer>` / a table / an iframe.
 5. All 16 `/data/**` download buttons resolve.
@@ -701,11 +715,13 @@ packet as a whole.
    included — verified by the crawl, not by inspection.
 8. Breadcrumb/metadata and footer-references/prev-next collapse by default and
    remember their state (`R-10`).
-9. The artifact ships no unreferenced asset; its composition is reported by the
+9. The graph button and `explore/` pages are present and functional in the
+   public static artifact, with no `/__lite/*` dependency (`R-16`).
+10. The artifact ships no unreferenced asset; its composition is reported by the
    build (`OP-005` Option A).
-10. The parity harness runs in CI and reports zero regressions against the
+11. The parity harness runs in CI and reports zero regressions against the
     recorded baseline.
-11. A GitHub Pages deployment from the workflow serves the artifact, verified at
+12. A GitHub Pages deployment from the workflow serves the artifact, verified at
     both `base = /` and a sub-path base (`R-9`).
 
 ---
@@ -716,26 +732,27 @@ Work paused here deliberately. Everything below is what a fresh reader needs.
 
 ### State
 
-**Phase 0 complete and verified.** Phases 1-5 are planned, decided, and **not
-started** — no Phase 1+ code exists.
+**Phases 0 and 1 complete and verified.** Phase 2+ is planned and **not
+started**. No planning decisions remain open.
 
 | Check | Result |
 | --- | --- |
-| `pnpm test` | 86/86 |
-| `pnpm collect` (repo `.env`, lite) | pass, ~7 s, no warnings |
+| `pnpm test` | 91/91 |
+| Pre-migration collect under the final identity rule | pass; 50 card + 34 link migration rows; zero duplicate identities |
+| Fresh pinned-branch collect (`2a0385c`) | 73 documents; zero unresolved card or document-link diagnostics |
 | Full static build | exit 0, 115 pages |
 | Lite static build | exit 0, 76 pages |
 | `pnpm check:plans` | pass |
 
-All Phase 0 code is committed:
+Phase 0 code is committed:
 
 | Commit | Contents |
 | --- | --- |
 | `961227a` | Phase 0 — shared classifier, renderer fallback, sharp allowlist |
 | `48a5871` | the `R-5` revert — `expand_galleries` removed, lite renders galleries again |
 
-Only this packet and `plans/open.md` are uncommitted, and they are documentation
-of the decisions above. There is no half-finished code in the tree.
+Phase 1 is complete in the working tree and intentionally paused for maintainer
+review before Phase 2.
 
 ### Reproducing the builds
 
@@ -762,23 +779,14 @@ before building the other.
 
 ### What to pick up next
 
-Phase 1, once `OP-012` is answered. Start at `WP-04` (the shared derivation
-module) rather than `WP-03`: WP-04 is what makes `R-6` structural, and if
-reference resolution slugifies both sides it shrinks WP-07's content worklist
-before that worklist is generated.
-
-Before Phase 2, re-count its feature usages against the working artifact — those
-numbers are the only ones in this plan still inherited from the broken build.
+After maintainer review, start Phase 2 by re-counting its feature usages against
+the working artifact — those numbers are the only ones in this plan still
+inherited from the broken build.
 
 ### Still open
 
-| ID | Question | Blocks |
-| --- | --- | --- |
-| `OP-011` | Do the graph button and `explore/` ship publicly? | `WP-16` |
-| `OP-012` | How to sequence the code/content split across two repos? | Phase 1 merge |
-
-Nothing else is undecided. Every other OP and DD in this document carries a
-resolution and the ruling that produced it.
+None. Every OP and DD in this document carries a resolution and the ruling that
+produced it.
 
 ### Superseded — do not resurrect
 
@@ -791,7 +799,7 @@ remembers an earlier decision finds out it changed instead of finding nothing:
   Superseded by `R-6`/`R-7`.
 - `OP-005` Options B and C — serve source in place; hotlink GitHub. Rejected on
   measurement by `R-13`.
-- The claim that dash-slugs cost 15 file renames. Wrong; corrected under
-  `OP-010`.
+- The aggressive underscore-to-dash route policy and its proposed content
+  renames. Rejected by the maintainer; corrected under `OP-010`.
 - The claim that small blobs are inlined into `content.json`. Wrong for JSON
   (true only for sqlite); corrected under `OP-005`.

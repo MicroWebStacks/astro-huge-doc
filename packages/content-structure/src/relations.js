@@ -11,10 +11,12 @@
 //   external   - scheme or protocol-relative URL
 //   unresolved - nothing matched; the page still renders (handoff §5.5)
 //
-// Matching is case-sensitive with URL-decoding and '/'-normalization only
-// (OP-1); anchor-only links are intra-document navigation, not relations.
+// Matching prefers the exact decoded source path, then compares document-like
+// targets through the shared filename slug rule. Anchor-only links are
+// intra-document navigation, not relations.
 import { posix } from 'path';
 import { exists, exists_public } from './utils.js';
+import {canonicalDocumentPath} from './identity.js';
 
 const EXTERNAL_URL_PATTERN = /^[a-zA-Z][a-zA-Z\d+.-]*:/
 
@@ -22,7 +24,18 @@ function normalizeSlashes(value){
     return String(value ?? '').replaceAll('\\','/')
 }
 
-async function resolveLinkRelation({sourcePath, rawUrl, docByPath}){
+function canonicalIndexFromPaths(docByPath){
+    const result = new Map()
+    for(const [path, doc] of docByPath?.entries?.() ?? []){
+        const canonical = canonicalDocumentPath(path)
+        if(canonical && !result.has(canonical)){
+            result.set(canonical, doc)
+        }
+    }
+    return result
+}
+
+async function resolveLinkRelation({sourcePath, rawUrl, docByPath, docByCanonicalPath = null}){
     const trimmed = String(rawUrl ?? '').trim()
     if(!trimmed){
         return null
@@ -55,8 +68,12 @@ async function resolveLinkRelation({sourcePath, rawUrl, docByPath}){
     // Exact path first, then two best-effort fallbacks: an extension-less
     // target may mean `<target>.md`, and a directory target resolves to that
     // directory's landing document (docByPath carries dir keys for those).
+    const canonicalIndex = docByCanonicalPath ?? canonicalIndexFromPaths(docByPath)
+    const targetExtension = posix.extname(contentPath).toLowerCase()
+    const documentLikeTarget = targetExtension === '' || targetExtension === '.md'
     const target = docByPath.get(contentPath)
-        ?? (posix.extname(contentPath) === '' ? docByPath.get(`${contentPath}.md`) : undefined)
+        ?? (targetExtension === '' ? docByPath.get(`${contentPath}.md`) : undefined)
+        ?? (documentLikeTarget ? canonicalIndex.get(canonicalDocumentPath(contentPath)) : undefined)
     if(target){
         return {status:'resolved', external:false, target_sid:target.sid, fragment}
     }
@@ -72,10 +89,15 @@ async function resolveLinkRelation({sourcePath, rawUrl, docByPath}){
 // documents: [{sid, path, url_type, links:[{url, text, heading, title}]}]
 async function buildRelationRows({documents = [], versionId = null}){
     const docByPath = new Map()
+    const docByCanonicalPath = new Map()
     for(const doc of documents){
         const path = normalizeSlashes(doc?.path)
         if(path && !docByPath.has(path)){
             docByPath.set(path, doc)
+        }
+        const canonicalPath = canonicalDocumentPath(path)
+        if(canonicalPath && !docByCanonicalPath.has(canonicalPath)){
+            docByCanonicalPath.set(canonicalPath, doc)
         }
     }
     // Landing documents also answer for their directory, so a link written as
@@ -95,7 +117,8 @@ async function buildRelationRows({documents = [], versionId = null}){
             const resolution = await resolveLinkRelation({
                 sourcePath: doc.path,
                 rawUrl: link?.url,
-                docByPath
+                docByPath,
+                docByCanonicalPath
             })
             if(!resolution){
                 continue
