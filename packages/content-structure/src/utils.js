@@ -101,7 +101,11 @@ async function load_json(rel_path,dir="content"){
 async function load_text(rel_path){
   const config = get_config()
   const path = join(config.contentdir,rel_path)
-  const filepath = decodeURIComponent(path)//could be an image url
+  return await load_text_abs(path)
+}
+
+async function load_text_abs(abs_path){
+  const filepath = decodeURIComponent(abs_path)//could be an image url
   const text = await readFile(filepath,'utf-8')
   return text
 }
@@ -143,6 +147,7 @@ export{
     load_yaml_code,
     load_json,
     load_text,
+    load_text_abs,
     list_to_map,
     add_documents,
     file_ext

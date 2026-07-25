@@ -67,7 +67,9 @@ const ASSET_KEY_SEPARATOR = '::';
 // used for unresolved-link rendering and the in-memory relations store, plus
 // OKF frontmatter columns (type/description/resource) on the document row.
 // Version 5 also resolves link nodes nested in complex table AST.
-const RECORD_VERSION = 5;
+// Version 6 resolves root-absolute image paths against public/ (DD-3) and
+// stores the collected asset uid in meta_data.image.
+const RECORD_VERSION = 6;
 // Alt text marking the synthetic image appended for a frontmatter `image:`
 // path; the item is dropped after collection, only its asset/blob remain.
 const META_IMAGE_ALT = 'mws-meta-image';
@@ -808,12 +810,14 @@ async function parseDocumentRecord(doc, rawText, hash) {
     // A frontmatter `image:` (card thumbnail) never appears in the body, so
     // the parse would not collect it. Append it as a sentinel image and let
     // collectDocument produce the asset/blob/dimensions exactly like a body
-    // image; the sentinel item itself is removed after collection. Absolute
-    // and external paths are skipped (they point outside the content tree).
+    // image; the sentinel item itself is removed after collection. External
+    // paths are skipped; root-absolute paths resolve against public/ (DD-3).
     let metaImageAppended = false;
     const metaImage = typeof frontmatter?.image === 'string' ? frontmatter.image.trim() : '';
-    if (metaImage && !metaImage.startsWith('/') && !/^[a-z][a-z\d+.-]*:/i.test(metaImage)) {
-        const metaImageAbs = join(contentDir(), posix.dirname(doc.path), metaImage);
+    if (metaImage && !/^[a-z][a-z\d+.-]*:/i.test(metaImage)) {
+        const metaImageAbs = metaImage.startsWith('/')
+            ? join(config.collect.rootdir ?? '', 'public', metaImage)
+            : join(contentDir(), posix.dirname(doc.path), metaImage);
         if (existsSync(metaImageAbs)) {
             body = `${body}\n\n![${META_IMAGE_ALT}](${metaImage})\n`;
             metaImageAppended = true;
@@ -905,7 +909,20 @@ async function parseDocumentRecord(doc, rawText, hash) {
             (item) => item?.type === 'image' && item.body_text === META_IMAGE_ALT
         );
         if (sentinelIndex !== -1) {
+            const sentinelAssetUid = payload.items[sentinelIndex]?.asset_uid ?? null;
             payload.items.splice(sentinelIndex, 1);
+            // Point meta_data.image at the collected asset uid (as the full
+            // profile does at collect time); consumers like cards must not
+            // re-derive the slugged uid, which lowercases file names.
+            if (sentinelAssetUid && typeof payload.row?.meta_data === 'string') {
+                try {
+                    const meta = JSON.parse(payload.row.meta_data);
+                    if (meta && typeof meta === 'object') {
+                        meta.image = sentinelAssetUid;
+                        payload.row.meta_data = JSON.stringify(meta);
+                    }
+                } catch { /* malformed meta_data: leave untouched */ }
+            }
         }
     }
 

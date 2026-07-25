@@ -482,16 +482,23 @@ async function ensureFrontmatterImageAsset(entry, content, assetList){
         return
     }
     const resolved = resolveEntryAssetPath(entry, trimmed)
-    if(!resolved || resolved.startsWith('/')){
+    if(!resolved){
         return
     }
-    const cleanedPath = normalizeRelativePath(resolved)
+    // Root-absolute image paths resolve against public/ (DD-3); the asset is
+    // registered with its absolute path and annotateAssets fills abs_path.
+    const isPublic = resolved.startsWith('/')
+    const cleanedPath = isPublic
+        ? resolved.replaceAll('\\','/')
+        : normalizeRelativePath(resolved)
     if(!cleanedPath){
         return
     }
     let asset = assetList.find((entryAsset)=>entryAsset?.path === cleanedPath)
     if(!asset){
-        const existsLocally = await exists(cleanedPath)
+        const existsLocally = isPublic
+            ? await exists_public(cleanedPath)
+            : await exists(cleanedPath)
         if(!existsLocally){
             return
         }

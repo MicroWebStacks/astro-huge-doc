@@ -1,6 +1,6 @@
 import slugify from 'slugify'
 import { readdir } from 'fs/promises'
-import { file_ext, get_next_uid, load_text, exists } from './utils.js'
+import { file_ext, get_next_uid, load_text_abs, exists, exists_public, exists_abs } from './utils.js'
 import {dirname, basename,parse, join} from 'path'
 import {remark} from 'remark'
 import remarkDirective from 'remark-directive'
@@ -37,16 +37,16 @@ function ensureUniqueSlug(state, slug){
     return unique
 }
 
-async function get_image_text(path){
-    if(!await exists(path)){
+async function get_image_text(abs_path){
+    if(!await exists_abs(abs_path)){
         //silence warning as redundant with the assets check warning
-        //warn(`(X) image ${path} does not exist`)
+        //warn(`(X) image ${abs_path} does not exist`)
         return ""
     }
-    if(!path.endsWith(".svg")){//only SVG supported for now
+    if(!abs_path.endsWith(".svg")){//only SVG supported for now
         return ""
     }
-    const svgText = await load_text(path)
+    const svgText = await load_text_abs(abs_path)
 
     const dom = new JSDOM(svgText, { contentType: 'image/svg+xml' });
     const textElements = dom.window.document.querySelectorAll('text');
@@ -458,14 +458,23 @@ async function buildImageAsset(node, state, imageEntry, extRaw){
         return null
     }
     const path = resolveDocumentAssetPath(state.entry, rawUrl)
-    if(!path || path.startsWith('/')){
+    if(!path){
         return null
     }
-    const existsLocally = await exists(path)
-    if(!existsLocally){
-        return null
+    // Root-absolute paths are served from public/ when present there (DD-3)
+    let abs_path
+    if(path.startsWith('/')){
+        if(!await exists_public(path)){
+            return null
+        }
+        abs_path = join(state.config.rootdir ?? '', 'public', path)
+    }else{
+        if(!await exists(path)){
+            return null
+        }
+        abs_path = join(state.config.contentdir ?? '', path)
     }
-    const textList = await get_image_text(path)
+    const textList = await get_image_text(abs_path)
     if(textList !== undefined && textList !== null){
         imageEntry.text_list = textList
     }
@@ -478,7 +487,7 @@ async function buildImageAsset(node, state, imageEntry, extRaw){
         path,
         ext:extRaw ?? file_ext(rawUrl),
         exists:true,
-        abs_path:join(state.config.contentdir ?? '', path)
+        abs_path
     }
     return asset
 }

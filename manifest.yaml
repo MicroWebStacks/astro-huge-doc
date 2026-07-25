@@ -1,5 +1,5 @@
 render:
-  folder: demo
+  folder: content
   highlighter:
     theme: dark-plus
     langs: ['javascript','js','python','yaml', 'markdown', 'mermaid', 'text']
@@ -20,6 +20,14 @@ fetch:
       branch: main
       folders: [content]
       dest: content
+    - repo: HomeSmartMesh/homesmartmesh.github.io
+      branch: main
+      folders: [public/images]
+      dest: public/images
+    - repo: HomeSmartMesh/homesmartmesh.github.io
+      branch: main
+      folders: [public/design]
+      dest: public/design
 output:
   ssr: dist
   content: content

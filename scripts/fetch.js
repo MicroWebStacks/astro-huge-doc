@@ -226,6 +226,9 @@ async function main() {
     const tempDir = await prepareTempDir();
 
     try {
+      // Several manifest entries can target the same repo (different
+      // folder/dest mappings); download and extract each repo only once.
+      const extractedRoots = new Map();
       for (const config of configs) {
         console.log(
           `\nProcessing ${config.owner}/${config.repoName}@${config.branch} -> ${path.relative(
@@ -234,23 +237,28 @@ async function main() {
           )}`,
         );
 
-        const archivePath = path.join(tempDir, `${config.repoName}-${Date.now()}.zip`);
-        await downloadArchive({
-          octokit,
-          owner: config.owner,
-          repo: config.repoName,
-          ref: config.branch,
-          targetPath: archivePath,
-        });
+        const repoKey = `${config.owner}/${config.repoName}@${config.branch}`;
+        let extractedRoot = extractedRoots.get(repoKey);
+        if (!extractedRoot) {
+          const archivePath = path.join(tempDir, `${config.repoName}-${Date.now()}.zip`);
+          await downloadArchive({
+            octokit,
+            owner: config.owner,
+            repo: config.repoName,
+            ref: config.branch,
+            targetPath: archivePath,
+          });
 
-        const extractedRoot = await extractArchive(archivePath, tempDir, config.repoName);
+          extractedRoot = await extractArchive(archivePath, tempDir, config.repoName);
+          extractedRoots.set(repoKey, extractedRoot);
+          await fsp.rm(archivePath, { force: true });
+        }
+
         await moveRequestedContent({
           extractedRoot,
           folders: config.folders,
           destPath: config.destPath,
         });
-
-        await fsp.rm(archivePath, { force: true });
       }
       console.log("\nFetch complete.");
     } finally {
