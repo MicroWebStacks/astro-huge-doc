@@ -28,7 +28,9 @@
     "ext:install": "code --install-extension packages/vscode-extension/markdown-site-preview.vsix --force",
     "ext:reinstall": "pnpm ext:package && pnpm ext:install",
     "engine:release": "node scripts/release-engine.js",
-    "ext:release": "node scripts/release-extension.js"
+    "ext:release": "node scripts/release-extension.js",
+    "check:artifact": "node scripts/check-static-artifact.js",
+    "check:parity": "node scripts/parity-metrics.js"
   },
   "dependencies": {
     "@astrojs/node": "^9.5.1",

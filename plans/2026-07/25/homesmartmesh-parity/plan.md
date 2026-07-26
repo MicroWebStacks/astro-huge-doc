@@ -12,13 +12,15 @@
 The goal is that `astro build --config astro.config.static.mjs` on this repo
 produces a static artifact that can replace the live site on GitHub Pages.
 
-**Status: Phases 0 and 1 are done.** Both static targets build (full 115 pages,
-lite 76 pages), and one path-only identity rule now drives full and lite. The
+**Status: Phases 0, 1, 2, 4 and 5 are done; Phase 3 is partial (`WP-13` only).** Both static targets build (full 115
+pages, lite 76 pages), and one path-only identity rule now drives full and lite. The
 HomeSmartMesh migration worklist has been applied on branch
 `astro-huge-doc-migration`; a fresh manifest fetch produces zero unresolved
-card or document-link diagnostics and builds 115 pages. What remains is markdown
-feature parity, asset completeness, static-mode runtime behaviour, and
-deployment/regression guard work.
+card or document-link diagnostics and builds 115 pages. The full artifact now
+renders the missing iframe, external GLB, XLSX, gallery-directory, and
+text-directive forms. Static-mode runtime correctness, publish chrome, the Pages workflow and the
+regression harness all landed in Phases 4-5. What remains is **Phase 3's asset
+work**: `WP-14`, `WP-21`, `WP-23` and `WP-25`.
 
 ## Goal And Objectives
 
@@ -31,9 +33,9 @@ deployment/regression guard work.
 3. Every markdown feature used by the content renders as it does live — no raw
    directive text, no empty galleries, no dropped 3D models or spreadsheets.
 4. The published pages carry no SSR-only runtime calls, no console 404s, and no
-   visible "index unavailable" chrome.
-5. The site can be deployed from CI with the existing reusable render action, at
-   either a root or a sub-path `base`.
+   visible "index unavailable" chrome. ✔ **met by WP-15**
+5. The site can be deployed from CI at either a root or a sub-path `base`. ✔
+   **met by Phase 5** — though not through `action.yml`; see `WP-18`.
 6. Every non-publish profile still renders every page without failing (`R-11`).
 
 ## Maintainer Rulings (2026-07-25)
@@ -51,9 +53,9 @@ These constrain everything below and are not open for re-litigation:
   fallback is the floor for what lite may do, never a target to aim at.
 - **R-4 — Phase 0 comes first and is real work.** No further phase planning is
   trustworthy until the site builds and pages can actually be compared. *(Phase
-  0 is now complete; Phases 1, 3, 4 and 5 were re-derived against the working
-  build in rounds 2-3. Phase 2's feature counts still come from the
-  broken-build survey — see the note above Phase 1.)*
+  0 is complete; Phases 1, 3, 4 and 5 were re-derived against the working
+  build in rounds 2-3. Phase 2 was subsequently implemented and its feature
+  counts were verified against the emitted full/static artifact.)*
 - **R-5 — Phase 0 removes nothing that already worked.** Lite rendered
   galleries before this packet, so it must render them after. Phase 0 is the
   minimum change that makes the build succeed; any capability reduction is out
@@ -117,6 +119,16 @@ the note below the table.
   has no effect on any JSON dataset's size, and presenting it as a global knob
   is how it came to be misunderstood (`OP-014`).
 
+### Round 5 (2026-07-25, the crossed C3 documents)
+
+- **R-18 — The C3 DevKit M1 crossing is a content inconsistency, not a
+  rendering issue, and is accepted as-is.** The two documents are each named
+  after the other's title, so under `R-6` their URLs read backwards. Both
+  render correctly and both exist on the live site. No renderer change, no
+  content edit, no redirect: `OP-015` Option C. The rich board page serves at
+  `/microcontrollers/esp32/esp32-c3-devkitm-1`. This is consistent with `R-7` —
+  our urls are deliberately allowed to differ from the live site's.
+
 ### Round 4 (2026-07-25, public discovery surfaces)
 
 - **R-16 — The graph button and `explore/` pages ship publicly.** Both are
@@ -177,7 +189,7 @@ re-measured after Phase 0 and are in `OP-005`.
 | `:iframe[]` directives | 2 (both render as raw attribute text) |
 | Remote `.glb` links | 12 (render as plain links; live renders `<model-viewer>`) |
 | `.xlsx` links | 2 (render as plain links; live renders a table) |
-| `/data/*.zip|hex` download buttons | 16 (all 404 locally; all 200 live) |
+| `/data/*.zip\|hex` download buttons | **14** (all 404 locally; all 200 live). The survey said 16; two of those were `/opt/zigbee2mqtt/data/configuration.yaml` and `.../data/database.db` in prose, matched by a loose `/data/` grep. Corrected during `WP-13`, which resolves all 14. |
 | `yaml gallery` / `yaml gallery_dir` blocks | ✔ 8 / 1 — both forms now expand in both profiles |
 | Console errors on every static page | `GET /__lite/navigation` 404, `GET /__lite/index-control?action=start` 404, plus a visible "Link index unavailable" status bar |
 
@@ -345,12 +357,12 @@ build works.
 
 ## Phases 1-5
 
-Revised 2026-07-25 (round 2) against the working build and the round-2 rulings.
-Phase 1 was rewritten outright; Phase 3's sizing WP and Phase 4's chrome WP are
-now backed by measurements rather than estimates. What has **not** yet been
-re-derived from the working artifact is the Phase 2 feature list (iframe, glb,
-xlsx, directive audit) — those counts still come from the broken-build survey
-and should be re-counted before Phase 2 starts.
+Revised 2026-07-25 against the working build and the round-2 rulings. Phase 1
+was rewritten outright; Phase 3's sizing WP and Phase 4's chrome WP are backed
+by measurements rather than estimates. Phase 2's iframe, GLB, XLSX, gallery,
+and directive counts were re-counted against its completed full/static
+artifact. Implementation facts and exact validation results live in
+`implementation.md` and `test.md`.
 
 ### Phase 1 — One identity rule, and the content migration it forces
 
@@ -392,8 +404,8 @@ where the live site renders a component.
 
 | WP | Work | Notes |
 | --- | --- | --- |
-| WP-13 | Extend `manifest.yaml` fetch to `public/data`, `public/favicon.svg`, `public/favicon.png`, `public/.nojekyll`. | Closes 16 download-button 404s. `.nojekyll` is required for GitHub Pages to serve `_astro/`. |
-| WP-14 | Ship `public/**` only for paths the built HTML actually references (`OP-005`, Option A). Add an artifact-composition report to the build. | **−86.8 MB of 349.8 MB (−25%)** on measured numbers, with no change to what any page renders. |
+| WP-13 | Extend `manifest.yaml` fetch to `public/data`, `public/favicon.svg`, `public/favicon.png`, `public/.nojekyll`. | **Done.** Closes all 14 download-button 404s (not 16 — see the baseline note). Needed a `files:` entry form in `scripts/fetch.js`: folder entries reset their destination, so `folders: [public]` would have deleted the sibling `public/images` and `public/design` fetches. `.nojekyll` is belt-and-braces — `actions/upload-pages-artifact` bypasses Jekyll anyway — but it matches the source repo and costs nothing. |
+| WP-14 | Ship `public/**` only for paths the built HTML actually references (`OP-005`, Option A). Add an artifact-composition report to the build. | **−86.8 MB of 356.9 MB (−24%)** on measured numbers, with no change to what any page renders. `WP-13` added `dist/data` (3.1 MB / 17 files), of which **3 files are unreferenced**: two space-named duplicates of underscore-named archives, and the bare `ot-rcp-com-1.2-usb_27.08.2021.hex` whose `.zip` is what the page links. The scan must percent-encode before comparing — one live href contains spaces. |
 | WP-21 | Prune blobs that no emitted page references. | Measured at 249 files / **0.5 MB** — negligible, so this is hygiene, not a size lever. Do it with WP-14 or not at all. |
 | WP-25 | JSON backend writes blob bytes straight to the flat served dir, bypassing the date-sharded sidecar tree it currently stages through (`OP-013`). Keep the sidecar for sqlite, where it is load-bearing. | Removes 198.4 MB of local duplication and the unbounded cross-run accumulation. No effect on the artifact. Also makes `external_storage_kb` honestly sqlite-only. |
 | WP-23 | Write the asset-path resolution rule into a spec and make one module implement it: a root-absolute path resolves against the **content root**, falling back to `public/` only when the file exists there (`R-8`, `OP-007`). Report content that resolves to neither. | No spec covers this today — `specification/` has no absolute-path rule at all, and `structure-db-lazy.js` carries its own `DD-3` comment about resolving against `public/`. 199 of 264 image assets are root-absolute, so this rule decides most of them. |
@@ -406,10 +418,10 @@ regression is visible rather than discovered.
 
 | WP | Work | Notes |
 | --- | --- | --- |
-| WP-15 | Guard `/__lite/*` clients (`lazy_navigation.js`, `lite_relation_indexer.js`) on `config.output !== 'static'` so the static artifact never issues them and never renders the "Link index unavailable" bar (`DD-006`). | Currently two console 404s + a visible failure bar on every published page. |
-| WP-16 | Make the breadcrumb+metadata area and the footer references+prev/next area **collapsible**, hidden by default, with sticky state — the existing indexing-status-bar pattern, reused (`R-10`, `OP-006`). Keep the graph button and `explore/` pages available on the public static site (`R-16`, `OP-011`). No functionality is removed, in any profile. | Applies everywhere, not just to the published site: one behaviour, not a chrome profile. The graph and Explore surfaces must use data emitted into the static artifact and must not call `/__lite/*`. |
-| WP-22 | Extract the collapsible-bar affordance (arrow control + persisted state) from the indexing status bar into a shared component before WP-16 consumes it three times. | Prerequisite for WP-16. Keeps the third copy from being written by hand. |
-| WP-17 | Head/branding parity: `<title>` (already correct on full), `<link rel="icon">` pointing at the fetched favicon, and a footer. Optionally add `description`/OG tags — the live site has none, so this is an improvement rather than parity. | |
+| WP-15 | Guard `/__lite/*` clients on `config.output !== 'static'` (`DD-006`). | **Done.** The cause was not where the survey put it: the clients were already gated on `extensionPreviewEnabled()`, but the repo `.env` sets `MICROWEBSTACKS_EXTENSION_MODE=true`, so the plan's own lite reproduction command baked the whole preview surface into a static artifact. New `extensionPreviewClientEnabled()` adds the output condition; `scripts/check-static-artifact.js` is the `DD-006` gate and checks reachability rather than a flat grep. |
+| WP-16 | Make the breadcrumb+metadata area and the footer references+prev/next area **collapsible**, hidden by default, with sticky state (`R-10`, `OP-006`). Keep the graph button and `explore/` pages available (`R-16`, `OP-011`). | **Done** via `CollapsibleBand`. The graph trigger stays *outside* the band: `R-16` ships it as a public discovery affordance, so it must not need an extra click to be found. Neither the graph nor `explore/` reaches `/__lite/*` — confirmed by the `WP-15` gate. |
+| WP-22 | Extract the collapsible-bar affordance (arrow control + persisted state) into a shared component. | **Done** — `src/layout/collapsible.js` + `CollapsibleBand.astro`, consumed by both chrome bands and the index status bar. Found on the way: the index bar was **not** actually sticky (`userCollapsed` reset every page load), despite `R-10` describing it as the existing sticky pattern. It is now. |
+| WP-17 | Head/branding parity: `<title>`, `<link rel="icon">`, and a footer. | **Done.** Icons declare `favicon.svg` → `favicon.png` → `favicon.ico` plus `apple-touch-icon`, all base-prefixed. `SiteFooter.astro` ships the footer *capability* but renders nothing unless a `render.footer` manifest key is set — the live site has no footer, so inventing branding would have put unrequested text on 115 pages. No `description`/OG tags were added. |
 
 Exit: a published page has a clean console, no SSR-only requests, and no
 nonfunctional extension-only affordances; the graph button and `explore/`
@@ -419,9 +431,9 @@ pages work from the static artifact.
 
 | WP | Work | Notes |
 | --- | --- | --- |
-| WP-18 | Add a GitHub Pages workflow driving the existing `action.yml` (`output=static`, `backend=json`, `profile=full`) → `actions/upload-pages-artifact` → `actions/deploy-pages`. | The reusable render action already exists (`specification/reusable-render/spec.md`); only the Pages wiring is missing. |
-| WP-19 | Promote the parity harness (build → serve → crawl all document URLs → diff structural metrics) into `test/` so regressions are caught, not rediscovered. | The `.tmp/parity-2026-07-25/compare.mjs` prototype already produces the numbers in this plan. Under `R-7` it compares *render* metrics, not urls. |
-| WP-24 | Verify both `base` values end-to-end: `/` (user site) and a sub-path (project site). Every internal href, asset url, and `/blobs/` reference must carry the prefix (`R-9`, `OP-008`). | The static config already reads `site`/`base` from env, so this is expected to be test-and-document — but a hardcoded leading `/` anywhere breaks only in the sub-path case, which is exactly the case nothing currently exercises. |
+| WP-18 | Add a GitHub Pages workflow → `actions/upload-pages-artifact` → `actions/deploy-pages`. | **Done** — `.github/workflows/pages.yml`, `workflow_dispatch` only (`R-17`). **Deviation:** it drives the in-repo builder, not `action.yml`. That Action installs a pinned *published* engine from npm, so running it here would build with a released engine and validate nothing in this packet; the consumer shape is already documented by `render-example.yml`. Never dispatched — the upload/deploy pair is unproven. |
+| WP-19 | Promote the parity harness into `test/`. | **Done** — `scripts/parity-metrics.js`, `test/fixtures/parity-baseline.json`, `test/parity-harness.test.js`. It reads the built artifact rather than serving and crawling it, which is faster and needs no port. Asymmetric by `DD-007`: gaining content is fine, losing a component is a failure. The 16 dangling links are the already-out-of-scope content-side dead links, baselined as accepted so only growth fails. |
+| WP-24 | Verify both `base` values end-to-end (`R-9`, `OP-008`). | **Done, and it was not test-and-document.** The sub-path build found **95 internal links emitted without the prefix** — every `:button[]{link=/...}` href and every authored root-absolute markdown link, including all 14 download buttons `WP-13` had just fixed. New `withBasePrefix()` in `blob-files.js`, applied in `ButtonDirective` and `link-presentation`; sub-path artifact now has zero unprefixed root-absolute references. |
 
 Exit: a green CI run publishes the artifact and the parity harness reports zero
 regressions against the recorded baseline.
@@ -444,6 +456,7 @@ regressions against the recorded baseline.
 | OP-012 | How is the Phase 1 code/content split sequenced across two repos? | The content migration is isolated on `HomeSmartMesh/homesmartmesh.github.io@astro-huge-doc-migration`, and this manifest pins that branch for validation. The later one-commit publishing-action/content-reference cutover remains outside this packet. | **Resolved** — `R-17` |
 | OP-013 | Do the local blob duplicates (`dataset/blobs` sidecar tree, 217.5 MB, accumulating across runs) get pruned? | `WP-25`: the JSON backend writes straight to the flat served dir and never stages through the sidecar, so the duplication stops being *created* rather than being cleaned up after. | **Resolved** — `R-14` |
 | OP-014 | Should `external_storage_kb` become sqlite-only in name and effect? | Yes — scope it to the sqlite writer, or rename it to say what it does. | **Resolved** — `R-15` |
+| OP-015 | The two C3 DevKit M1 documents are named after each other's titles, so under `R-6` their URLs read backwards. Merge, swap the filenames, or accept? | **Accept** (Option C). It is a content inconsistency, not a rendering issue, so the renderer stays unchanged and no content edit is made in this packet. The rich page serves at `/microcontrollers/esp32/esp32-c3-devkitm-1`. | **Resolved** — `R-18` |
 
 ### OP-010 — gentle path normalization
 
@@ -467,6 +480,54 @@ or genuinely stale document links. The final rule exposed 50 unresolved card
 rows and 34 unresolved link rows before those content edits; every row was
 inspected, and a fresh collection of the corrected branch reports zero of
 either kind.
+
+### OP-015 — the crossed C3 DevKit M1 documents
+
+**Resolved: Option C, accept (`R-18`).** Raised during the 2026-07-25 takeover
+from a side-by-side screenshot that looked like content loss. It is not: full
+evidence in `implementation.md` ("Post-phase review diagnosis") and `test.md`
+("Sparse-C3 re-verification"). The maintainer ruled it a content
+inconsistency rather than a rendering issue, so nothing changes here. The
+options below are retained as the record of what was weighed.
+
+#### What is actually true
+
+Two documents exist, and **each is named after the other's title**:
+
+| Source file | `title` | Body | Live URL (title-derived) | Our URL (`R-6`, filename-derived) |
+| --- | --- | --- | --- | --- |
+| `c3-devkit-m1.md` | `ESP32 C3 DevKit M1` | 2 buttons, 288 B | `/…/esp32-c3-devkit-m1/` 200 | `/…/c3-devkit-m1` |
+| `esp32-c3-devkitm-1.md` | `C3 Dev Kit M1` | full board page, 548 B | `/…/c3-dev-kit-m1/` 200 | `/…/esp32-c3-devkitm-1` |
+
+Both documents exist and render on the live site too, with the same bodies. The
+duplication predates the migration and is identical on HomeSmartMesh `main` and
+`astro-huge-doc-migration`. Under the old title-derived scheme the crossing was
+invisible, because the URL followed the title; under `R-6` the URL follows the
+filename, so each URL now reads as the other document's name. Nothing is lost
+and no renderer behaves incorrectly.
+
+#### Blast radius of a content fix
+
+Small and fully enumerated: the two files, plus **one** card uid
+(`microcontrollers.esp32.esp32-c3-devkitm-1` in
+`microcontrollers/esp32/readme.md`). Nothing else in the content set references
+either document, and the stub is carded by nothing at all — it is reachable
+only from the navigation tree, on the live site as much as here.
+
+#### Options
+
+| Option | Effect | Cost | Note |
+| --- | --- | --- | --- |
+| **A — merge** | Fold the stub's two buttons into the rich board page, delete the stub, name the survivor `c3-devkit-m1.md`. One C3 DevKit M1 document at `/…/c3-devkit-m1`. | 2 file edits, 1 deletion, 1 card uid | Ends the duplication instead of renaming it. The stub's two buttons (ESP32-C3 datasheets, Espressif user guide) are reference links that sit naturally on the board page. |
+| **B — swap filenames** | Rename each file to match its own title: rich → `c3-devkit-m1.md`, stub → `esp32-c3-devkitm-1.md`. | 2 renames, 1 card uid | Fixes only the crossing. The duplication survives, as it does live. Also the closest URL to live's `/c3-dev-kit-m1/`. |
+| **C — accept** ← **chosen** | No content change. Rich page stays at `/…/esp32-c3-devkitm-1`. | none | Consistent with `R-7` (urls are deliberately allowed to differ). It does leave a URL pair that reads backwards, which is why the diagnosis is written down here in full — the next reviewer who spots it should find this section rather than re-derive it. |
+
+#### Why this is not folded into Phase 3
+
+Phase 3 is asset fetch and artifact composition. This is a content-authoring
+decision about which documents should exist and what they are called — the same
+class of decision `R-7` reserves for the maintainer, and it touches the
+migration branch rather than this repository. Phase 3 proceeds independently.
 
 ### OP-012 — scope boundary
 
@@ -549,7 +610,8 @@ merits.
 
 "Ship only what is referenced" is only safe if the reference scan sees *every*
 way an asset url can reach the page. `<img src>` is the easy case; the scan must
-also cover `:button[]{}` download hrefs (16 `/data/**` links), `<a href>`,
+also cover `:button[]{}` download hrefs (14 `/data/**` links, one of them
+containing spaces and emitted unencoded into `href`), `<a href>`,
 `srcset`, inline `style="background-image:url(...)"`, and any url built in
 client JS. Scanning the **built HTML** rather than the source markdown catches
 all but the last. Fail closed: if the scan cannot classify a file, ship it.
@@ -708,40 +770,75 @@ packet as a whole.
    report. Zero duplicate-slug warnings.
 4. Zero pages contain raw directive text, an empty gallery, or a plain link
    where the live site renders `<model-viewer>` / a table / an iframe.
-5. All 16 `/data/**` download buttons resolve.
+5. All 14 `/data/**` download buttons resolve. ✔ **met by WP-13**
 6. A published page loads with an empty browser console and no `/__lite/**`
-   requests.
+   requests. ✔ **met by WP-15**, enforced by `scripts/check-static-artifact.js`.
 7. Every non-publish profile renders every page without failing (`R-11`), lite
    included — verified by the crawl, not by inspection.
 8. Breadcrumb/metadata and footer-references/prev-next collapse by default and
-   remember their state (`R-10`).
+   remember their state (`R-10`). ✔ **met by WP-22/WP-16**
 9. The graph button and `explore/` pages are present and functional in the
-   public static artifact, with no `/__lite/*` dependency (`R-16`).
+   public static artifact, with no `/__lite/*` dependency (`R-16`). ✔ **met by
+   WP-16**, with the graph trigger deliberately outside the collapsible band.
 10. The artifact ships no unreferenced asset; its composition is reported by the
-   build (`OP-005` Option A).
+   build (`OP-005` Option A). **Outstanding — `WP-14`.** The composition report
+   exists (`scripts/check-static-artifact.js`), but `public/**` selection does
+   not.
 11. The parity harness runs in CI and reports zero regressions against the
-    recorded baseline.
+    recorded baseline. ✔ **met by WP-19** — recorded at 115 pages, wired into
+    `pages.yml`; `test/parity-harness.test.js` runs it whenever `dist/` holds
+    the full artifact.
 12. A GitHub Pages deployment from the workflow serves the artifact, verified at
-    both `base = /` and a sub-path base (`R-9`).
+    both `base = /` and a sub-path base (`R-9`). **Partial** — both bases are
+    verified end-to-end locally (`WP-24`, 95 unprefixed links found and fixed)
+    and `pages.yml` exists, but it has never been dispatched, so the
+    upload/deploy pair is unproven.
 
 ---
 
 ## Handover (2026-07-25)
 
-Work paused here deliberately. Everything below is what a fresh reader needs.
+Work paused after Phase 2 and resumed by maintainer instruction on the same
+day. Everything below is what a fresh reader needs.
+
+### Takeover state (2026-07-25)
+
+- Phases 0, 1, 2, **4 and 5 are complete**. Phase 3 is partial: `WP-13` landed,
+  and `WP-14`, `WP-21`, `WP-23`, `WP-25` are the only work left in the packet.
+- Phases 4 and 5 were done in one pass by maintainer instruction, after Phase 3
+  was started. They do not depend on the remaining Phase 3 asset work.
+- Three findings from that pass are worth a reader's attention before touching
+  the code:
+  - **`WP-15`**: the repo `.env` sets `MICROWEBSTACKS_EXTENSION_MODE=true`, so
+    the documented lite static build was baking the extension-preview surface
+    into the artifact. Fixed by an output-aware client gate.
+  - **`WP-24`**: 95 internal links were emitted without the base prefix. Only a
+    sub-path build exposes this class of bug — run one before believing `R-9`
+    holds.
+  - **`WP-22`**: the index status bar was never actually sticky, though `R-10`
+    describes it as the existing sticky pattern. It is now.
+- Phase 1/2 changes remain in the working tree and intentionally uncommitted.
+  Git history stays maintainer-owned.
+- HomeSmartMesh stays pinned to `astro-huge-doc-migration` at `2a0385c`.
+- The publishing-action cutover remains outside this packet (`R-17`).
+- The sparse-C3 review observation was re-opened, re-verified against the live
+  site, and closed as accepted-as-is (`R-18`, `OP-015`) — a content
+  inconsistency, not a rendering issue. See “Post-phase review diagnosis: the
+  sparse C3 page” in `implementation.md`.
 
 ### State
 
-**Phases 0 and 1 complete and verified.** Phase 2+ is planned and **not
+**Phases 0 through 2 complete and verified.** Phase 3+ is planned and **not
 started**. No planning decisions remain open.
 
 | Check | Result |
 | --- | --- |
-| `pnpm test` | 91/91 |
+| Full test suite (fresh disposable install) | 97/97 |
 | Pre-migration collect under the final identity rule | pass; 50 card + 34 link migration rows; zero duplicate identities |
 | Fresh pinned-branch collect (`2a0385c`) | 73 documents; zero unresolved card or document-link diagnostics |
 | Full static build | exit 0, 115 pages |
 | Lite static build | exit 0, 76 pages |
+| Phase 2 built-DOM audit | 2 YouTube embeds; 12 model viewers; 2 XLSX tables; 9 non-empty galleries; 0 raw iframe directives |
 | `pnpm check:plans` | pass |
 
 Phase 0 code is committed:
@@ -751,8 +848,8 @@ Phase 0 code is committed:
 | `961227a` | Phase 0 — shared classifier, renderer fallback, sharp allowlist |
 | `48a5871` | the `R-5` revert — `expand_galleries` removed, lite renders galleries again |
 
-Phase 1 is complete in the working tree and intentionally paused for maintainer
-review before Phase 2.
+Phase 2 is complete in the working tree and intentionally paused for maintainer
+review before Phase 3.
 
 ### Reproducing the builds
 
@@ -779,14 +876,14 @@ before building the other.
 
 ### What to pick up next
 
-After maintainer review, start Phase 2 by re-counting its feature usages against
-the working artifact — those numbers are the only ones in this plan still
-inherited from the broken build.
+After maintainer review, start Phase 3 with the asset-fetch and artifact
+composition work. Phase 2's feature counts were re-counted against the working
+artifact and are recorded in `implementation.md` and `test.md`.
 
 ### Still open
 
 None. Every OP and DD in this document carries a resolution and the ruling that
-produced it.
+produced it. `OP-015` was the last to close, as accept-as-is under `R-18`.
 
 ### Superseded — do not resurrect
 

@@ -8,6 +8,10 @@ content/
 dataset/
 public/images/
 public/design/
+public/data/
+public/favicon.svg
+public/favicon.png
+public/.nojekyll
 .tmp/
 *.vsix
 packages/md-render/

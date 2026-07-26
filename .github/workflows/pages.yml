@@ -1,0 +1,112 @@
+# Publish the HomeSmartMesh content set to GitHub Pages
+# (plans/2026-07/25/homesmartmesh-parity, WP-18).
+#
+# Manual only. R-17 keeps the publishing cutover outside this packet: this
+# repository is the validation island where the replacement builder is proven,
+# not the thing that serves homesmartmesh.github.io today. `workflow_dispatch`
+# makes a publish an explicit act, never a side effect of a push.
+#
+# Why this does not `uses: ./` (action.yml): that Action exists for *consumer*
+# repositories and installs a pinned, already-published
+# @microwebstacks/md-render from npm. Running it here would build the content
+# with a released engine rather than with the source in this checkout, so it
+# could not validate any change made in this packet. The consumer shape is
+# documented separately in render-example.yml; this workflow drives the
+# in-repo builder end to end:
+#
+#   pnpm fetch -> pnpm collect -> astro build (full/json/static) -> artifact gate
+#
+# `base` covers both R-9 deployments: empty for a user site served at "/", or
+# e.g. "/astro-huge-doc/" for a project site served under a repository path.
+name: Publish to GitHub Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: 'Base path, e.g. /astro-huge-doc/ for a project site. Empty for a root site.'
+        required: false
+        default: ''
+      site:
+        description: 'Canonical absolute site URL, e.g. https://homesmartmesh.github.io'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two publishes race for the same Pages deployment; do not cancel one
+# midway, since a half-uploaded artifact is worse than a queued run.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # manifest.yaml pins the content branch. The token lifts the anonymous
+      # GitHub API rate limit that a zipball download would otherwise hit.
+      - name: Fetch content
+        run: pnpm fetch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      # Required: the collector writes the dataset the static build reads, and
+      # its output must be regenerated whenever collector code or content moves.
+      - name: Collect
+        run: pnpm collect
+        env:
+          MICROWEBSTACKS_DOTENV_OVERRIDE: 'false'
+          DOCS_PROFILE: full
+          DOCS_BACKEND: json
+
+      # The publish target fixed by R-1. MICROWEBSTACKS_DOTENV_OVERRIDE=false
+      # matters even with no .env in CI: it keeps the profile/backend explicit
+      # here rather than inherited from a file that exists on developer
+      # machines and sets DOCS_PROFILE=lite.
+      - name: Build static artifact
+        run: npx astro build --config astro.config.static.mjs
+        env:
+          MICROWEBSTACKS_DOTENV_OVERRIDE: 'false'
+          DOCS_PROFILE: full
+          DOCS_BACKEND: json
+          DOCS_OUTPUT: static
+          MICROWEBSTACKS_BASE: ${{ inputs.base }}
+          MICROWEBSTACKS_SITE: ${{ inputs.site }}
+
+      # WP-15/DD-006 gate: fails the publish if any page can reach an SSR-only
+      # /__lite/* route, and drops the dead preview chunks Astro emits for
+      # components whose render condition was false.
+      - name: Check static artifact
+        run: node scripts/check-static-artifact.js dist --prune
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

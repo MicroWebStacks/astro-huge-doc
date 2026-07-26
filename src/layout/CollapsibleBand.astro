@@ -1,0 +1,114 @@
+---
+/*
+ * Collapsible chrome band (homesmartmesh-parity WP-22/WP-16, ruling R-10).
+ *
+ * Wraps a chrome area — never article content — in a thin always-visible rail
+ * carrying one arrow. Collapsed is the default and the arrow is the entire
+ * collapsed footprint, so a published page opens on the document rather than
+ * on navigation furniture. Nothing is removed: the slot renders exactly what
+ * it was given, and opening the band restores it in full, in every profile.
+ *
+ * State lives in collapsible.js, shared with the link-index status bar.
+ */
+export interface Props {
+    /** Stable storage key; also the aria-controls target id. */
+    stateKey: string;
+    /** Human name used in the toggle's title/aria-label ("Show <label>"). */
+    label: string;
+    /** Chevron side: the top band opens downward, the footer upward. */
+    placement?: 'top' | 'bottom';
+}
+
+const { stateKey, label, placement = 'top' } = Astro.props as Props;
+const contentId = `collapsible-${stateKey}`;
+---
+<div class="collapsible" data-collapsible-key={stateKey} data-collapsible-label={label}
+    data-placement={placement} data-collapsed="true">
+    <div class="collapsible-rail">
+        <button type="button" class="collapsible-toggle" data-collapsible-toggle
+            aria-expanded="false" aria-controls={contentId}
+            title={`Show ${label}`} aria-label={`Show ${label}`}>
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                <path d="M4 6.5 8 10.5 12 6.5" fill="none" stroke="currentColor"
+                    stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+    </div>
+    <div class="collapsible-content" id={contentId} data-collapsible-content hidden>
+        <slot />
+    </div>
+</div>
+<style>
+/* The band sits on the shell surface like the sidebars, so collapsed chrome
+   still reads as a boundary between the app bar and the document. */
+.collapsible{
+    background-color: var(--nav-bg-color);
+    color: var(--menu-text-color);
+}
+.collapsible-rail{
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 1.1rem;
+    padding: 0 var(--article-pad, var(--space-3));
+}
+.collapsible[data-placement="top"]{
+    border-bottom: 1px solid var(--soft-border-color);
+}
+.collapsible[data-placement="bottom"]{
+    border-top: 1px solid var(--soft-border-color);
+}
+/* Footer band: the rail belongs at the bottom edge, under the content it
+   reveals, so the arrow stays next to the page edge it hangs from. */
+.collapsible[data-placement="bottom"] .collapsible-rail{
+    order: 2;
+}
+.collapsible[data-placement="bottom"]{
+    display: flex;
+    flex-direction: column;
+}
+.collapsible-toggle{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 .35rem;
+    border: 0;
+    background: transparent;
+    color: var(--content-color-faint);
+    cursor: pointer;
+    line-height: 0;
+}
+.collapsible-toggle:hover{
+    color: var(--content-color);
+}
+.collapsible-toggle:focus-visible{
+    outline: 2px solid var(--front-blue);
+    outline-offset: 1px;
+    border-radius: var(--radius-sm);
+}
+.collapsible-toggle svg{
+    transition: transform 0.18s ease;
+}
+/* Chevron points toward where the content will appear, and flips once open. */
+.collapsible[data-placement="bottom"] .collapsible-toggle svg{
+    transform: rotate(180deg);
+}
+.collapsible[data-collapsed="false"] .collapsible-toggle svg{
+    transform: rotate(180deg);
+}
+.collapsible[data-placement="bottom"][data-collapsed="false"] .collapsible-toggle svg{
+    transform: rotate(0deg);
+}
+.collapsible-content[hidden]{
+    display: none;
+}
+@media (prefers-reduced-motion: reduce){
+    .collapsible-toggle svg{ transition: none; }
+}
+/* Preview popups show the article only; the band goes with the rest of the
+   chrome (Layout.astro hides its contents already). */
+:global(html[data-preview-mode="true"]) .collapsible{
+    display: none;
+}
+</style>
+<script src="./collapsible.js" />

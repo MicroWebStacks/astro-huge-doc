@@ -1,3 +1,10 @@
+import {readFlag, writeFlag} from './collapsible.js';
+
+// Shared persistence with the two chrome bands (WP-22). This bar is open by
+// default — an indexing run is worth watching — so the flag it stores is the
+// inverse of theirs: "the user dismissed it". Sticky across pages now, where
+// it used to reset on every load.
+const DISMISSED_KEY = 'index-status-dismissed';
 const POLL_MS = 500;
 const GRACE_MS = 900;
 const COMPLETE_HIDE_MS = 1400;
@@ -118,7 +125,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const bar = document.querySelector('.lite-index-status');
     const reopen = document.querySelector('[data-index-reopen]');
     if (!bar || !reopen) return;
-    const view = {bar, reopen, userCollapsed: false, completeHandled: false, hideTimer: null};
+    const view = {bar, reopen, userCollapsed: readFlag(DISMISSED_KEY), completeHandled: false, hideTimer: null};
+    if (view.userCollapsed) setCollapsed(view, true);
     let activated = false;
     const activate = () => {
         if (activated) return;
@@ -131,6 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
     bar.addEventListener('click', async (event) => {
         if (event.target.closest('[data-index-collapse]')) {
             view.userCollapsed = true;
+            writeFlag(DISMISSED_KEY, true);
             setCollapsed(view, true);
             return;
         }
@@ -142,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     reopen.addEventListener('click', () => {
         view.userCollapsed = false;
+        writeFlag(DISMISSED_KEY, false);
         setCollapsed(view, false);
     });
 }, false);

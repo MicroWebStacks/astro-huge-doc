@@ -65,31 +65,18 @@ function normalizeGithubConfigs(fetchConfig) {
 
   const seenDestPaths = new Set();
 
-  return selectedEntries.map(({ entry, index }) => {
-    const { repo, branch = "main", folders, dest } = entry;
+  const normalized = selectedEntries.map(({ entry, index }) => {
+    const { repo, branch = "main", folders, files, dest } = entry;
     const [owner, repoName] = repo.split("/");
 
-    let folderList = folders ?? [];
-    if (!Array.isArray(folderList)) {
-      folderList = [folderList];
+    const folderList = normalizeRepoPaths(folders, "fetch.github.folders");
+    const fileList = normalizeRepoPaths(files, "fetch.github.files");
+
+    if (folderList.length && fileList.length) {
+      throw new Error(
+        `fetch.github[${index}] declares both folders and files; use separate entries so the destination reset stays unambiguous`,
+      );
     }
-
-    folderList = folderList
-      .filter((item) => item !== undefined && item !== null && `${item}`.trim().length > 0)
-      .map((item) => {
-        if (typeof item !== "string") {
-          throw new Error("fetch.github.folders entries must be strings");
-        }
-
-        const trimmed = item.trim().replace(/^[./\\]+/, "");
-        if (path.isAbsolute(trimmed)) {
-          throw new Error("fetch.github.folders must be relative paths");
-        }
-        if (trimmed.split(path.sep).includes("..")) {
-          throw new Error("fetch.github.folders cannot contain '..'");
-        }
-        return trimmed;
-      });
 
     const destPath = path.resolve(ROOT_DIR, dest ?? repoName);
     if (!destPath.startsWith(ROOT_DIR)) {
@@ -109,9 +96,56 @@ function normalizeGithubConfigs(fetchConfig) {
       repo,
       branch,
       folders: folderList,
+      files: fileList,
       destPath,
     };
   });
+
+  assertNoResetOverAnotherDestination(normalized);
+  return normalized;
+}
+
+function normalizeRepoPaths(value, label) {
+  let list = value ?? [];
+  if (!Array.isArray(list)) {
+    list = [list];
+  }
+
+  return list
+    .filter((item) => item !== undefined && item !== null && `${item}`.trim().length > 0)
+    .map((item) => {
+      if (typeof item !== "string") {
+        throw new Error(`${label} entries must be strings`);
+      }
+
+      const trimmed = item.trim().replace(/^[./\\]+/, "");
+      if (path.isAbsolute(trimmed)) {
+        throw new Error(`${label} must be relative paths`);
+      }
+      if (trimmed.split(/[/\\]/).includes("..")) {
+        throw new Error(`${label} cannot contain '..'`);
+      }
+      return trimmed;
+    });
+}
+
+// Folder entries wipe their destination before copying, so a folder entry whose
+// destination contains another entry's destination would silently delete a
+// sibling fetch. File entries are additive and cannot.
+function assertNoResetOverAnotherDestination(entries) {
+  const resets = entries.filter((entry) => !entry.files.length);
+  for (const reset of resets) {
+    for (const other of entries) {
+      if (other === reset) continue;
+      const relative = path.relative(reset.destPath, other.destPath);
+      if (relative && !relative.startsWith("..") && !path.isAbsolute(relative)) {
+        throw new Error(
+          `Destination "${path.relative(ROOT_DIR, reset.destPath)}" is reset before copying and contains ` +
+            `"${path.relative(ROOT_DIR, other.destPath)}", which another fetch entry populates`,
+        );
+      }
+    }
+  }
 }
 
 function normalizeGithubSelection(selection) {
@@ -198,7 +232,34 @@ async function copyContents(srcDir, destDir) {
   }
 }
 
-async function moveRequestedContent({ extractedRoot, folders, destPath }) {
+async function copyRequestedFiles({ extractedRoot, files, destPath }) {
+  // Additive on purpose: named files sit beside whatever else the manifest
+  // writes into this destination, so the destination is never reset.
+  await ensureDir(destPath);
+
+  for (const file of files) {
+    const filePath = path.join(extractedRoot, file);
+    if (!(await fileExists(filePath))) {
+      throw new Error(`File "${file}" not found in downloaded repository`);
+    }
+
+    const stats = await fsp.stat(filePath);
+    if (!stats.isFile()) {
+      throw new Error(`"${file}" is a directory; list it under folders instead of files`);
+    }
+
+    const to = path.join(destPath, path.basename(file));
+    console.log(`Copying ${file} -> ${path.relative(ROOT_DIR, to)}`);
+    await fsp.cp(filePath, to, { force: true });
+  }
+}
+
+async function moveRequestedContent({ extractedRoot, folders, files, destPath }) {
+  if (files.length) {
+    await copyRequestedFiles({ extractedRoot, files, destPath });
+    return;
+  }
+
   await resetDestination(destPath);
 
   if (!folders.length) {
@@ -257,6 +318,7 @@ async function main() {
         await moveRequestedContent({
           extractedRoot,
           folders: config.folders,
+          files: config.files,
           destPath: config.destPath,
         });
       }
@@ -270,4 +332,9 @@ async function main() {
   }
 }
 
-main();
+// Only fetch when run as a command; tests import the pure helpers above.
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  main();
+}
+
+export { normalizeGithubConfigs, moveRequestedContent };

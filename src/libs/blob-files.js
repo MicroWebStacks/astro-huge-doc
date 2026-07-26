@@ -28,6 +28,29 @@ function basePrefix(base) {
     return trimmed ? `/${trimmed}` : '';
 }
 
+/* Prefix an authored root-absolute link with the deployment base (R-9).
+ *
+ * A root-absolute path in content means "from the site root" (R-8), so under a
+ * project-site base like /astro-huge-doc/ it must carry that prefix or it
+ * resolves against the domain root and 404s. This is invisible at base "/",
+ * which is why WP-24 had to build the sub-path artifact to find the 95 links
+ * that were missing it.
+ *
+ * Untouched: external and protocol-relative URLs, fragments, relative paths,
+ * and anything already carrying the prefix.
+ */
+function withBasePrefix(url, base = '/') {
+    const value = String(url ?? '');
+    if (!value.startsWith('/') || value.startsWith('//')) {
+        return value;
+    }
+    const prefix = basePrefix(base);
+    if (!prefix || value === prefix || value.startsWith(`${prefix}/`)) {
+        return value;
+    }
+    return `${prefix}${value}`;
+}
+
 function blobFileUrl(hash, ext, base = '/') {
     if (!hash) {
         return null;
@@ -50,5 +73,6 @@ export {
     blobFileName,
     blobFileUrl,
     basePrefix,
+    withBasePrefix,
     resolveBlobsSourceDir
 };

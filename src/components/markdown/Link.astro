@@ -2,14 +2,17 @@
 import ModelViewer from './model/ModelViewer.astro';
 import {getAssetInfo, getAssetUrl} from '@/libs/structure-db';
 import Code from './code/Code.astro';
+import TableXLSX from './table/TableXLSX.astro';
 import {config} from '@/config';
 import {resolveLinkPresentation} from './link-presentation.js';
+import {classifyLinkComponent} from './link-components.js';
 import './Link.css';
 
 export interface Props {
     item: {
       asset_uid?: string;
       doc_sid?: string;
+      doc_path?: string;
       version_id?: string;
       body_text: string;
       ast: {
@@ -36,31 +39,45 @@ const presentation = hasAsset ? null : resolveLinkPresentation({
 });
 
 let url = hasAsset ? getAssetUrl(item.asset_uid!, versionId) : presentation?.href;
-let is_model3d = false;
-let is_table = false;
-let is_diagram = false;
-let is_link = true;
+let assetExt = '';
+let diagram = false;
 
 if (hasAsset) {
   const asset_info = getAssetInfo(item);
   const diagramAliases = config.diagram?.aliases ?? {};
-  const normalizedExt = String(asset_info.ext ?? '').trim().toLowerCase();
+  const normalizedExt = String(asset_info?.ext ?? '').trim().toLowerCase();
   const trimmedExt = normalizedExt.startsWith('.') ? normalizedExt.slice(1) : normalizedExt;
   const diagramLanguage = diagramAliases[trimmedExt] ?? trimmedExt;
-  is_model3d = asset_info.ext === 'glb' && config.profile !== 'lite';
-  is_diagram = Boolean(config.diagram?.languages?.[diagramLanguage]);
-  is_link = !is_model3d && !is_table && !is_diagram;
+  assetExt = trimmedExt;
+  diagram = Boolean(config.diagram?.languages?.[diagramLanguage]);
 }
+const component = classifyLinkComponent({
+  url: item.ast?.url,
+  assetExt,
+  hasAsset,
+  profile: config.profile,
+  diagram
+});
 ---
-{is_model3d &&
+{component.model3d &&
   <ModelViewer src={url} title={item.body_text} />
 }
-{is_link && presentation?.unresolved &&
+{component.table &&
+  <TableXLSX
+    src={item.ast?.url ?? ''}
+    href={url ?? item.ast?.url ?? ''}
+    title={item.body_text}
+    documentPath={item.doc_path}
+    assetUid={item.asset_uid}
+    versionId={versionId}
+  />
+}
+{component.link && presentation?.unresolved &&
   <a class="link unresolved" title={presentation.title} aria-disabled="true">
     {item.body_text}
   </a>
 }
-{is_link && !presentation?.unresolved &&
+{component.link && !presentation?.unresolved &&
   <a
     href={url ?? '#'}
     class={presentation?.className ?? 'link'}
@@ -71,6 +88,6 @@ if (hasAsset) {
     {item.body_text}
   </a>
 }
-{is_diagram &&
+{component.diagram &&
   <Code item={item} />
 }

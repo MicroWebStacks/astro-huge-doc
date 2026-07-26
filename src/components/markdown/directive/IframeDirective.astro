@@ -1,0 +1,41 @@
+---
+import {normalizeIframeSrc} from './iframe.js';
+
+export interface Props {
+  attributes?: Record<string, string | boolean | null | undefined>;
+}
+
+const {attributes = {}} = Astro.props as Props;
+const src = normalizeIframeSrc(attributes.src);
+const title = String(attributes.title ?? '');
+const width = String(attributes.width ?? '560');
+const height = String(attributes.height ?? '315');
+const centered = Object.hasOwn(attributes, 'center');
+---
+<div class:list={['iframe-container', {center: centered}]}>
+  <iframe
+    src={src}
+    title={title}
+    width={width}
+    height={height}
+    loading="lazy"
+    referrerpolicy="strict-origin-when-cross-origin"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+    allowfullscreen
+  ></iframe>
+</div>
+
+<style>
+.iframe-container {
+  margin-block: var(--space-3);
+  max-width: 100%;
+}
+.iframe-container.center {
+  display: flex;
+  justify-content: center;
+}
+iframe {
+  border: 0;
+  max-width: 100%;
+}
+</style>

@@ -3,6 +3,7 @@ import Layout from "@/layout/Layout.astro"
 import AstroMarkdown from '@/components/markdown/AstroMarkdown.astro'
 import FrontmatterPanel from '@/components/markdown/FrontmatterPanel.astro'
 import Breadcrumb from '@/layout/Breadcrumb.astro'
+import CollapsibleBand from '@/layout/CollapsibleBand.astro'
 import RelationsFooter from '@/layout/RelationsFooter.astro'
 import { getEntry, getDocuments } from '@/libs/structure-db.js'
 import { isValidLogStructure } from '@/layout/layout_utils'
@@ -41,8 +42,10 @@ const isLogView = found
 {found&&
     <Layout title={title} headings={headings} >
             <div class="page-chrome">
-                <Breadcrumb data={data} />
-                <FrontmatterPanel data={data} />
+                <CollapsibleBand stateKey="page-chrome" label="breadcrumb and metadata">
+                    <Breadcrumb data={data} />
+                    <FrontmatterPanel data={data} />
+                </CollapsibleBand>
             </div>
             <div class={isLogView ? 'log-view' : undefined}>
                 <AstroMarkdown items={items} data={data} headings={headings} />

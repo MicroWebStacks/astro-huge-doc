@@ -28,6 +28,14 @@ fetch:
       branch: astro-huge-doc-migration
       folders: [public/design]
       dest: public/design
+    - repo: HomeSmartMesh/homesmartmesh.github.io
+      branch: astro-huge-doc-migration
+      folders: [public/data]
+      dest: public/data
+    - repo: HomeSmartMesh/homesmartmesh.github.io
+      branch: astro-huge-doc-migration
+      files: [public/favicon.svg, public/favicon.png, public/.nojekyll]
+      dest: public
 output:
   ssr: dist
   content: content

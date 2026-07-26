@@ -8,7 +8,7 @@
 import { getDocument } from '@/libs/structure-db';
 import { basePrefix } from '@/libs/blob-files.js';
 import { config } from '@/config';
-import { extensionPreviewEnabled } from '@/libs/extension-preview.js';
+import { extensionPreviewClientEnabled } from '@/libs/extension-preview.js';
 
 export interface Props {
     data: { url?: string };
@@ -18,7 +18,9 @@ const { data } = Astro.props as Props;
 const url = typeof data?.url === 'string' ? data.url : '';
 const prefix = basePrefix(config.base);
 const segments = url === '' ? [] : url.split('/');
-const showPreviewHistory = extensionPreviewEnabled();
+// preview_history.js is emitted under the same client gate (Layout.astro), so
+// these buttons must not be rendered where that script will not exist (WP-15).
+const showPreviewHistory = extensionPreviewClientEnabled();
 
 const crumbs = [];
 let accumulated = '';

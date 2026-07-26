@@ -1,0 +1,59 @@
+---
+import {readFileSync} from 'node:fs';
+import {config} from '@/config';
+import {getAssetInfoBlob_version} from '@/libs/structure-db';
+import MarkdownTable from './MarkdownTable.jsx';
+import {resolveXlsxPath, workbookBufferToTableModel} from './xlsx-table.js';
+import '../Link.css';
+
+export interface Props {
+  src: string;
+  title: string;
+  documentPath?: string;
+  href?: string;
+  assetUid?: string;
+  versionId?: string;
+}
+
+const {
+  src,
+  title,
+  documentPath = '',
+  href = src,
+  assetUid,
+  versionId = config.collect.version_id
+} = Astro.props as Props;
+let model = null;
+let error = '';
+try {
+  let buffer = assetUid
+    ? getAssetInfoBlob_version(assetUid, versionId)?.buffer
+    : null;
+  if (!buffer) {
+    const file = resolveXlsxPath(config.content_path, documentPath, src);
+    if (!file) throw new Error('XLSX path is not a local content file');
+    buffer = readFileSync(file);
+  }
+  model = workbookBufferToTableModel(buffer);
+  if (!model.headers.length) throw new Error('Workbook has no rows');
+} catch (cause) {
+  error = cause instanceof Error ? cause.message : String(cause);
+}
+---
+{model
+  ? <section class="xlsx-table" aria-label={title || 'Spreadsheet table'}>
+      {title && <h3>{title}</h3>}
+      <MarkdownTable client:load model={model} />
+    </section>
+  : <a class="link" href={href} title={`Unable to render spreadsheet: ${error}`}>{title || src}</a>
+}
+
+<style>
+.xlsx-table {
+  margin-block: var(--space-3);
+  max-width: 100%;
+}
+.xlsx-table h3 {
+  margin-block: 0 var(--space-2);
+}
+</style>

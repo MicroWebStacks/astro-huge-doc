@@ -22,6 +22,26 @@ function extensionPreviewEnabled() {
     return process.env.MICROWEBSTACKS_EXTENSION_MODE === 'true';
 }
 
+/* Client-side half of the gate (homesmartmesh-parity WP-15 / DD-006).
+ *
+ * extensionPreviewEnabled() answers "is this an extension preview run?", and
+ * src/middleware.js registers /__lite/* under exactly that. But a static build
+ * has no middleware at all: nothing can answer those routes, whatever the env
+ * says. The repo `.env` sets MICROWEBSTACKS_EXTENSION_MODE=true, so
+ * `DOCS_OUTPUT=static astro build` with repo defaults was baking the whole
+ * preview surface — the lazy navigation skeleton, the relation-indexer bar and
+ * its polling client — into a published artifact where every request 404s and
+ * the user sees a "Link index unavailable" bar.
+ *
+ * This is not a second condition the endpoint side cannot see: it is the same
+ * condition, evaluated where the endpoints provably do not exist. UI that
+ * depends on /__lite/* reads this; server code answering /__lite/* reads
+ * extensionPreviewEnabled(). See specification/run-modes/spec.md.
+ */
+function extensionPreviewClientEnabled() {
+    return extensionPreviewEnabled() && config.output !== 'static';
+}
+
 async function stampMtime(name) {
     try {
         return Math.trunc((await stat(join(config.collect.json_dir, name))).mtimeMs);
@@ -280,4 +300,4 @@ async function indexControlPayload(action) {
     return controlRelationIndex(action);
 }
 
-export {extensionPreviewEnabled, versionPayload, navigationPayload, sourceRoutePayload, runtimePayload, statsPayload, indexStatusPayload, indexControlPayload};
+export {extensionPreviewEnabled, extensionPreviewClientEnabled, versionPayload, navigationPayload, sourceRoutePayload, runtimePayload, statsPayload, indexStatusPayload, indexControlPayload};

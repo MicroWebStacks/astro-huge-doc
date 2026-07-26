@@ -1,5 +1,5 @@
 import {resolveLink} from '@/libs/structure-db';
-import {basePrefix} from '@/libs/blob-files.js';
+import {basePrefix, withBasePrefix} from '@/libs/blob-files.js';
 import {config} from '@/config';
 
 /** Resolve an authored Markdown link for prose or a rich table cell. */
@@ -17,6 +17,12 @@ function resolveLinkPresentation({ast = {}, docSid = null, versionId = null} = {
     if (resolved && !ast?.rel && relation?.url) {
         const fragment = relation.fragment ? `#${relation.fragment}` : '';
         href = `${basePrefix(config.base)}/${relation.url}${fragment}`;
+    } else if (!external) {
+        // Everything not rewritten above keeps the authored value: a
+        // pre-resolved ast.rel, and links the collector could not resolve.
+        // Those are still site-root-relative when they start with "/", so a
+        // sub-path deployment has to prefix them (WP-24, R-9).
+        href = withBasePrefix(href, config.base);
     }
 
     return {

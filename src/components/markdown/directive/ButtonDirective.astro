@@ -1,5 +1,7 @@
 ---
 import Svgicons from '@/components/svgicons.astro';
+import {withBasePrefix} from '@/libs/blob-files.js';
+import {config} from '@/config';
 import {extname} from 'path'
 
 export interface Props {
@@ -10,6 +12,9 @@ export interface Props {
 
 const { label, link, icon=null } = Astro.props as Props;
 const external = link.startsWith('http')
+// Authored button links are site-root-relative; a sub-path deployment needs
+// the base prefix or every download and cross-page button 404s (WP-24, R-9).
+const href = external ? link : withBasePrefix(link, config.base)
 let used_icon = icon
 
 if(icon == null){
@@ -21,7 +26,7 @@ if(icon == null){
 }
 ---
 <div class="container">
-  <a href={link} class={`link ${external?"external":""}`} target={external?"_blank":"_self"}>
+  <a href={href} class={`link ${external?"external":""}`} target={external?"_blank":"_self"}>
     <span class="button text">{label}</span>
     {used_icon&&
       <span class="icon"><Svgicons filename={used_icon}/></span>

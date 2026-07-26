@@ -10,6 +10,7 @@ import { getDocuments, getBacklinks } from '@/libs/structure-db';
 import { basePrefix } from '@/libs/blob-files.js';
 import { config } from '@/config';
 import PanZoomModal from '@/components/panzoom/panzoommodal.astro';
+import CollapsibleBand from './CollapsibleBand.astro';
 
 export interface Props {
     data: { url?: string; sid?: string; level?: number };
@@ -63,34 +64,40 @@ const hasContent = Boolean(prev || next || backlinkGroups.length > 0);
 ---
 {hasContent &&
     <footer class="relations-footer" data-link-preview="off">
-        {backlinkGroups.length > 0 &&
-            <section class="backlinks" aria-label="Pages referencing this page">
-                <h2>Referenced by</h2>
-                <ul>
-                    {backlinkGroups.map((group) => (
-                        <li>
-                            <a href={`${prefix}/${group.url}`}>{group.title}</a>
-                            {group.refs.map((ref) => (
-                                <span class="context">
-                                    {ref.source_heading && <span class="heading">under “{ref.source_heading}”</span>}
-                                    {ref.link_text && <span class="quote">“{ref.link_text}”</span>}
-                                </span>
-                            ))}
-                        </li>
-                    ))}
-                </ul>
-            </section>
-        }
-        {(prev || next) &&
-            <nav class="prev-next" aria-label="Neighboring pages">
-                {prev
-                    ? <a class="prev" href={`${prefix}/${prev.url}`}><span class="direction">← Previous</span><span class="label">{prev.title}</span></a>
-                    : <span class="spacer" />}
-                {next
-                    ? <a class="next" href={`${prefix}/${next.url}`}><span class="direction">Next →</span><span class="label">{next.title}</span></a>
-                    : <span class="spacer" />}
-            </nav>
-        }
+        {/* R-10: references and prev/next collapse behind one arrow, hidden by
+            default with sticky state. The graph trigger below stays outside the
+            band — R-16 ships it as a public discovery affordance, so it must
+            not need an extra click to be discovered. */}
+        <CollapsibleBand stateKey="relations-footer" label="references and neighboring pages" placement="bottom">
+            {backlinkGroups.length > 0 &&
+                <section class="backlinks" aria-label="Pages referencing this page">
+                    <h2>Referenced by</h2>
+                    <ul>
+                        {backlinkGroups.map((group) => (
+                            <li>
+                                <a href={`${prefix}/${group.url}`}>{group.title}</a>
+                                {group.refs.map((ref) => (
+                                    <span class="context">
+                                        {ref.source_heading && <span class="heading">under “{ref.source_heading}”</span>}
+                                        {ref.link_text && <span class="quote">“{ref.link_text}”</span>}
+                                    </span>
+                                ))}
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            }
+            {(prev || next) &&
+                <nav class="prev-next" aria-label="Neighboring pages">
+                    {prev
+                        ? <a class="prev" href={`${prefix}/${prev.url}`}><span class="direction">← Previous</span><span class="label">{prev.title}</span></a>
+                        : <span class="spacer" />}
+                    {next
+                        ? <a class="next" href={`${prefix}/${next.url}`}><span class="direction">Next →</span><span class="label">{next.title}</span></a>
+                        : <span class="spacer" />}
+                </nav>
+            }
+        </CollapsibleBand>
         {sid &&
             <div class="graph-entry" data-panzoom-root="true" data-name="graph" data-graph-root data-graph-sid={sid} data-graph-prefix={prefix}>
                 <button type="button" class="graph-trigger" data-action="open-graph"
@@ -121,6 +128,21 @@ const hasContent = Boolean(prev || next || backlinkGroups.length > 0);
     border-top: 1px solid var(--soft-border-color);
     color: var(--menu-text-color);
     box-sizing: border-box;
+}
+/* The footer already supplies the shell surface and its opening border, so the
+   nested band contributes only the arrow and the show/hide behaviour. */
+.relations-footer :global(.collapsible){
+    background: transparent;
+    border: 0;
+    color: inherit;
+}
+.relations-footer :global(.collapsible-rail){
+    padding: 0;
+    min-height: 1rem;
+}
+/* Collapsed, the footer is a thin rail rather than an empty band. */
+.relations-footer:has(:global(.collapsible[data-collapsed="true"])){
+    padding-block: var(--space-1) var(--space-2);
 }
 .backlinks{
     max-width: var(--prose-measure);
