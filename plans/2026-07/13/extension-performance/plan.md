@@ -169,6 +169,15 @@ looking at, not to the size of the workspace:
   produce visible label glitches. The full AST for a page is produced the
   first time the page is requested, then cached keyed by content hash
   (OP-002).
+  **Amended 2026-07-27 — the title half is superseded by `R-24`**
+  ([`2026-07/25/homesmartmesh-parity`](../../25/homesmartmesh-parity/plan.md)).
+  Menu labels come from the frontmatter `title` when present, in both
+  profiles. The walk pays one bounded 4 KB head-read per markdown file,
+  cached by path + size + mtime and seeded from the previous `filetree.json`,
+  so restarts re-read only changed files. The glitch objection does not apply:
+  titles are resolved *during* the walk, not upgraded after paint, so a label
+  is never rewritten under the user. **Slugs are unaffected** — identity is
+  still filename-only, and no other file content is read at startup.
 - **AD-002 — Incremental collect (change-set reuse).**
   **Ruling: superseded.** With frontmatter reads dropped there is no
   file-content pass left to make incremental: the selected page is rendered
@@ -218,7 +227,10 @@ currently shown page.
   agreement is deliberately broken in lite.** Lite slugs derive from file
   paths only: URL = slugified relative path **without file extension**; label
   = the original filename (spaces and all) without extension. No frontmatter
-  slug/title overrides in lite. Consequence, accepted: the same content can
+  slug/title overrides in lite. *(Label amended 2026-07-27 by `R-24`: the
+  frontmatter `title` labels the entry when present, filename otherwise. The
+  URL half stands — no frontmatter slug override, in any profile.)*
+  Consequence, accepted: the same content can
   have different URLs in lite vs full — lite targets standard GitHub-style
   repos where filenames are the identity.
 - **OP-002 — Lazy cache keying.** **Resolved: content hash.** A cached

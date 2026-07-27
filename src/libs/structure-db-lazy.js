@@ -5,8 +5,12 @@
  * (specification/engine-profiles/spec.md): resource use proportional to what
  * the user is looking at, not to workspace size.
  *
- * - Startup does a file-level walk only (no file contents are read): document
- *   identity (label, slug, url) derives from filenames, never frontmatter.
+ * - Startup does a file-level walk: document identity (slug, url, uid, level,
+ *   order) derives from filenames, never frontmatter. The only content the
+ *   walk reads is a bounded head-read per markdown file to pick up the
+ *   frontmatter `title`, which is a *display label* for menus and headings —
+ *   it feeds nothing that could move a page. Titles are cached by
+ *   path + size + mtime, so re-walks and restarts re-read changed files only.
  *   The walk result is persisted as <json_dir>/filetree.json and re-derived
  *   only when <json_dir>/tree.stamp changes (the extension bumps it on file
  *   add/delete/rename — content edits never trigger a re-walk).
@@ -24,7 +28,7 @@
  * Must NOT import better-sqlite3 or sharp (directly or transitively).
  */
 import {createHash} from 'crypto';
-import {existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync} from 'fs';
+import {closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, realpathSync, statSync, writeFileSync} from 'fs';
 import {join, posix} from 'path';
 import {config} from '../../config.js';
 import {basePrefix, blobFileName, blobFileUrl} from './blob-files.js';
@@ -82,7 +86,9 @@ const ASSET_KEY_SEPARATOR = '::';
 // now resolves through canonical slug comparison.
 // Version 9 replaces the briefly tested dash-only document rule with gentle
 // normalization that preserves URL-unreserved filename characters and case.
-const RECORD_VERSION = 9;
+// Version 10 takes the document title from frontmatter (display label only);
+// a v9 record's stored document row still carries the filename-derived title.
+const RECORD_VERSION = 10;
 // Alt text marking the synthetic image appended for a frontmatter `image:`
 // path; the item is dropped after collection, only its asset/blob remain.
 const META_IMAGE_ALT = 'mws-meta-image';
@@ -502,13 +508,166 @@ function shortMD5(text) {
     return createHash('md5').update(text, 'utf8').digest('hex').substring(0, 8);
 }
 
+/* ------------------------------------------- display metadata (label, order)
+
+   How a page is *presented* — its menu label and its position among its
+   siblings — comes from the frontmatter `title` and `order` when the author
+   wrote them, exactly as the full profile does (`collect.js`: `title =
+   frontmatter.title ?? slug`, then `applyEntryOverrides` for `order`). This is
+   display only: url, uid, slug and level stay filename-derived, so opening or
+   editing a file can never move a page.
+
+   The walk therefore reads the *head* of each markdown file — one bounded
+   read, never the whole document, and never a YAML parse (gray-matter sits
+   behind the lazy parse-deps import that startup must not pay for). Results
+   are cached by path + size + mtime and seeded from the previous
+   filetree.json, so a restart re-reads only the files that actually changed. */
+
+// Generous enough that the closing `---` is inside the head for any realistic
+// frontmatter block; it is still a single read either way.
+const FRONTMATTER_HEAD_BYTES = 16384;
+// Bump when the walk's derivation of any persisted field changes: a snapshot
+// written by older code must not seed caches with values this code would
+// derive differently. v2 = `sort_order` carries the frontmatter `order`
+// (null when unset) rather than the walk's position counter.
+const TREE_VERSION = 2;
+const displayCache = new Map(); // rel path -> {size, mtime_ms, title, order}
+let displayCacheSeeded = false;
+let headReads = 0; // head-reads this walk paid for; reported in the walk log
+const NO_DISPLAY = {title: null, order: null};
+
+/* A single-line YAML scalar, quoted or plain. Block scalars (`|`, `>`) would
+   need a real parser, so they fall back to the filename. */
+function yamlScalarValue(raw) {
+    const value = String(raw).trim();
+    if (!value || value.startsWith('|') || value.startsWith('>')) {
+        return null;
+    }
+    if (value.length > 1 && value.startsWith('"') && value.endsWith('"')) {
+        return value.slice(1, -1).replace(/\\(.)/g, '$1').trim() || null;
+    }
+    if (value.length > 1 && value.startsWith("'") && value.endsWith("'")) {
+        return value.slice(1, -1).replace(/''/g, "'").trim() || null;
+    }
+    // Plain scalar: a `#` preceded by whitespace opens a comment.
+    const comment = value.search(/\s#/);
+    return (comment === -1 ? value : value.slice(0, comment)).trim() || null;
+}
+
+/* `order: 12` pins an entry among its siblings. Only a finite number counts —
+   anything else leaves the entry unpinned rather than sorting on garbage. */
+function yamlNumberValue(raw) {
+    const scalar = yamlScalarValue(raw);
+    if (scalar === null) {
+        return null;
+    }
+    const value = Number(scalar);
+    return Number.isFinite(value) ? value : null;
+}
+
+function readFrontmatterDisplay(absPath) {
+    let fd;
+    try {
+        fd = openSync(absPath, 'r');
+    } catch {
+        return NO_DISPLAY;
+    }
+    let read = 0;
+    const buffer = Buffer.allocUnsafe(FRONTMATTER_HEAD_BYTES);
+    try {
+        read = readSync(fd, buffer, 0, FRONTMATTER_HEAD_BYTES, 0);
+    } catch {
+        return NO_DISPLAY;
+    } finally {
+        closeSync(fd);
+    }
+    let head = buffer.toString('utf8', 0, read);
+    if (head.charCodeAt(0) === 0xfeff) {
+        head = head.slice(1);
+    }
+    const lines = head.split(/\r?\n/);
+    if (lines[0]?.trim() !== '---') {
+        return NO_DISPLAY;
+    }
+    let title = null;
+    let order = null;
+    for (const line of lines.slice(1)) {
+        const trimmed = line.trim();
+        if (trimmed === '---' || trimmed === '...') {
+            return {title, order}; // block closed; nulls where it said nothing
+        }
+        // Anchored at column 0, so a `title:`/`order:` nested under another key
+        // is not the document's. `title : x` (space before the colon) occurs in
+        // real content and parses as the same key.
+        if (title === null) {
+            const match = /^title[ \t]*:[ \t]*(.*)$/.exec(line);
+            if (match) {
+                title = yamlScalarValue(match[1]);
+                continue;
+            }
+        }
+        if (order === null) {
+            const match = /^order[ \t]*:[ \t]*(.*)$/.exec(line);
+            if (match) {
+                order = yamlNumberValue(match[1]);
+            }
+        }
+    }
+    // No closing delimiter inside the head: either a document that merely opens
+    // with a `---` rule (gray-matter would find no frontmatter here either), or
+    // frontmatter longer than FRONTMATTER_HEAD_BYTES. Both fall back.
+    return NO_DISPLAY;
+}
+
+function seedDisplayCache() {
+    if (displayCacheSeeded) {
+        return;
+    }
+    displayCacheSeeded = true;
+    try {
+        const snapshot = JSON.parse(readFileSync(fileTreePath(), 'utf8'));
+        if (snapshot?.tree_version !== TREE_VERSION) {
+            return;
+        }
+        for (const entry of snapshot.source_entries ?? []) {
+            // Folder pages are folded into their directory node, which carries
+            // no size/mtime to validate against; those re-read once per walk.
+            if (entry?.entry_type !== 'file' || entry.document_title == null) {
+                continue;
+            }
+            displayCache.set(entry.path, {
+                size: entry.size ?? null,
+                mtime_ms: entry.mtime_ms ?? null,
+                title: entry.document_title,
+                order: entry.sort_order ?? null
+            });
+        }
+    } catch {
+        // No usable snapshot: every markdown head is read once, then cached.
+    }
+}
+
+function documentDisplay(absPath, relPath, stat, fallbackTitle) {
+    const size = stat?.size ?? null;
+    const mtimeMs = stat ? Math.trunc(stat.mtimeMs) : null;
+    const cached = displayCache.get(relPath);
+    if (cached && cached.size === size && cached.mtime_ms === mtimeMs) {
+        return {title: cached.title ?? fallbackTitle, order: cached.order};
+    }
+    const {title, order} = readFrontmatterDisplay(absPath);
+    headReads++;
+    displayCache.set(relPath, {size, mtime_ms: mtimeMs, title, order});
+    return {title: title ?? fallbackTitle, order};
+}
+
 function walkWorkspace() {
     const startedAt = Date.now();
+    seedDisplayCache();
+    headReads = 0;
     const root = contentDir();
     const documents = [];
     const sourceEntries = [];
     const usedUrls = new Map();
-    const orderTracker = new Map();
     // Diagnostics for the walk summary line: the root composition tells apart
     // "the walk dropped the folders" from "navigation filtered them out".
     let rootDirs = 0;
@@ -576,13 +735,15 @@ function walkWorkspace() {
                     const uid = identity.uid;
                     const pathSegments = relPath.split('/');
                     const fileName = pathSegments.at(-1) ?? '';
-                    const title = identity.url_type === 'dir' && pathSegments.length > 1
+                    // Filename label, used as-is when the file carries no
+                    // frontmatter title (a plain GitHub-style repo).
+                    const fallbackTitle = identity.url_type === 'dir' && pathSegments.length > 1
                         ? pathSegments.at(-2)
                         : fileName.replace(/\.[^.]+$/, '');
+                    // `order` stays null when the author pinned nothing; the
+                    // menu comparators read that as "unpinned, sort by label".
+                    const {title, order} = documentDisplay(absPath, relPath, stat, fallbackTitle);
                     const level = levelFor(identity.url_type, relPath);
-                    const orderKey = `${relDir || '.'}|${level}`;
-                    const order = (orderTracker.get(orderKey) ?? 0) + 1;
-                    orderTracker.set(orderKey, order);
                     doc = {
                         sid: shortMD5(uid),
                         uid,
@@ -672,6 +833,7 @@ function walkWorkspace() {
     }
     const walkMs = Date.now() - startedAt;
     const extras = [
+        `${headReads}/${documents.length} frontmatter head-reads`,
         ...(symlinkedDirsFollowed ? [`${symlinkedDirsFollowed} symlinked dirs followed`] : []),
         ...(skippedEntries ? [`${skippedEntries} entries skipped`] : [])
     ];
@@ -686,6 +848,7 @@ function walkWorkspace() {
         mkdirSync(jsonDir(), {recursive: true});
         writeFileSync(fileTreePath(), JSON.stringify({
             version_id: LAZY_VERSION_ID,
+            tree_version: TREE_VERSION,
             walked_at: new Date().toISOString(),
             walk_ms: walkMs,
             documents,
@@ -1304,7 +1467,9 @@ function getDocuments(versionId = null) {
             url: doc.url ?? '',
             title: doc.title ?? '',
             level: doc.level ?? 0,
-            sort_order: doc.order ?? 0,
+            // null, not 0, when the author pinned nothing: the menu builders
+            // distinguish "pinned first" from "unpinned, sorted by label".
+            sort_order: doc.order ?? null,
             url_type: doc.url_type ?? null
         }))
         .sort((a, b) => {

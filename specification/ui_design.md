@@ -60,8 +60,16 @@ The shell is an IDE-style three-pane layout, familiar from VS Code:
 - **Scale:** body at `1rem` (16px); headings step up on a GitHub-aligned
   scale — `h1 2 · h2 1.5 · h3 1.25 · h4–h6 1 rem` — chosen because GitHub's
   markdown rendering is the maintainer's reference for reading comfort. UI
-  affordances (menus, controls) sit at `~0.85rem` (`--text-sm`). Sizes are
+  affordances (controls, captions) sit at `~0.85rem` (`--text-sm`). Sizes are
   tokens (`--text-*` in `tokens.css`), never ad-hoc.
+- **Navigation is denser than the rest of the chrome.** The pages rail and the
+  outline are a file tree: scanned, not read, and depth costs vertical space
+  the tree needs. They follow VS Code's explorer rather than the scale above —
+  22px rows, 13px text, 8px of indent per level (`--nav-row-height`,
+  `--nav-text`, `--nav-indent`, `--nav-header-height`). Every tree renderer
+  shares those tokens: `SubMenu.astro` (server-rendered) and
+  `lazy_navigation.css` (the extension's post-paint tree) style the same rail
+  and must not drift apart.
 - **Weight & rhythm:** regular for body, 600 for headings and emphasis. Body
   line-height `1.5` (`--leading-body`), headings `~1.25` (`--leading-heading`);
   ~`1rem` (`--space-4`) between blocks, more space above headings.

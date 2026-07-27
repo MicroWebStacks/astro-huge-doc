@@ -144,6 +144,81 @@ the note below the table.
   currently publishing repository, which does not yet use `astro-huge-doc`
   (`OP-012`).
 
+### Round 6 (2026-07-27, chrome bottom-edge review)
+
+Reviewing the shipped chrome in the browser, the maintainer found the bottom
+edge crowded and inconsistent, and ruled as follows. These **amend `R-10` and
+`R-16`** and are implemented (see `implementation.md`, "Round 6").
+
+- **R-19 — One control for hide and show, and it travels with the surface.**
+  A surface that hides itself must be brought back by *the same button*, moved
+  by the same animation — never by a second control that appears where the
+  first one stood, which reads as magic. Applied to the link-index status bar:
+  the toggle is a handle on the bar's top edge, so it rides the full slide and
+  comes to rest against the viewport edge. (First cut of this ruling only
+  aligned two separate controls on one spot; the maintainer rejected that on
+  review — same place is not the same button.)
+- **R-20 — The relations footer carries prev/next only.** Backlinks leave the
+  footer entirely: the neighborhood graph is the reference overview, so a
+  second "referenced by" list is redundant chrome at the most expensive place
+  on the page. With two links left there is nothing worth hiding, so the
+  footer loses its collapse arrow as well — `R-10` no longer applies to it
+  (the breadcrumb + metadata band keeps its arrow unchanged).
+- **R-21 — The graph is an app-bar icon.** It belongs with the other chrome
+  affordances (info, explore, log), not in a band at the bottom of a long
+  page. Icon only, no label. This supersedes the "no separate app-bar icon"
+  note in the OKF packet's `DD-11`; `R-16` (ships publicly, no `/__lite/*`
+  dependency) is unchanged.
+- **R-22 — Fixed chrome may not sit on content.** While the status bar shows,
+  the article scroller reserves exactly its height, and gives the space back
+  when the bar collapses.
+
+### Round 7 (2026-07-27, xlsx in lite)
+
+- **R-23 — A workbook link renders as a table in every profile.** Reviewing
+  `/microcontrollers/esp32/esp32-c3-devkitm-1` in the extension preview, the
+  maintainer found the `pinout` workbook still a bare link where the live site
+  shows a sortable table. The lite gate on `.xlsx` (`R-3`/`R-11`, `WP-11`) is
+  withdrawn: unlike `.glb` — which needs the `@google/model-viewer` client
+  bundle that lite deliberately stubs out — a workbook is parsed **server-side**
+  and reuses the `MarkdownTable` island lite already ships, so the gate bought
+  nothing and cost render parity. `.glb` keeps its gate. Implemented; see
+  `implementation.md`, "Round 7".
+
+### Round 8 (2026-07-27, menu labels)
+
+- **R-24 — A menu label is the title, never the slug.** Comparing the pages
+  rail against the reference, the maintainer found lite listing `c3-devkit-m1`,
+  `esp32`, `microcontrollers` where the reference reads *C3 Dev Kit M1*,
+  *ESP32*, *Microcontrollers*. Labels are display data, not identity: a
+  document's label is its frontmatter `title` when it has one, else its
+  filename without extension, in **both** profiles. Identity is untouched —
+  "use labels in menu only, never touch url, that stays as is" — so url, uid,
+  slug, level and sort order remain filename-derived. Supersedes the menu-label
+  clause of `DD-002` and the lite half of `AD-001` in
+  [`2026-07/13/extension-performance`](../../13/extension-performance/plan.md).
+  Implemented; see `DD-002 — amended` below.
+
+### Round 9 (2026-07-27, sibling order and menu density)
+
+- **R-25 — `order` pins, the rest sort A→Z.** Reviewing the relabelled rail the
+  maintainer found sibling order still ignored. A frontmatter `order` pins an
+  entry among its siblings, ascending; entries the author left unpinned follow,
+  A→Z by label. Both profiles, one comparator pair kept in step
+  (`source_navigation.sortSourceNodes`, `layout_utils.sortByOrderThenLabel`).
+  The pinned-before-unpinned half is new to *both* profiles: full read `order`
+  but coerced a missing one to `0`, which sorted unpinned entries ahead of
+  everything pinned. Resolves `OP-017`. Like `R-24` this is display only —
+  `order` reaches no url, uid or slug.
+- **R-26 — The pages rail is a file tree, and follows VS Code's density.**
+  The rail's 36px rows and 12px insets belong to a reading surface, not to a
+  tree that has to show depth; roughly half of an ESP32-sized section fit on
+  screen. Rows become 22px at 13px text with 8px of indent per level, named as
+  `--nav-*` tokens so `SubMenu.astro` and `lazy_navigation.css` — two renderers
+  of the same rail — cannot drift. Recorded in
+  [`specification/ui_design.md`](../../../../specification/ui_design.md) as a
+  deliberate exception to the type scale, not an oversight.
+
 **Consequence — parity is no longer url parity.** `R-1` set the publish target;
 `R-6`/`R-7` now say our urls are *deliberately* allowed to differ from
 <https://homesmartmesh.github.io/>. So the measured "34/73 divergent urls" stops
@@ -457,6 +532,7 @@ regressions against the recorded baseline.
 | OP-013 | Do the local blob duplicates (`dataset/blobs` sidecar tree, 217.5 MB, accumulating across runs) get pruned? | `WP-25`: the JSON backend writes straight to the flat served dir and never stages through the sidecar, so the duplication stops being *created* rather than being cleaned up after. | **Resolved** — `R-14` |
 | OP-014 | Should `external_storage_kb` become sqlite-only in name and effect? | Yes — scope it to the sqlite writer, or rename it to say what it does. | **Resolved** — `R-15` |
 | OP-015 | The two C3 DevKit M1 documents are named after each other's titles, so under `R-6` their URLs read backwards. Merge, swap the filenames, or accept? | **Accept** (Option C). It is a content inconsistency, not a rendering issue, so the renderer stays unchanged and no content edit is made in this packet. The rich page serves at `/microcontrollers/esp32/esp32-c3-devkitm-1`. | **Resolved** — `R-18` |
+| OP-017 | Menu *ordering* in lite. `R-24` fixed labels; the reference also orders siblings by frontmatter `order`, which full honours and lite does not (lite sorts by walk position, i.e. alphabetical within a folder). The walk already reads the frontmatter head, so `order` would cost nothing extra to pick up — but it changes visible ordering, which was not asked for. | **Honour it, in both profiles.** Pinned entries first, ascending; unpinned follow A→Z by label. Neither profile had that rule before: full read `order` but coerced a missing one to `0`, which jumped unpinned entries ahead of pinned. | **Resolved** — `R-25` |
 
 ### OP-010 — gentle path normalization
 
@@ -705,6 +781,34 @@ startup**; reading frontmatter when a page is opened is fine.
 This preserves `2026-07/19/okf-support` (`structure-db-lazy.js:880-898`) intact.
 The testable invariant for `R-6`: opening a file must never change any url, uid,
 menu label, or sort order.
+
+#### Amended 2026-07-27 — menu labels come from the title (`R-24`)
+
+Reviewing the running site against the reference, the maintainer ruled that
+lumping **menu labels** in with identity was the wrong call: lite showed
+`c3-devkit-m1` / `esp32` where the reference shows *C3 Dev Kit M1* / *ESP32*,
+and the full profile was already labelling from `title` — so the rule as
+written did not describe either profile. Labels move out of the identity list:
+
+> A document's label is its frontmatter `title` when it has one, else its
+> filename without extension — **in both profiles**. The label is display only:
+> url, uid, slug, level and sort order stay filename-derived, so editing a
+> title can never move a page. Lite's tree walk pays **one bounded head-read**
+> per markdown file for it (4 KB, no YAML parse), cached by path + size + mtime
+> and seeded from the previous `filetree.json`, so a restart re-reads only the
+> files that changed.
+
+`R-6` is unchanged — identity is still the slugified filename, full stop. What
+changed is that a menu label was never identity. Sibling order followed one
+round later under `R-25`, on the same reasoning and through the same head-read.
+
+Implemented in `src/libs/structure-db-lazy.js` (`documentTitle`,
+`readFrontmatterTitle`, `seedTitleCache`), covered by
+[`test/lite-menu-labels.test.js`](../../../../test/lite-menu-labels.test.js).
+Measured on the HomeSmartMesh snapshot (73 documents): cold walk 25 ms with
+73/73 head-reads, warm walk 22 ms with 22/73 — the 22 being folder pages, whose
+entries are folded into their directory node and so carry no size/mtime to
+validate a seeded title against.
 
 ### DD-006 — what `/__lite/` is
 

@@ -8,6 +8,142 @@
 content inconsistency, not a rendering issue. The external publishing-action
 cutover remains outside this packet (`R-17`).
 
+## Round 9 — sibling order and rail density (2026-07-27, complete)
+
+`R-25`, `R-26`. Two follow-ups from reviewing the relabelled rail.
+
+**Order (`R-25`).** The frontmatter `order` was ignored in lite and mishandled
+in full. Lite's walk never read it, so `sort_order` carried the walk's position
+counter (alphabetical within a folder). Full read it, but every consumer wrote
+`sort_order ?? 0` — so a document with no `order` sorted as 0 and jumped ahead
+of everything the author had pinned.
+
+| File | Change |
+| --- | --- |
+| `src/libs/structure-db-lazy.js` | The head-read (`readFrontmatterDisplay`) now returns `{title, order}`; `documentDisplay` caches both. `doc.order` is the frontmatter value or **null** — the per-directory position counter (`orderTracker`) is gone, it existed only to fill this field. `TREE_VERSION` 1 → 2 so a v1 snapshot cannot seed position counters as if they were authored orders. |
+| `src/libs/structure-db-json.js`, `structure-db-lazy.js` | `getDocuments()` emits `sort_order: doc.order ?? null`, matching what the sqlite backend already returned raw. The `?? 0` was what erased the distinction. |
+| `src/layout/source_navigation.js`, `src/layout/layout_utils.js` | `sortSourceNodes` and `sortByOrderThenLabel` — the pages rail and the app bar — take the same rule: pinned first ascending, then unpinned A→Z by label. They are cross-referenced in comments; they must not drift. |
+
+Result on the HomeSmartMesh snapshot, identical in lite and in the static
+build: app bar `Home · Robotics · 3D Printing · Web · Microcontrollers`
+(orders 2/3/4/5, then the unpinned sections) — previously alphabetical. ESP32's
+children lead with Datasheets → ESP-Mesh in authored order, then the 9 unpinned
+pages A→Z. The live site puts its unpinned tail in *reverse filename* order;
+that is a legacy sort artifact and was deliberately not reproduced.
+
+**Density (`R-26`).** The rail used 36px rows and `--text-sm`, and a leaf cost
+16px of indent per level. Measured in Chromium: rows now 22px at 13px text,
+9px per level (8px + the 1px indent guide), header 28px. The ESP32 section went
+from roughly half a screen to the whole subtree plus its siblings.
+
+| File | Change |
+| --- | --- |
+| `src/layout/tokens.css` | New `--nav-row-height` / `--nav-text` / `--nav-indent` / `--nav-header-height`. Deliberately *not* on the type scale — see `R-26`. |
+| `src/layout/SubMenu.astro` | Rows, twistie (a fixed 16px column, leaves inset to match), text padding and nesting indent move onto the tokens. Labels now truncate with an ellipsis instead of wrapping to a second line — the row height is fixed, so wrapping was what produced the 45px rows. |
+| `src/layout/lazy_navigation.css` | **The one that matters for the extension.** This is the post-paint client tree the preview actually shows; `SubMenu.astro` renders the server-side copy. The first pass at this round changed only the Astro component and the browser looked untouched. Same tokens, same rules. |
+| `src/layout/SideMenu.astro` | Header, depth-control strip and skeleton follow the same rhythm (28px header, 24px buttons). |
+
+## Round 8 — menu labels from the title (2026-07-27, complete)
+
+`R-24`. The pages rail in lite listed slugs — `c3-devkit-m1`, `esp32`,
+`microcontrollers` — where the reference site reads *C3 Dev Kit M1*, *ESP32*,
+*Microcontrollers*. Only lite diverged: the full profile has always labelled
+from `title` (`content-structure/src/collect.js`: `title = frontmatter.title ??
+slug`), and the app bar, breadcrumb and card headings inherited the same slugs
+from the same field.
+
+Root cause: `walkWorkspace()` derived `doc.title` from the filename because the
+walk read no file contents at all. The fix reads the frontmatter *head* — a
+single 4 KB `readSync`, no YAML parse, `gray-matter` stays behind the lazy
+parse-deps import startup must not pay for.
+
+| File | Change |
+| --- | --- |
+| `src/libs/structure-db-lazy.js` | `readFrontmatterTitle()` extracts a column-0 `title:` from a leading `---` block in the first 4 KB (single-line scalars only — quoted, plain-with-comment, or `title : x`; a block scalar falls back to the filename). `documentTitle()` caches by path + size + mtime; `seedTitleCache()` primes it from the previous `filetree.json`, guarded by a new `tree_version` field so a snapshot written by older code cannot seed stale labels. `RECORD_VERSION` 9 → 10: a v9 page record's stored document row still carries the filename title. |
+| `specification/engine-profiles/spec.md` | Identity contract: a label is the title, else the filename, in both profiles. Performance contract: startup is file-level operations *plus one bounded head-read per markdown file*. |
+| `test/lite-menu-labels.test.js` | New. Every single-line YAML form, the filename fallbacks (no frontmatter / no title / nested `title` / block scalar), folder-page titles labelling directory nodes, and — the invariant that matters — no title reaching any url. Plus cache invalidation: an edited title is picked up on the next walk. |
+
+**Identity is untouched.** url, uid, slug, level and sort order stay
+filename-derived; the per-page parse already lists `title` in `identityColumns`,
+so an opened page cannot re-label itself either. `/microcontrollers/esp32/c3-devkit-m1`
+still serves at that path while reading *ESP32 C3 DevKit M1* in the menu.
+
+Measured cost. HomeSmartMesh snapshot (73 documents, 298 entries): cold walk
+25 ms at 73/73 head-reads, warm walk 22 ms at 22/73. The residual 22 are folder
+pages — their file entry is folded into the directory node, which carries no
+size/mtime to validate a seeded title against, so they re-read once per process.
+`pnpm bench:lite --pages 1000 --fresh` (1111 documents, and it wipes the json
+dir to force a truly cold walk): 95 ms total, of which the head-reads are 38 ms
+measured in isolation against 9 ms to stat the same 1111 files — so ~35 µs per
+markdown file, paid once per file per change. The walk log line now reports
+`<reads>/<documents> title head-reads` (AD-007).
+
+Ordering is **not** in this round: lite still sorts by walk position where the
+reference honours frontmatter `order`. Recorded as `OP-017`, awaiting a ruling.
+
+## Round 7 — XLSX tables in lite (2026-07-27, complete)
+
+`R-23`. The `pinout` workbook on `/microcontrollers/esp32/esp32-c3-devkitm-1`
+rendered as a bare link in the extension preview while the live site shows a
+table. Two independent faults, both fixed:
+
+| File | Change |
+| --- | --- |
+| `src/components/markdown/link-components.js` | `.xlsx` no longer gated on `profile !== 'lite'`. The workbook is read and converted server-side and the result feeds the `MarkdownTable` island lite already ships for ordinary Markdown tables, so nothing profile-specific was ever needed. `.glb` keeps its gate — lite aliases `@google/model-viewer` to an empty module, so a viewer there would be inert. |
+| `scripts/stage-engine.js` | `xlsx` removed from `EXCLUDED_DEPS`. `Link.astro` imports `TableXLSX.astro` unconditionally and Vite leaves `xlsx` **external** in the SSR build — verified: the built chunk carrying every page's footer starts with `import {read, utils} from 'xlsx'`. Excluding it meant the staged engine would fail to load *any* page once `WP-11` landed, and a fresh `md-render build` would fail to resolve the import. This was already broken for the full-profile render command before this round; the staged package under `packages/md-render` predates `WP-11` (built 2026-07-24) and so never surfaced it. |
+
+Nothing changed for the full profile: `.xlsx` already classified as a table
+there.
+
+### Verification
+
+| Check | Result |
+| --- | --- |
+| `pnpm test` | **127/127** |
+| Lite dev server, `/microcontrollers/esp32/esp32-c3-devkitm-1` | before: `.xlsx-table` present as CSS only, workbook rendered as `<a>`; after: `<section class="xlsx-table">` with the parsed island — `J1 Header 9`, `RGB LED` in the payload, **no** "Unable to render spreadsheet" fallback |
+| Lite dev server, `/microcontrollers/esp32/wall-display` (the second workbook) | `<section class="xlsx-table">`, no fallback |
+| SSR build (`astro build`, scratch outDir) | exit 0; `xlsx` confirmed external in `dist/server/chunks/` |
+
+Lite reaches the workbook through the collected blob
+(`getAssetInfoBlob_version`), not the source-path fallback — link items carry no
+`ast.url` in the JSON dataset, so `TableXLSX`'s `resolveXlsxPath` branch is
+unreachable there and the blob path is what makes this work in all backends.
+
+**Not re-staged.** `packages/md-render` and the installed `.vsix` still carry
+the 2026-07-24 engine. Run `pnpm build && pnpm ext:reinstall` to see this in the
+installed extension; the vendoring step will now pull `xlsx` (~7.8 MB against a
+428 MB vendored tree).
+
+## Round 6 — chrome bottom-edge review (2026-07-27, complete)
+
+Four maintainer rulings from reviewing the shipped chrome in a browser
+(`R-19`–`R-22` in `plan.md`). They amend `R-10`/`R-16`, so `WP-22`/`WP-16`
+below describe the *previous* shape of the footer.
+
+| File | Change |
+| --- | --- |
+| `src/layout/LiteRelationIndexer.astro`, `src/layout/lite_relation_indexer.js` | `R-19`. One `[data-index-toggle]` handle, absolutely positioned at `bottom:calc(100% - 1px)` of the bar — on its top edge, 1px into its border so the line breaks around it. The bar travels its full height (`translateY(100%)`, no `visibility`/`pointer-events` on the collapsed state) and the handle rides along. Measured at 1400×900: handle top 839 → 880 while the bar goes 858 → 900, sampled mid-transition at 866 with the bar at 887 — one element, moving together. The bar's content moved into `.index-body`, which takes `visibility:hidden` on a matching transition: off-screen is not hidden from a screen reader, and the delay keeps the text from blinking out before the slide starts. |
+| `src/layout/RelationsFooter.astro` | `R-20`. Prev/next only — the backlink query, the "Referenced by" list, the `CollapsibleBand` wrapper and the graph button are gone. One row, `var(--space-2)` block padding: 51 px tall, down from ~150 px plus the rail. |
+| `src/layout/AppBar.astro` | `R-21`. The graph entry (`data-graph-root` + render target + `PanZoomModal`) moved here as an icon-only `nav-toggle`; `graph_entry.js` binds it unchanged because the whole root moved together. Also `.nav-toggle[hidden]{display:none}` — see below. |
+| `src/layout/Layout.astro`, `src/pages/index.astro`, `src/pages/[...url].astro` | `graphSid` threaded page → layout → app bar (the layout has no entry of its own). |
+| `src/layout/Layout.astro`, `src/layout/tokens.css` | `R-22`. `--index-status-height` (2.6 rem; 3.6 rem where the bar wraps to two rows) is both the bar's `min-height` and, with `--index-status-handle` on top of it, the article scroller's reserve — applied only while `body:has(.lite-index-status:not([data-collapsed="true"]))`. Measured 75.2 px showing, 12 px collapsed. |
+
+### The preview lock never responded to clicks
+
+Not a message-plumbing fault: outside the VS Code webview `preview_lock.js`
+sets `hidden` on the toggle and returns *before* binding its click handler. But
+`.nav-toggle` sets `display:flex`, and an author rule outranks the UA's
+`[hidden]{display:none}` — so in a plain `pnpm dev` browser tab the button
+stayed visible and inert, exactly the reported symptom. One rule
+(`.nav-toggle[hidden]{display:none}`) makes the attribute win. Inside the
+webview the control was, and remains, functional.
+
+Verified in a headless browser against the dev server: lock absent outside the
+webview, graph modal opens from the app bar and renders the neighborhood SVG,
+one toggle element in the DOM at all times, its collapsed state still sticky
+across a reload. Suite 125/125 (6 new assertions in
+`test/layout-footer.test.js`).
+
 ## Phase 5 — deployment and regression guard (complete)
 
 ### WP-18 — GitHub Pages workflow
@@ -114,7 +250,7 @@ renders the indexer bar, the lazy navigation and the preview-history controls.
 | `src/layout/collapsible.js` (new) | One arrow behaviour and one persistence rule for all three surfaces. Flags live in a single `chrome-band-flags` localStorage set; an absent key reads as the default, so the common case stores nothing. Storage failures degrade to a working, non-sticky toggle. |
 | `src/layout/CollapsibleBand.astro` (new) | The band: a thin rail carrying one chevron, collapsed by default (`R-10`), with the slot rendered untouched when open. |
 | `src/pages/[...url].astro`, `src/pages/index.astro` | The breadcrumb + metadata band. |
-| `src/layout/RelationsFooter.astro` | The references + prev/next band. |
+| `src/layout/RelationsFooter.astro` | The references + prev/next band. **Superseded by `R-20`** (Round 6): the footer is prev/next only and no longer a band. |
 | `src/layout/lite_relation_indexer.js` | Third consumer: same store, its own key and polarity. |
 
 Two decisions worth recording:
@@ -122,6 +258,8 @@ Two decisions worth recording:
 - **The graph trigger stays outside the band.** `R-10` names references and
   prev/next; `R-16` ships the graph button as a public discovery affordance, so
   burying it behind a click would work against the ruling that put it there.
+  *Round 6 took this further under `R-21`: the trigger left the footer for the
+  app bar.*
 - **The indexer's dismissal is now sticky.** `R-10` describes the index status
   bar as the existing sticky-state pattern. It was not — `userCollapsed` reset
   on every page load. It now persists through the shared store, which is what
@@ -282,10 +420,13 @@ Rendering was re-checked, not assumed. The rich document renders in full at
 `/microcontrollers/esp32/esp32-c3-devkitm-1`: five headings (`C3 Dev Kit M1`,
 `PIO Board`, `ESP32 C3 Mini`, `Schematics`, `Pinout`), the `c3-m1.webp` image,
 the `ini` board block, the schematic SVG, and the XLSX pinout. The review
-screenshot was taken against the **lite** dev server, where the XLSX
-deliberately stays a plain link (`link-components.js` gates `.glb`/`.xlsx` on
-`profile !== 'lite'`, per `R-3`/`R-11`); the full profile renders it as a
-table, which is the artifact audit's second XLSX table.
+screenshot was taken against the **lite** dev server, where the XLSX stayed a
+plain link (`link-components.js` gated `.glb`/`.xlsx` on `profile !== 'lite'`,
+per `R-3`/`R-11`); the full profile rendered it as a table, which is the
+artifact audit's second XLSX table.
+
+**Superseded 2026-07-27 (`R-23`):** the lite gate on `.xlsx` is removed — see
+"Round 7 — XLSX tables in lite" above. `.glb` keeps its gate.
 
 The sparse stub is not referenced by any card — `microcontrollers/esp32/readme.md`
 cards `microcontrollers.esp32.esp32-c3-devkitm-1` (the rich page) and never the

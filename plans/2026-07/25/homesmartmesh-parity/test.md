@@ -3,6 +3,71 @@
 Environment: Windows 11, Node 22, pnpm workspace, content set = HomeSmartMesh
 (73 documents, 199 MB) fetched per `manifest.yaml`.
 
+## Round 9 run — sibling order and rail density (2026-07-27)
+
+`R-25`, `R-26`. Lite dev server on 4389 plus a Chromium (Playwright) pass, and
+a full static build for the publish target.
+
+| # | Command / inspection | Actual |
+| --- | --- | --- |
+| 1 | Authored `order` in `content/microcontrollers/*/readme.md` | esp32 1, riscv 2, stm32 3, nrf52 4, nrf53 none |
+| 2 | Lite pages rail under Microcontrollers | `ESP32, Risc-V, STM32, nRF52, nRF53` — pinned in authored order, unpinned last. Matches the reference |
+| 3 | Lite ESP32 children | `Datasheets, ESP32-C3 0.42 Oled, Software, Waveshare S3 3.5 Inch display, Timer Cam OV3660, TTGO T-Display, TTGO T5-EPaper, M5 Stick C Plus, FireBeetle, M5 Atom Lite, ESP-Now, ESP-Mesh` (orders 1,1,3,5,11,12,13,14,15,16,20,21) then the 9 unpinned A→Z |
+| 4 | App bar, lite | `Home \| Robotics \| 3D Printing \| Web \| Microcontrollers \| Frameworks \| Protocols \| Other` — matches the reference; was alphabetical |
+| 5 | App bar + rail, **full/json** backend | byte-identical ordering to lite |
+| 6 | `astro build --config astro.config.static.mjs` (full/json/static, scratch outdir) | **exit 0**, 75 `index.html`. `microcontrollers/esp32/c3-devkit-m1/index.html` carries the same 26 labels in the same order |
+| 7 | Chromium, rail measured (`getComputedStyle` + rects) | row height **22px** uniform (was 36px, and 45px where a label wrapped); font **13px** (was 13.6px); indent **9px**/level (8px + 1px guide, was 16px); header **28px** (was 40px) |
+| 8 | Same page, dark theme screenshot | Whole ESP32 subtree plus Risc-V / STM32 / nRF52 / nRF53 visible in 1000px; previously about half the subtree |
+| 9 | `node --test test/lite-menu-labels.test.js` | **8/8 pass** (5 label + 3 order) |
+| 10 | `pnpm test` | **135/135 pass** |
+| 11 | `pnpm check:plans` | pass |
+
+Trap worth recording: the first density pass changed only `SubMenu.astro` and
+the browser showed no difference. The extension preview renders the rail
+**client-side** from `/__lite/navigation` into `.lazy-menu-tree`, styled by the
+global `lazy_navigation.css`, whose selectors outrank the Astro-scoped ones.
+Both files style the same rail; a change to one alone is invisible in the
+profile the maintainer is looking at.
+
+## Round 8 run — menu labels from the title (2026-07-27)
+
+`R-24`. Lite backend driven directly (`DOCS_PROFILE=lite DOCS_BACKEND=json`)
+against the normal HomeSmartMesh content.
+
+| # | Command / inspection | Actual |
+| --- | --- | --- |
+| 1 | `buildNavigationMenus('/microcontrollers/esp32/c3-devkit-m1')` app bar | `Home \| 3D Printing \| Frameworks \| Microcontrollers \| Other \| Protocols \| Robotics \| Web` — was lowercase slugs (`home \| 3dprinting \| frameworks \| ...`) |
+| 2 | Same call, pages rail | `Microcontrollers > ESP32 > {ESP32 C3 DevKit M1, ESP32-C3 0.42 Oled, Datasheets, Debug, ESP-Mesh, FireBeetle, M5 Stick C Plus, TTGO T-Display, Waveshare S3 3.5 Inch display, …}` — matches the reference site's labels |
+| 3 | Links on those same nodes | unchanged: `/microcontrollers/esp32/c3-devkit-m1`, `/microcontrollers/esp32/waveshare-s3-3.5`, … Still filename-derived |
+| 4 | Cold walk (`dataset/json/filetree.json` removed) | `73 documents, 298 entries in 25 ms; 73/73 title head-reads` |
+| 5 | Warm walk (snapshot present) | `… in 22 ms; 22/73 title head-reads` — the 22 are folder pages, which have no seedable file entry |
+| 6 | `pnpm bench:lite --pages 1000 --fresh` | `1111 documents … in 95 ms; 1111/1111 title head-reads`. Isolated: 38 ms for the 1111 head-reads vs 9 ms to stat the same files |
+| 7 | `node --test test/lite-menu-labels.test.js` | **5/5 pass** |
+| 8 | `pnpm test` | **132/132 pass** (127 + 5 new) |
+| 9 | `pnpm check:plans` | pass — 38 packets, indexes consistent |
+
+Not covered: no browser pass. The labels were read out of the menu builders the
+page renders from, not off a rendered screenshot. `bench:lite` also fails at its
+last step (`SSR benchmark needs dist/server/entry.mjs`) — pre-existing, that
+step needs a prior `pnpm build`, and it is after every measurement used here.
+
+## Round 7 run — XLSX tables in lite (2026-07-27)
+
+`R-23`. Lite dev server on port 4399 (`DOCS_PROFILE=lite astro dev`), existing
+`dataset/json`, no re-collect.
+
+| # | Command / inspection | Actual |
+| --- | --- | --- |
+| 1 | `GET /microcontrollers/esp32/esp32-c3-devkitm-1` **before** the change | 200, 154 KB. `xlsx-table` appears only inside `TableXLSX.astro`'s injected CSS; the workbook is an `<a>` |
+| 2 | Same route **after** | 200, 168 KB. `<section class="xlsx-table" aria-label="pinout">` + hydrated island; payload contains `J1 Header 9` and `RGB LED`; **0** "Unable to render spreadsheet" |
+| 3 | `GET /microcontrollers/esp32/wall-display` (second workbook) | 200, `<section class="xlsx-table" aria-label="Pinout">`, no fallback |
+| 4 | `astro build` (server output, scratch `MICROWEBSTACKS_OUTDIR`) | exit 0; `grep` finds `import { read, utils } from 'xlsx'` in the emitted server chunk — i.e. externalized, so the staged engine must vendor it |
+| 5 | `node --test "test/**/*.test.js"` | **127/127 pass** |
+
+Not covered: the packaged extension. `packages/md-render` still holds the
+2026-07-24 engine, so this needs `pnpm build && pnpm ext:reinstall` (which will
+now vendor `xlsx`) before the installed preview shows the table.
+
 ## Phase 2 Definition-of-Done run (2026-07-25)
 
 | # | Command / inspection | Actual |
@@ -125,9 +190,10 @@ not; the two documents are named after each other's titles. Ruled accepted-as-is
 | 5 | Grep the whole content set for references to either document | one: card uid `microcontrollers.esp32.esp32-c3-devkitm-1` in `microcontrollers/esp32/readme.md`. The stub is carded by nothing. |
 
 The review screenshot was taken against the **lite** dev server, so the pinout
-XLSX is a plain link there by design (`link-components.js` gates `.glb`/`.xlsx`
+XLSX was a plain link there by design (`link-components.js` gated `.glb`/`.xlsx`
 on `profile !== 'lite'`). The full artifact's XLSX-table count of 2 already
-covers this page.
+covers this page. **Superseded 2026-07-27 by `R-23`** — lite renders the table
+too; see the Round 7 run below.
 
 ## Phase 1 Definition-of-Done run (2026-07-25)
 

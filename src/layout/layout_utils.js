@@ -172,11 +172,17 @@ function labelFromUrl(url) {
     return withSpaces.charAt(0).toUpperCase() + withSpaces.slice(1);
 }
 
+/* Same rule as source_navigation.sortSourceNodes: a frontmatter `order` pins an
+   entry, ascending; unpinned entries follow, A→Z by label. Keep the two in step
+   — the app bar and the pages rail must not disagree about sibling order. */
 function sortByOrderThenLabel(a, b) {
-    const orderA = a.order ?? 0;
-    const orderB = b.order ?? 0;
-    if (orderA !== orderB) {
-        return orderA - orderB;
+    const pinnedA = a.order !== null && a.order !== undefined;
+    const pinnedB = b.order !== null && b.order !== undefined;
+    if (pinnedA !== pinnedB) {
+        return pinnedA ? -1 : 1;
+    }
+    if (pinnedA && a.order !== b.order) {
+        return a.order - b.order;
     }
     const labelA = a.label ?? '';
     const labelB = b.label ?? '';
@@ -290,7 +296,7 @@ function buildAppBarMenuFromDocs(docs, pathname) {
             label,
             link,
             active_class: resolveSection(link, sections) === currentSection ? 'active' : '',
-            order: doc.sort_order ?? 0,
+            order: doc.sort_order ?? null,
             isHome
         });
     }
@@ -332,7 +338,7 @@ function buildSectionMenuFromDocs(docs, pathname) {
                 url,
                 label,
                 nodeKey: url || 'home',
-                order: doc?.sort_order ?? 0,
+                order: doc?.sort_order ?? null,
                 active: false,
                 expanded: true,
                 items: []

@@ -38,8 +38,8 @@ function escapeXml(value) {
     })[ch]);
 }
 
-/* The graph modal surface is themed (--content-bg-color, see
-   RelationsFooter.astro's .graph-entry overrides), unlike the always-light
+/* The graph modal surface is themed (--content-bg-color, see AppBar.astro's
+   .graph-entry overrides), unlike the always-light
    photo/diagram lightbox — so every color here must be a theme token that
    already carries contrast against the content surface in both light and
    dark mode (labels: content ink; fills: raised surface tokens). */

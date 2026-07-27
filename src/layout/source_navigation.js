@@ -35,14 +35,22 @@ function buildDocLink(url, base) {
     return `${basePrefix(base)}/${cleaned}`;
 }
 
+/* Sibling order, shared with layout_utils.sortByOrderThenLabel:
+   a frontmatter `order` pins an entry, ascending; everything the author did not
+   pin follows, A→Z by label. Pinned-before-unpinned is what makes a partial
+   `order:` sprinkling useful — otherwise a missing order would read as 0 and
+   jump the pinned entries. */
 function sortSourceNodes(a, b) {
     if (a.entryType !== b.entryType) {
         return a.entryType === 'dir' ? -1 : 1;
     }
-    const orderA = a.order ?? 0;
-    const orderB = b.order ?? 0;
-    if (orderA !== orderB) {
-        return orderA - orderB;
+    const pinnedA = a.order !== null && a.order !== undefined;
+    const pinnedB = b.order !== null && b.order !== undefined;
+    if (pinnedA !== pinnedB) {
+        return pinnedA ? -1 : 1;
+    }
+    if (pinnedA && a.order !== b.order) {
+        return a.order - b.order;
     }
     return (a.label ?? '').localeCompare(b.label ?? '');
 }
@@ -149,7 +157,7 @@ function buildSectionMenuFromSourceEntries(sourceEntries, pathname, base = '/', 
             nodeKey: entry.path,
             label: labelFromSourceEntry(entry),
             entryType: entry.entry_type,
-            order: entry.sort_order ?? 0,
+            order: entry.sort_order ?? null,
             active: activePath === entry.path,
             expanded: true,
             items: [],

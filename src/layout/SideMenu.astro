@@ -94,12 +94,13 @@ nav{
   position:sticky;
   top:0;
   z-index:2;
-  min-height:2.5rem;
+  min-height:var(--nav-header-height);
   display:flex;
   align-items:center;
-  padding-inline:var(--space-3);
-  font-size:var(--text-sm);
+  padding-inline:var(--space-2);
+  font-size:var(--nav-text);
   font-weight:600;
+  letter-spacing:0.02em;
   color:var(--content-color-muted);
   background:var(--nav-bg-color);
   border-bottom:1px solid var(--soft-border-color);
@@ -110,16 +111,17 @@ nav.closed{
 nav.open{
     width:var(--data_width);
 }
+/* Placeholder rows stand in for real ones, so they follow the same rhythm. */
 .menu-skeleton{
   display:flex;
   flex-direction:column;
-  gap:var(--space-3);
-  padding:var(--space-4) var(--space-3);
+  gap:var(--space-2);
+  padding:var(--space-2) var(--space-2);
 }
 .menu-skeleton span{
   display:block;
   width:78%;
-  height:0.8rem;
+  height:0.7rem;
   border-radius:var(--radius-sm);
   background:color-mix(in srgb, var(--content-color-muted) 22%, transparent);
   animation:menu-skeleton-pulse 1.2s ease-in-out infinite alternate;
@@ -161,14 +163,14 @@ nav::-webkit-scrollbar-corner {
    while the menu scrolls. */
 .depth-controls{
   position: sticky;
-  top: 2.5rem;
+  top: var(--nav-header-height);
   z-index: 1;
   display:flex;
   align-items:center;
   justify-content:center;
   flex-direction: row;
   gap:0.15rem;
-  padding:var(--space-1) 0.15rem;
+  padding:2px 0.15rem;
   color:var(--content-color);
   background: var(--nav-bg-color);
   border-top: 1px solid var(--soft-border-color);
@@ -179,8 +181,8 @@ nav.toc_menu .depth-controls{
   justify-content:center;
 }
 .depth-btn{
-  width: 2rem;
-  height: 2rem;
+  width: 1.5rem;
+  height: 1.5rem;
   display:inline-flex;
   align-items:center;
   justify-content:center;
@@ -189,14 +191,14 @@ nav.toc_menu .depth-controls{
   border-radius: var(--radius-sm);
   color: var(--content-color);
   padding: 2px;
-  font-size: var(--text-sm);
+  font-size: var(--nav-text);
   line-height: 1;
   cursor: pointer;
   user-select: none;
 }
 .depth-btn.all{
   width:auto;
-  min-width:2.25rem;
+  min-width:1.75rem;
   padding-inline:var(--space-1);
 }
 .depth-btn:focus-visible{
@@ -205,7 +207,7 @@ nav.toc_menu .depth-controls{
 }
 .depth-btn.auto{
   width: auto;
-  min-width: 2.75rem;
+  min-width: 2.25rem;
   gap: var(--space-1);
   padding-inline: var(--space-1);
 }
@@ -222,7 +224,7 @@ nav.toc_menu .depth-controls{
 }
 .mode-level{
   min-width: 0.65rem;
-  font-size: var(--text-sm);
+  font-size: var(--nav-text);
   font-variant-numeric: tabular-nums;
   line-height: 1;
   color: var(--content-color-muted);

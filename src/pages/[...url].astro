@@ -40,7 +40,7 @@ const isLogView = found
     && isValidLogStructure(headings)
 ---
 {found&&
-    <Layout title={title} headings={headings} >
+    <Layout title={title} headings={headings} graphSid={data?.sid ?? null} >
             <div class="page-chrome">
                 <CollapsibleBand stateKey="page-chrome" label="breadcrumb and metadata">
                     <Breadcrumb data={data} />

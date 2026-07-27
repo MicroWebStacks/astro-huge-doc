@@ -1,6 +1,6 @@
 import {buildGraphSvg} from './graph_view.js';
 
-/* Wires the RelationsFooter "Graph" affordance (OKF plan TP-13/DD-11): fetch
+/* Wires the app bar's graph icon (OKF plan TP-13/DD-11, ruling R-16): fetch
    the neighborhood payload once, build the SVG, then dispatch the same
    'open' CustomEvent the diagram toolbar uses so the existing panzoom modal
    (panzoom_common.js, already wired at DOMContentLoaded) takes over. */

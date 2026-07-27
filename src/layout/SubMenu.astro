@@ -73,12 +73,12 @@ const imageIcon = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" s
         padding: 0px;
     }
     ul.nested{
-        padding-left: var(--space-2);
+        padding-left: 0;
         border-top:   0px;
         border-left:  1px solid var(--menu-border-left-color);
         border-right: 0px;
         border-bottom:0px;
-        margin-left: var(--space-2);
+        margin-left: var(--nav-indent);
         overflow: hidden;
         max-height: 200vh;
         transition-property: max-height;
@@ -95,12 +95,12 @@ const imageIcon = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" s
     .entry_container{
         padding:0px;
         padding-left:0px;
-        user-select: none;    
+        user-select: none;
         color:var(--content-color);
         display:flex;
         align-items: center;
-        min-height:2.25rem;
-        font-size:var(--text-sm);
+        min-height:var(--nav-row-height);
+        font-size:var(--nav-text);
     }
     .entry_container>a{
         text-decoration: none;
@@ -114,24 +114,29 @@ const imageIcon = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" s
     .entry_container.active{
         background-color: var(--menu-active-color);
     }
+    /* Twistie column, 16px like VS Code's. A leaf has no chevron, so its text
+       carries the same inset instead and the two line up. */
     span.icon{
-        padding:var(--space-1);
-        padding-right:var(--space-1);
+        width:1rem;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        padding:0;
         flex-grow: 0;
+        flex-shrink: 0;
     }
     span.text{
-        padding:2px;
-        padding-top:var(--space-1);
-        padding-bottom:var(--space-1);
+        padding:0 var(--space-1);
         color:var(--menu-text-color);
         display: block;
         flex-grow: 1;
-        line-height:1.35;
+        line-height:var(--nav-row-height);
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
     }
     span.text:not(.parent){
-        padding:var(--space-3);
-        padding-top:var(--space-1);
-        padding-bottom:var(--space-1);
+        padding-left:calc(1rem + var(--space-1));
     }
 
     span.icon > svg{
@@ -171,7 +176,6 @@ const imageIcon = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" s
         position: relative;
         background-color: var(--menu-active-color);
         color: var(--content-color);
-        padding-left: var(--space-3);
     }
     a.toc_href.active > span.text::before{
         content: "";

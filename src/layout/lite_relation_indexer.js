@@ -30,9 +30,15 @@ async function control(action) {
     return response.json();
 }
 
+// One control for both directions: it is the bar's own handle, so hiding and
+// showing move the same button along the same slide (no second element that
+// appears where the first one was).
 function setCollapsed(view, collapsed) {
     view.bar.dataset.collapsed = collapsed ? 'true' : 'false';
-    view.reopen.hidden = !collapsed;
+    const label = `${collapsed ? 'Show' : 'Hide'} link index status`;
+    view.toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    view.toggle.setAttribute('aria-label', label);
+    view.toggle.setAttribute('title', label);
 }
 
 function showError(view, message) {
@@ -123,10 +129,10 @@ async function activateIndexer(view) {
 
 document.addEventListener('DOMContentLoaded', () => {
     const bar = document.querySelector('.lite-index-status');
-    const reopen = document.querySelector('[data-index-reopen]');
-    if (!bar || !reopen) return;
-    const view = {bar, reopen, userCollapsed: readFlag(DISMISSED_KEY), completeHandled: false, hideTimer: null};
-    if (view.userCollapsed) setCollapsed(view, true);
+    const toggle = document.querySelector('[data-index-toggle]');
+    if (!bar || !toggle) return;
+    const view = {bar, toggle, userCollapsed: readFlag(DISMISSED_KEY), completeHandled: false, hideTimer: null};
+    setCollapsed(view, view.userCollapsed || bar.dataset.collapsed === 'true');
     let activated = false;
     const activate = () => {
         if (activated) return;
@@ -137,10 +143,11 @@ document.addEventListener('DOMContentLoaded', () => {
     navigation?.addEventListener('microwebstacks:navigation-ready', activate, {once: true});
     setTimeout(activate, GRACE_MS);
     bar.addEventListener('click', async (event) => {
-        if (event.target.closest('[data-index-collapse]')) {
-            view.userCollapsed = true;
-            writeFlag(DISMISSED_KEY, true);
-            setCollapsed(view, true);
+        if (event.target.closest('[data-index-toggle]')) {
+            const collapsed = bar.dataset.collapsed !== 'true';
+            view.userCollapsed = collapsed;
+            writeFlag(DISMISSED_KEY, collapsed);
+            setCollapsed(view, collapsed);
             return;
         }
         const button = event.target.closest('[data-index-action]');
@@ -148,10 +155,5 @@ document.addEventListener('DOMContentLoaded', () => {
         button.disabled = true;
         try { render(view, await control(button.dataset.indexAction)); }
         finally { button.disabled = false; }
-    });
-    reopen.addEventListener('click', () => {
-        view.userCollapsed = false;
-        writeFlag(DISMISSED_KEY, false);
-        setCollapsed(view, false);
     });
 }, false);

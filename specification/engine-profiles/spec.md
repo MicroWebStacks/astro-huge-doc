@@ -58,9 +58,13 @@ Rules that follow:
 Both renderer profiles target OKF bundles and standard GitHub-style Markdown
 repositories, where the file tree is the source of truth:
 
-- A document's label is its filename without extension, verbatim (spaces and
-  original casing preserved) in lite. Full may use frontmatter title and order
-  as display metadata.
+- A document's label is its frontmatter `title` when it has one, and otherwise
+  its filename without extension, verbatim (spaces and original casing
+  preserved). This holds in both profiles. The label is display metadata: it
+  names the page in menus, headings and cards, and feeds nothing below.
+- A document's position among its siblings is its frontmatter `order` when it
+  has one. Pinned entries sort first, ascending; entries the author left
+  unpinned follow, A→Z by label. Also display metadata, also both profiles.
 - A document's URL and UID derive from its relative path without the final
   `.md`. Preserve RFC 3986 URL-unreserved ASCII characters (`A-Z`, `a-z`,
   digits, `-`, `.`, `_`, `~`) and their case. Normalize only unsafe character
@@ -77,9 +81,11 @@ resource use must be proportional to what the user is currently looking at,
 not to the size of the workspace:
 
 - Startup work ahead of the first rendered page is bounded by file-level
-  operations (directory walk, file metadata) — **no file contents are read**
-  to build the navigation tree; labels and URLs come from filenames (see the
-  identity contract above).
+  operations (directory walk, file metadata) plus **one bounded head-read per
+  markdown file** for its frontmatter `title` and `order` — never a whole
+  document, never a YAML parse. Results are cached by path + size + mtime and
+  seeded from the previous `filetree.json`, so a restart re-reads only changed
+  files. URLs still come from filenames alone (see the identity contract).
 - The navigation index (`filetree.json` or successor) is rewritten only when
   files are added, deleted, or renamed — never on content edits.
 - Deep per-page work (AST build, diagram rendering, highlighting) happens on

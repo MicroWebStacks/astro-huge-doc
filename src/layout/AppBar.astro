@@ -2,6 +2,7 @@
 import './colors.css';
 import Icon from "@/components/icon.astro"
 import ThemeToggle from './ThemeToggle.astro';
+import PanZoomModal from '@/components/panzoom/panzoommodal.astro';
 import { buildAppBarMenu } from './layout_utils.js';
 import { basePrefix } from '@/libs/blob-files.js';
 import { config } from '@/config';
@@ -20,12 +21,15 @@ export interface Props {
     showPreviewLock?: boolean;
     exploreEnabled?: boolean;
     logPage?: { url: string; title: string } | null;
+    /** Concept id of the page in view; enables the neighborhood-graph icon. */
+    graphSid?: string | null;
 }
 
-const { menu: providedMenu = [], showLeftToggle = false, showRightToggle = false, showRuntimeInfo = false, showPreviewLock = false, exploreEnabled = false, logPage = null } = Astro.props as Props;
+const { menu: providedMenu = [], showLeftToggle = false, showRightToggle = false, showRuntimeInfo = false, showPreviewLock = false, exploreEnabled = false, logPage = null, graphSid = null } = Astro.props as Props;
 const menu = providedMenu.length ? providedMenu : buildAppBarMenu(Astro.url.pathname);
-const logHref = logPage ? `${basePrefix(config.base)}/${logPage.url}` : null;
-const exploreHref = `${basePrefix(config.base)}/explore`;
+const prefix = basePrefix(config.base);
+const logHref = logPage ? `${prefix}/${logPage.url}` : null;
+const exploreHref = `${prefix}/explore`;
 const left_side  = menu.filter((item)=>(!Object.hasOwn(item,"align") || !(item.align=="right")))
 const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.align=="right")))
 
@@ -82,6 +86,23 @@ const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.ali
                         <circle cx="6.4" cy="6.4" r="1.2" fill="currentColor"></circle>
                     </svg>
                 </a>
+            </li>
+        }
+        {graphSid &&
+            <li class="nav-toggle-item graph-entry" data-panzoom-root="true" data-name="graph"
+                data-graph-root data-graph-sid={graphSid} data-graph-prefix={prefix}>
+                <button type="button" class="nav-toggle" data-action="open-graph"
+                    title="Neighborhood graph" aria-label="Show neighborhood graph">
+                    <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+                        <circle cx="8" cy="3.2" r="1.9" fill="none" stroke="currentColor" stroke-width="1.3"></circle>
+                        <circle cx="3.2" cy="12.4" r="1.9" fill="none" stroke="currentColor" stroke-width="1.3"></circle>
+                        <circle cx="12.8" cy="12.4" r="1.9" fill="none" stroke="currentColor" stroke-width="1.3"></circle>
+                        <line x1="8" y1="5.1" x2="4" y2="10.6" stroke="currentColor" stroke-width="1.2"></line>
+                        <line x1="8" y1="5.1" x2="12" y2="10.6" stroke="currentColor" stroke-width="1.2"></line>
+                    </svg>
+                </button>
+                <div class="graph-render-target" hidden></div>
+                <PanZoomModal sourceSelector=".graph-render-target svg" />
             </li>
         }
         {showRuntimeInfo &&
@@ -212,6 +233,12 @@ a.chrome-link{
     background-color:var(--header-active-color);
     color:var(--content-color);
 }
+/* display:flex above outranks the UA's [hidden]{display:none}, so a toggle
+   hidden from script (the preview lock outside the webview) would otherwise
+   stay visible — and dead, since its script returns before binding. */
+.nav-toggle[hidden]{
+    display:none;
+}
 .nav-toggle:focus-visible{
     outline:2px solid var(--front-blue);
     outline-offset:2px;
@@ -226,6 +253,36 @@ a.chrome-link{
 }
 .nav-toggle[aria-expanded="false"] .fill{
     opacity:0;
+}
+/* Neighborhood graph (OKF plan TP-13/DD-11, ruling R-16): a public discovery
+   affordance, so it lives with the other chrome icons instead of behind a
+   click in the footer. The button is a plain nav-toggle; the render target and
+   its modal ride along in the same <li> because graph_entry.js binds them as
+   one root. */
+.graph-entry{
+    position:relative;
+}
+.graph-entry .nav-toggle[aria-busy="true"]{
+    opacity:0.6;
+    cursor:progress;
+}
+/* The shared lightbox surface is deliberately "always light" (photos, static
+   diagrams carry their own dark ink). The graph SVG is client-rendered with
+   theme tokens instead — like mermaid/plantuml — so its modal must follow the
+   active theme or dark-mode ink lands on a light surface (unreadable).
+   Scoped to this entry: the diagram/image lightboxes keep their light look. */
+.graph-entry :global(.modal-background .modal){
+    background-color: var(--content-bg-color);
+    border-color: var(--soft-border-color);
+}
+.graph-entry :global(.modal-background .close-x){
+    color: var(--content-color-faint);
+}
+.graph-entry :global(.modal-background .modal-header:hover){
+    background: var(--surface-2-bg);
+}
+.graph-entry :global(.modal-background .modal-header:hover > span.close-x){
+    color: var(--content-color);
 }
 /* Preview lock toggle (webview-only): shackle swaps open/closed and the
    keyhole dot accents blue when locked, mirroring the menu-toggle pattern. */
@@ -252,3 +309,5 @@ a.chrome-link{
     }
 }
 </style>
+<script src="../components/panzoom/panzoom_common.js" />
+<script src="./graph_entry.js" />

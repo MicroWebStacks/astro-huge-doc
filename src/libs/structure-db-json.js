@@ -379,7 +379,10 @@ function getDocuments(versionId = null) {
             url: doc.url ?? '',
             title: doc.title ?? '',
             level: doc.level ?? 0,
-            sort_order: doc.order ?? 0,
+            // null, not 0, when the author pinned nothing — same as the sqlite
+            // backend's raw `"order" AS sort_order`. The menu builders read the
+            // difference as "pinned first" vs "unpinned, sorted by label".
+            sort_order: doc.order ?? null,
             url_type: doc.url_type ?? null
         }))
         .sort((a, b) => {

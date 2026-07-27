@@ -15,9 +15,11 @@ import { config } from '@/config';
 export interface Props {
 	title: string;
 	headings: Array<Object>;
+	/** Concept id of the page in view; drives the app bar's graph icon. */
+	graphSid?: string | null;
 }
 
-const { headings } = Astro.props;
+const { headings, graphSid = null } = Astro.props;
 const rawTitle = ((Astro.props as any).frontmatter || Astro.props).title;
 // The root content doc carries "." as its title; show "Home" instead
 // (mirrors homeLabel() used for the nav).
@@ -169,7 +171,7 @@ const liveReloadPolling = liveReload && Boolean(process.env.MICROWEBSTACKS_LAUNC
 	<body >
 		<div class="appbar-nav_content-footer">
 			<header>
-				<AppBar menu={appbar_menu} showLeftToggle={liveReload || pages_menu_items.length > 0} showRightToggle={toc_menu_items.visible} showRuntimeInfo={liveReload} showPreviewLock={liveReload} exploreEnabled={config.profile !== 'lite'} logPage={logPage} />
+				<AppBar menu={appbar_menu} showLeftToggle={liveReload || pages_menu_items.length > 0} showRightToggle={toc_menu_items.visible} showRuntimeInfo={liveReload} showPreviewLock={liveReload} exploreEnabled={config.profile !== 'lite'} logPage={logPage} graphSid={graphSid} />
 			</header>
 			<main>
 				<div id="wide-nav" class="scroll">
@@ -291,6 +293,14 @@ main{
 	min-width:0;
     scroll-behavior: smooth;
     scroll-padding-top: var(--space-3);
+}
+/* The link-index status bar is fixed to the viewport bottom, so while it is
+   showing it sits on top of the last lines of the article and of the prev/next
+   footer. Reserve its height plus its handle inside the scroller — and give the
+   space straight back when the bar collapses, so a published page never pays
+   for it. */
+:global(body:has(.lite-index-status:not([data-collapsed="true"]))) .content{
+	padding-bottom: calc(var(--article-pad) + var(--index-status-height) + var(--index-status-handle));
 }
 #toc-nav-div{
 	background: var(--nav-bg-color);

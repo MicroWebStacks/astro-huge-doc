@@ -24,7 +24,7 @@ test('iframe URLs map YouTube share and watch URLs to embeds', () => {
     assert.equal(normalizeIframeSrc('/local/embed.html'), '/local/embed.html');
 });
 
-test('full renders external GLB and local XLSX links while lite degrades to links', () => {
+test('GLB stays full-only while XLSX links render as tables in both profiles', () => {
     const glb = 'https://raw.githubusercontent.com/example/model.glb?download=1';
     assert.equal(extensionFromUrl(glb), 'glb');
     assert.equal(classifyLinkComponent({url: glb, profile: 'full'}).model3d, true);
@@ -32,8 +32,21 @@ test('full renders external GLB and local XLSX links while lite degrades to link
 
     const xlsx = './images/pinout.xlsx';
     assert.equal(classifyLinkComponent({url: xlsx, profile: 'full'}).table, true);
-    assert.equal(classifyLinkComponent({url: xlsx, profile: 'lite'}).link, true);
+    assert.equal(classifyLinkComponent({url: xlsx, profile: 'lite'}).table, true);
+    assert.equal(classifyLinkComponent({url: xlsx, profile: 'lite'}).link, false);
     assert.equal(classifyLinkComponent({url: 'https://example.com/', profile: 'full'}).link, true);
+});
+
+test('XLSX assets classify as tables from the collected extension alone', () => {
+    // Lite items carry no link ast; the workbook is identified by asset ext.
+    const result = classifyLinkComponent({
+        url: undefined,
+        assetExt: '.xlsx',
+        hasAsset: true,
+        profile: 'lite'
+    });
+    assert.equal(result.table, true);
+    assert.equal(result.link, false);
 });
 
 test('diagram assets retain priority over ordinary links', () => {

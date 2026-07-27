@@ -42,14 +42,40 @@
   --space-6: 2rem;
   --space-7: 3rem;
 
+  /* Navigation density. The pages rail and the outline are a *file tree*, not
+     prose: they are scanned, not read, and a tall row wastes the one dimension
+     a deep tree needs. These follow VS Code's explorer — the reference the
+     maintainer named — rather than the type scale above: 22px rows, 13px text,
+     8px of indent per nesting level. SideMenu and SubMenu share them so the
+     header, the control strip and the rows stay on one rhythm. */
+  --nav-row-height: 1.375rem; /* 22px */
+  --nav-text: 0.8125rem;      /* 13px */
+  --nav-indent: 0.5rem;       /* 8px per level */
+  --nav-header-height: 1.75rem;
+
   /* Radius — two roles only. */
   --radius-sm: 4px; /* controls, chips, small cards */
   --radius-md: 8px; /* larger panels */
+
+  /* Height of the fixed link-index status bar (LiteRelationIndexer.astro) and
+     of the handle riding on its top edge. Declared here because the article
+     scroller has to reserve exactly that much room to keep both off the end of
+     the page; keep them in sync with the component. Narrow viewports wrap the
+     progress bar onto a second row — see the override below. */
+  --index-status-height: 2.6rem;
+  --index-status-handle: 1.35rem;
 
   /* Elevation — single-layer shadow, tinted per-theme via --card-shadow-color
      (colors.css). Decorative accent bars (SideMenu active-item inset,
      Heading left rule, SubMenu caret) are not elevation and stay literal. */
   --shadow-raised: 0 1px 3px var(--card-shadow-color);
+}
+
+@media only screen and (max-width: 700px) {
+  :root {
+    /* Two rows: summary + actions, then the progress bar underneath. */
+    --index-status-height: 3.6rem;
+  }
 }
 
 /* Respect the OS-level reduced-motion preference for all non-essential

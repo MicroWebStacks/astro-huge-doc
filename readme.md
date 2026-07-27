@@ -77,7 +77,7 @@ above are the supported combinations (see
 | Content-addressed static assets `/blobs/<hash>.<ext>` | ✅ | ✅ | immutable cache + ETag/304, both profiles |
 | Data backend | SQLite (+ versioning, blob store) | JSON files | `DOCS_BACKEND` dispatcher (`src/libs/structure-db.js`) |
 | 3D / model-viewer | ✅ | ❌ | profile-gated island (stubbed out of the lite build) |
-| xlsx ingestion | ✅ | ❌ | collect-time only |
+| xlsx workbook tables | ✅ | ✅ | `.xlsx` links render through `TableXLSX` (workbook parsed server-side, shared table island) |
 | Image optimization (sharp) | ⚠️ optional | ❌ | full-only |
 | GitHub fetch / auth (octokit, passport) | ✅ | ❌ | server-only, full |
 | Native deps (better-sqlite3, sharp) | better-sqlite3 only | ❌ none | dynamic import + `EXCLUDED_DEPS` |
@@ -85,7 +85,7 @@ above are the supported combinations (see
 **Dropped from both profiles:** Dataset SQL (duckdb) and Plotly charts, plus the
 MUI and Mantine UI kits that rode on them. May return later as full-only features.
 
-Anything that is *generation* (collect, xlsx) is full-only; *rendering* is shared.
+Anything that is *generation* (collect) is full-only; *rendering* is shared.
 The lite build loads no native dependencies. In the extension it is fully lazy:
 startup walks the file tree only (labels and URLs derive from filenames — see
 `specification/engine-profiles/spec.md`), each page is parsed the first time it

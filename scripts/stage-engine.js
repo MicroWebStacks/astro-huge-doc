@@ -73,6 +73,13 @@ const RUNTIME_PATHS = [
 // dependency is left out of our declared deps (npm's default peer-dep
 // auto-install resolves a compatible version on demand) rather than pinned
 // here, since our own `three` range is older than what model-viewer expects.
+//
+// 'xlsx' is NOT in this set either, for the same structural reason: Link.astro
+// imports TableXLSX.astro unconditionally and Vite leaves `xlsx` external in
+// the SSR build, so the prebuilt `dist/server` chunk that carries every page's
+// footer does `import {read, utils} from 'xlsx'` at load time. Both the
+// extension preview (which now renders workbook tables in lite too) and a
+// fresh `md-render build` need it resolvable.
 const EXCLUDED_DEPS = new Set([
   '@octokit/rest',
   'adm-zip',
@@ -81,8 +88,7 @@ const EXCLUDED_DEPS = new Set([
   'passport',
   'passport-github',
   'sharp',
-  'three',
-  'xlsx'
+  'three'
 ]);
 // content-structure lives in this repo as a private workspace package
 // (packages/content-structure, adopted per
