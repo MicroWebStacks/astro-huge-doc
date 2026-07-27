@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.0.24 - 2026-07-27
+
+- The preview lock moved out of the VS Code editor title bar into the
+  preview's own app bar. The toggle now relays through the webview, so it
+  responds to clicks and stays in sync with the panel title (engine 0.0.20).
+- The Pages rail now labels entries from each document's title instead of its
+  filename, respects frontmatter `order`, and uses a denser row layout that
+  fits a whole section on screen (engine 0.0.20).
+- Preview now renders image galleries, embedded iframes, XLSX workbook tables,
+  external `.glb` model viewers, and text-form details directives
+  (engine 0.0.20).
+- Knowledge documents gained a local neighborhood graph, opened from the
+  relations footer (engine 0.0.20).
+- Page chrome collapses behind one shared control with sticky state
+  (engine 0.0.20).
+
 ## 0.0.23 - 2026-07-23
 
 - Preview now opens the rendered route for the active `.md` file, follows

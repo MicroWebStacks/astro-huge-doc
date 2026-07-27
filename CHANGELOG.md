@@ -3,6 +3,43 @@
 Release notes for the `@microwebstacks/md-render` npm package. The VS Code
 extension has a separate changelog at `packages/vscode-extension/CHANGELOG.md`.
 
+## 0.0.20 - 2026-07-27
+
+### Added
+
+- Added a local neighborhood graph for knowledge documents, opened from the
+  relations footer, with pan and zoom, clickable nodes, and theme-aware
+  colors.
+- Added an `iframe` directive for embedded content such as video players.
+- Added XLSX workbook tables, so a linked spreadsheet renders as a sortable
+  Markdown table in both the full and lite profiles.
+- Added image galleries, external `.glb` model viewers, and text-form details
+  directives to the set of rendered Markdown features.
+- Added collapsible page chrome: the app bar, breadcrumb band, and footer
+  collapse behind one shared control that remembers its state.
+- Added an optional site footer plus favicon and head branding for published
+  static sites.
+- Added an additive `files:` manifest entry that fetches loose files and
+  folders (for example `public/data` and favicons) alongside content.
+- Added a preview lock toggle to the app bar.
+
+### Changed
+
+- The lite profile now labels navigation from the document `title` rather than
+  the filename slug, matching the full profile. Reading the frontmatter head
+  keeps startup cost to a single small read per file.
+- Frontmatter `order` is now honored consistently across profiles: documents
+  the author pinned sort first in ascending order, and unpinned documents
+  follow alphabetically instead of jumping ahead as order 0.
+- The pages rail is denser - shorter rows, smaller text, and less indent per
+  nesting level - so a section and its siblings fit on screen together.
+
+### Fixed
+
+- Fixed internal links dropping the configured `base` prefix, which broke
+  navigation on sub-path deployments.
+- Fixed static builds baking in the extension-preview surface.
+
 ## 0.0.19 - 2026-07-23
 
 ### Added
