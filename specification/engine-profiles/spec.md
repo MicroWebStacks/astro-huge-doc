@@ -53,6 +53,44 @@ Rules that follow:
 - Rendering code is shared across all three; anything that is *generation or
   storage* may be profile- or backend-specific.
 
+## Artifact ownership — engine files and workspace files
+
+Every path the engine touches belongs to exactly one of two owners, and the
+published `@microwebstacks/md-render` package contains **only** engine-owned
+files. A workspace is any docs folder the engine renders: this repository when
+building its own site, the folder a VS Code user opened, or a consumer's
+`--workspace` argument.
+
+| Owner | Paths | Anchored to |
+|---|---|---|
+| Engine | `config.js`, `server/`, `scripts/`, `bin/`, `src/`, the astro configs, `dist/` | `engineRoot` (`MICROWEBSTACKS_ENGINE_ROOT`) |
+| Workspace | content, `dataset/`, the JSON store, blobs, **`public/`** | `workspaceRoot` (`MICROWEBSTACKS_WORKSPACE_ROOT`) |
+
+Rules that follow from this and must not be quietly relaxed:
+
+- **`public/` is workspace-owned.** It holds the *workspace's* root-absolute
+  static assets — `/images/x.png` written literally in a document. Astro's
+  `publicDir` therefore resolves against `workspaceRoot`, never against the
+  Astro `--root` (which is always the engine). SSR additionally serves the live
+  workspace `public/`, because a prebuilt `dist/` only ever carries the assets
+  of whatever workspace produced it.
+- **A fetch destination is never an engine path.** `manifest.yaml` fetch entries
+  write workspace content. Adding one that writes inside an engine-owned
+  directory puts that content into every published artifact.
+- **The engine ships no content.** No document, image, or dataset from any
+  workspace — including this repository's own — may appear in the npm package or
+  in the VSIX's bundled engine payload.
+- **Packaging checks need an upper bound, not just a lower one.** Verifying that
+  required files are *present* cannot detect files that should be *absent*;
+  `scripts/stage-engine.js` enforces a staged-size budget for that reason.
+
+Learned 2026-07-27: `public/` was engine-owned by default (Astro resolves
+`publicDir` against `--root`), then became a `manifest.yaml` fetch destination.
+Neither change was wrong alone; together they put 86.8 MB of one content set's
+images into the 0.0.20 engine tarball twice — once as `public/`, once mirrored
+into `dist/client/` — and npm rejected the publish. The same defect silently
+gave `md-render build` consumers the engine's images instead of their own.
+
 ## Document identity contract — filenames, not frontmatter
 
 Both renderer profiles target OKF bundles and standard GitHub-style Markdown

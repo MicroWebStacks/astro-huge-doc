@@ -1,20 +1,30 @@
 # Changelog
 
-## 0.0.24 - 2026-07-27
+## 0.0.25 - 2026-07-27
 
+- The extension is dramatically smaller. Its bundled engine no longer carries
+  86.8 MB of unrelated documentation images, so the download and the engine copy
+  hydrated into VS Code storage on first preview both shrink by roughly a third
+  (engine 0.0.21).
+- Root-absolute asset links (`/images/x.png`) in your own documents now resolve
+  against your workspace's `public/` folder instead of the engine's
+  (engine 0.0.21).
 - The preview lock moved out of the VS Code editor title bar into the
   preview's own app bar. The toggle now relays through the webview, so it
-  responds to clicks and stays in sync with the panel title (engine 0.0.20).
+  responds to clicks and stays in sync with the panel title (engine 0.0.21).
 - The Pages rail now labels entries from each document's title instead of its
   filename, respects frontmatter `order`, and uses a denser row layout that
-  fits a whole section on screen (engine 0.0.20).
+  fits a whole section on screen (engine 0.0.21).
 - Preview now renders image galleries, embedded iframes, XLSX workbook tables,
   external `.glb` model viewers, and text-form details directives
-  (engine 0.0.20).
+  (engine 0.0.21).
 - Knowledge documents gained a local neighborhood graph, opened from the
-  relations footer (engine 0.0.20).
+  relations footer (engine 0.0.21).
 - Page chrome collapses behind one shared control with sticky state
-  (engine 0.0.20).
+  (engine 0.0.21).
+
+Version 0.0.24 was packaged with this same feature set but never uploaded; its
+bundled engine could not be published. Nothing was released under that number.
 
 ## 0.0.23 - 2026-07-23
 
@@ -84,15 +94,15 @@
 - Preview startup no longer times out on large cold workspaces: readiness is
   probed on a cheap endpoint instead of waiting for the first full page
   render, the progress notification reports elapsed wait time, and the first
-  page warms up in the background — past a short grace period the preview
+  page warms up in the background â€” past a short grace period the preview
   opens and displays as soon as the page is ready.
 
 ## 0.0.18 - 2026-07-15
 
-- New: a preview diagnostics panel, opened from a new ⓘ icon in the app bar.
+- New: a preview diagnostics panel, opened from a new â“˜ icon in the app bar.
   Shows engine version and commit, which server mode is running, workspace
   and docs paths, file/page counts, how many pages the lazy cache has parsed
-  so far, live-reload/navigation endpoint health, and — per page — which
+  so far, live-reload/navigation endpoint health, and â€” per page â€” which
   diagrams render locally versus through a Kroki server (engine 0.0.12).
 - Live-reload polling now only starts when something can actually signal a
   change, instead of polling on a fixed interval regardless.
@@ -177,7 +187,7 @@
   startup no longer aborts on locked or permission-restricted cache
   directories (engine 0.0.5).
 
-## 0.0.9 — 2026-07-04
+## 0.0.9 â€” 2026-07-04
 
 First release under the new name **Markdown Site Preview**
 (marketplace ID `microwebstacks.markdown-site-preview`, previously published
@@ -191,8 +201,8 @@ as `microwebstacks.microwebstacks-docs-preview`).
 
 ## Earlier versions (as MicroWebStacks Docs Preview)
 
-- **0.0.6** — fixed `EBUSY` error on engine cleanup under Windows.
-- **0.0.5** — dispatcher bypass fix and engine upgrade (engine 0.0.3).
-- **0.0.4** — first public marketplace release: file tree, outline,
+- **0.0.6** â€” fixed `EBUSY` error on engine cleanup under Windows.
+- **0.0.5** â€” dispatcher bypass fix and engine upgrade (engine 0.0.3).
+- **0.0.4** â€” first public marketplace release: file tree, outline,
   mermaid/plantuml/blockdiag diagrams via Kroki, sortable tables, Shiki
   syntax highlighting.

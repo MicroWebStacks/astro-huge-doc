@@ -9,6 +9,7 @@ import { config } from './config.js';
 import yaml from '@rollup/plugin-yaml';
 import react from '@astrojs/react';
 import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
 const isLite = config.profile === 'lite';
 
@@ -35,10 +36,33 @@ function viteCacheDir() {
 const emptyModule = fileURLToPath(new URL('./src/libs/empty-module.js', import.meta.url));
 const liteAliases = isLite ? { '@google/model-viewer': emptyModule } : {};
 
+// `public/` holds the *workspace's* root-absolute static assets (`/images/x.png`
+// written literally in a document), not the engine's. Astro's default resolves
+// publicDir against the Astro --root, which is always the engine (see
+// src/libs/render-build.js: `astro build --root engineRoot`), so the default
+// pointed every deployment at the engine checkout's own public/ folder.
+//
+// Two things went wrong with that. A consumer running `md-render build
+// --workspace their-docs` got the engine's public/ baked into their site and
+// their own public/ ignored entirely. And when this repo started fetching a
+// content set into its public/ (manifest.yaml fetch entries, 2026-07-25), that
+// content became part of every published engine artifact - 86.8 MB of it,
+// twice, which is what npm rejected on the 0.0.20 publish attempt.
+//
+// config.js already anchors every workspace-owned path to workspaceRoot
+// (content_path, storePath, jsonDir, collect.rootdir) and every engine-owned
+// path to engineRoot (outDir). publicDir belongs to the first group; this puts
+// it there. A workspace with no public/ directory is normal - Astro skips a
+// missing publicDir and emits no static assets.
+function workspacePublicDir() {
+  return join(config.workspaceRoot, 'public');
+}
+
 export function baseAstroConfig() {
   return {
     integrations: [react()],
     outDir: config.outDir,
+    publicDir: workspacePublicDir(),
     trailingSlash: 'ignore',
     ...(isLite ? { image: { service: passthroughImageService() } } : {}),
     vite: {

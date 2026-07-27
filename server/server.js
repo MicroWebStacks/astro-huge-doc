@@ -117,6 +117,15 @@ app.use('/blobs', async (req, res, next) => {
     res.status(200).send(await readFile(filePath));
 });
 app.use(express.static(join(outdir, 'client')))
+// The workspace's own root-absolute assets (`/images/x.png` authored in a
+// document). `astro build` copies publicDir into dist/client, but only for the
+// workspace it was built against - the published engine ships a dist/ built
+// against no workspace at all, and the extension runs that prebuilt dist/
+// against whichever folder the user opened. Serving the live workspace public/
+// here is what makes those paths resolve in every SSR deployment rather than
+// only in the one that happened to run the build. Registered after dist/client
+// so a built asset still wins on an exact path collision.
+app.use(express.static(join(config.workspaceRoot, 'public')))
 if (htmlCacheMiddleware) {
     app.use(htmlCacheMiddleware)
 }

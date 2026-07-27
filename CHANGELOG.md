@@ -3,7 +3,20 @@
 Release notes for the `@microwebstacks/md-render` npm package. The VS Code
 extension has a separate changelog at `packages/vscode-extension/CHANGELOG.md`.
 
-## 0.0.20 - 2026-07-27
+## 0.0.21 - 2026-07-27
+
+### Fixed
+
+- `public/` is now workspace-owned rather than engine-owned. Astro's
+  `publicDir` resolves against the workspace root instead of the engine
+  checkout, and SSR serves the live workspace `public/` directory. Previously
+  `md-render build --workspace <docs>` copied the *engine's* static assets into
+  the consumer's site and ignored the consumer's own, so root-absolute links
+  like `/images/x.png` resolved to the wrong files or none at all.
+- The published package no longer contains workspace content. 0.0.20 carried
+  86.8 MB of one content set's images twice - once as `public/`, once mirrored
+  into `dist/client/` - which npm rejected at publish time. Staging now enforces
+  a size budget so extra files fail fast instead of at the registry.
 
 ### Added
 
@@ -39,6 +52,10 @@ extension has a separate changelog at `packages/vscode-extension/CHANGELOG.md`.
 - Fixed internal links dropping the configured `base` prefix, which broke
   navigation on sub-path deployments.
 - Fixed static builds baking in the extension-preview surface.
+
+Version 0.0.20 was staged with this same feature set but never published; the
+registry rejected it for the packaging defect fixed above. Nothing was released
+under that number.
 
 ## 0.0.19 - 2026-07-23
 

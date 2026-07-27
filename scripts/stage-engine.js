@@ -36,12 +36,18 @@ const PACKAGE_NAME = '@microwebstacks/md-render';
 // installer renames it back after extracting (see extension.js installEngine).
 const VENDOR_DIR_NAME = '_modules';
 // Runtime files the lite engine needs to collect, render, and serve docs,
-// plus (bin, public, src/pages, src/layout, src/components, the two static
-// astro configs, tsconfig.json) what `md-render build` needs to run a fresh
-// `astro build` against a consumer's own content from the published package
+// plus (bin, src/pages, src/layout, src/components, the two static astro
+// configs, tsconfig.json) what `md-render build` needs to run a fresh `astro
+// build` against a consumer's own content from the published package
 // (specification/reusable-render/spec.md). astro.config.mjs (the Node-adapter
 // SSR config) is deliberately not staged: the extension only ever runs
 // prebuilt `dist/`, and the render command is fixed to output=static.
+//
+// `public/` is deliberately NOT here. It belongs to the workspace, not the
+// engine (specification/engine-profiles/spec.md, "Artifact ownership"), and
+// astro.config.shared.mjs now resolves publicDir against workspaceRoot. Staging
+// it is what put 86.8 MB of one content set's images into the 0.0.20 tarball -
+// twice, since `dist/client` is a copy of it - and got the publish rejected.
 const RUNTIME_PATHS = [
   'CHANGELOG.md',
   'config.js',
@@ -53,12 +59,21 @@ const RUNTIME_PATHS = [
   'src/pages',
   'src/layout',
   'src/components',
-  'public',
   'astro.config.shared.mjs',
   'astro.config.static.mjs',
   'tsconfig.json',
   'dist'
 ];
+// Upper bound on the staged tree, checked before the tarball is ever offered to
+// npm. Every other check in this pipeline is a lower bound ("these files must
+// be present"), which is why 181 MB of stowaway content passed staging and
+// packaging clean and only failed at the registry PUT - after a full build and
+// a spent OTP. Sized off the published baselines: 0.0.19 staged ~404 MB and
+// published fine, 0.0.20 reached 602 MB and was rejected E413. This is a
+// tripwire for content leaking back in, not a budget to tune against; if a real
+// dependency pushes the engine past it, raise it deliberately in the same
+// commit that adds the dependency.
+const MAX_STAGED_MB = 460;
 // Dependencies that only matter to full-site fetch/auth or native paths that
 // neither the extension (DOCS_PROFILE=lite + DOCS_BACKEND=json) nor the
 // render command (DOCS_PROFILE=full + DOCS_BACKEND=json, per OP-008) exercise
@@ -184,6 +199,59 @@ async function readJson(file) {
   return JSON.parse(await fsp.readFile(file, 'utf8'));
 }
 
+async function measureTree(dir) {
+  let bytes = 0;
+  let files = 0;
+  for (const entry of await fsp.readdir(dir, {withFileTypes: true})) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const nested = await measureTree(full);
+      bytes += nested.bytes;
+      files += nested.files;
+    } else if (entry.isFile()) {
+      bytes += (await fsp.stat(full)).size;
+      files += 1;
+    }
+  }
+  return {bytes, files};
+}
+
+// Fails staging when the tree exceeds MAX_STAGED_MB. The residual leak path
+// this guards: `dist/client` is a copy of whatever publicDir held at build
+// time, so staging a `pnpm build` that ran against a populated workspace (as
+// opposed to the empty root scripts/release-engine.js forces) would pull that
+// workspace's assets back in through dist/ even now that public/ is unstaged.
+async function assertStagedSizeWithinBudget(outDir) {
+  const {bytes, files} = await measureTree(outDir);
+  const mb = bytes / (1024 * 1024);
+  console.log(`Staged tree: ${mb.toFixed(1)} MB across ${files} files (budget ${MAX_STAGED_MB} MB).`);
+  if (mb <= MAX_STAGED_MB) {
+    return;
+  }
+
+  const client = path.join(outDir, 'dist', 'client');
+  const offenders = [];
+  if (fs.existsSync(client)) {
+    for (const entry of await fsp.readdir(client, {withFileTypes: true})) {
+      if (!entry.isDirectory() || entry.name === '_astro') {
+        continue;
+      }
+      const {bytes: size} = await measureTree(path.join(client, entry.name));
+      if (size > 1024 * 1024) {
+        offenders.push(`dist/client/${entry.name} (${(size / (1024 * 1024)).toFixed(1)} MB)`);
+      }
+    }
+  }
+
+  throw new Error(
+    `Staged engine is ${mb.toFixed(1)} MB, over the ${MAX_STAGED_MB} MB budget.\n` +
+    (offenders.length > 0
+      ? `Workspace content appears to have been built into dist/: ${offenders.join(', ')}.\n` +
+        'Rebuild against an empty workspace root (scripts/release-engine.js does this) before staging.\n'
+      : 'Check what grew before publishing; npm rejects oversized tarballs at PUT time.\n')
+  );
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const rootPkg = await readJson(path.join(repoRoot, 'package.json'));
@@ -269,6 +337,7 @@ async function main() {
     await hideVendoredModules(outDir);
     await vendorWorkspaceLib(outDir);
     console.log(`Vendored dependencies (incl. workspace ${WORKSPACE_LIB_NAME}) into ${path.join(outDir, VENDOR_DIR_NAME)}.`);
+    await assertStagedSizeWithinBudget(outDir);
   } else {
     console.warn(`\nWARNING: --no-vendor output does not include ${WORKSPACE_LIB_NAME}; it is a workspace-local package (${WORKSPACE_LIB_DIR}) not on the registry — provide it manually before installing.`);
   }
