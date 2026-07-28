@@ -242,12 +242,20 @@ body{
 body.mobile-nav-open{
 	overflow:hidden;
 }
+:global(body.nav-resizing),
+:global(body.nav-resizing *){
+	user-select:none !important;
+	cursor:col-resize !important;
+}
 /* Body => .appbar-nav_content-footer (full width; the app bar owns nav toggles) */
 .appbar-nav_content-footer{
 	flex-grow:1;
 	display:flex;
 	flex-direction: column;
 	height:100vh;
+	width:100%;
+	max-width:100vw;
+	min-width:0;
 }
 /* appbar-nav_content-footer => header, main */
 header{
@@ -267,11 +275,15 @@ main{
 	height:80vh;
 	max-width: 100vw;
 	min-width: 0;
+	overflow:hidden;
 }
 /* main => #wide-nav, resize-left, article.content, #resize-right, #toc-nav-div */
 
 #wide-nav{
 	background: var(--nav-bg-color);
+	flex-grow: 0;
+	flex-shrink: 0;
+	overflow:hidden;
 }
 #mobile-nav{
 	display: none;
@@ -306,6 +318,7 @@ main{
 	background: var(--nav-bg-color);
 	flex-grow: 0;
 	flex-shrink: 0;
+	overflow:hidden;
 }
 
 
@@ -313,9 +326,12 @@ main{
 	/* Keep the navigation boundary visible without reserving a white gutter.
 	   The pseudo-element below retains a comfortably sized resize target. */
 	position:relative;
+	flex:0 0 1px;
 	width:1px;
 	background-color: var(--soft-border-color);
 	box-sizing:border-box;
+	touch-action:none;
+	user-select:none;
 }
 .nav-resize::after{
 	content:"";
@@ -325,7 +341,8 @@ main{
 .active.nav-resize{
 	cursor:col-resize;
 }
-.active.nav-resize:hover{
+.active.nav-resize:hover,
+.nav-resize.is-resizing{
 	background-color: var(--front-blue);
 	transition: background-color 0.5s;
 }

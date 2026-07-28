@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.0.26 - 2026-07-28
+
+- The preview app bar no longer wraps or scrolls the page sideways in a narrow
+  editor pane. Sections that do not fit move into a `More` menu that always
+  keeps the current section and Home reachable, and at the narrowest widths the
+  bar switches to a compact section selector (engine 0.0.22).
+- In a narrow pane the secondary tools - external links, knowledge log,
+  explore, graph, runtime information, and preview lock - now sit in a `Tools`
+  menu, while Pages, theme, and On this page stay one click away
+  (engine 0.0.22).
+- Dragging the Pages and On this page dividers now behaves the same on both
+  sides: the drag follows the pointer outside the pane, stops selecting text,
+  recovers if the pointer is lost, and updates the matching app-bar toggle when
+  a drag opens or collapses a rail (engine 0.0.22).
+- Fixed the Pages depth buttons shifting sideways as you widened the rail
+  (engine 0.0.22).
+
 ## 0.0.25 - 2026-07-27
 
 - The extension is dramatically smaller. Its bundled engine no longer carries

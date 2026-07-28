@@ -136,8 +136,9 @@ nav.pages_menu[data-lazy-navigation] .depth-controls {
   z-index: 1;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.15rem;
+  overflow: hidden;
   padding: 2px 0.15rem;
   background: var(--nav-bg-color);
   border-block: 1px solid var(--soft-border-color);
@@ -145,6 +146,7 @@ nav.pages_menu[data-lazy-navigation] .depth-controls {
 
 nav.pages_menu[data-lazy-navigation] .depth-btn {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   width: 1.5rem;

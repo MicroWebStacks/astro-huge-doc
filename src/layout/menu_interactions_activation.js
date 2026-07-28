@@ -47,57 +47,90 @@ function toggle_storage_key(nav_el, storageKey){
 }
 
 // The thin handles between nav and content keep only the drag-to-resize role.
-function configure_resize(resize_el,nav_el,left_to_right){
+// Both sides use the same snap band: widths at or below 60px collapse, while
+// the 61-159px band keeps the last usable width until the collapse threshold
+// is crossed.
+function configure_resize(resize_el, nav_el, left_to_right, options = {}){
     if(!resize_el || !nav_el){ return; }
-    var global_resize_state = false
-    var x_down
-    var start_width
+    const collapseWidth = 60;
+    const minimumWidth = 160;
+    const maximumViewportRatio = 0.4;
+    let activePointerId = null;
+    let xDown = 0;
+    let startWidth = 0;
 
-    function finish_mouse(){
-        global_resize_state = false
-        nav_el.style.transition = "none"
-        if(nav_el.clientWidth < 20){
-            nav_el.classList.add("closed")
-            nav_el.classList.remove("open")
-            nav_el.setAttribute("data-width","20vw")
-        }else{
-            nav_el.classList.add("open")
-            nav_el.classList.remove("closed")
+    function store_open_state(open){
+        options.button?.setAttribute("aria-expanded", open ? "true" : "false");
+        if(options.storageKey){
+            localStorage.setItem(
+                toggle_storage_key(nav_el, options.storageKey),
+                open ? "true" : "false"
+            );
         }
+    }
+
+    function set_width(width){
+        const value = `${width}px`;
+        nav_el.style.width = value;
+        nav_el.setAttribute("data-width", value);
+    }
+
+    function finish_pointer(event){
+        if(activePointerId === null){ return; }
+        if(event?.pointerId !== undefined && event.pointerId !== activePointerId){ return; }
+        const pointerId = activePointerId;
+        activePointerId = null;
+        if(resize_el.hasPointerCapture?.(pointerId)){
+            resize_el.releasePointerCapture(pointerId);
+        }
+        resize_el.classList.remove("is-resizing");
+        document.body.classList.remove("nav-resizing");
+        nav_el.style.transition = "none";
+        if(nav_el.clientWidth < 20){
+            nav_el.classList.add("closed");
+            nav_el.classList.remove("open");
+            nav_el.setAttribute("data-width","20vw");
+        }else{
+            nav_el.classList.add("open");
+            nav_el.classList.remove("closed");
+        }
+        const open = nav_el.classList.contains("open");
+        store_open_state(open);
         nav_el.dispatchEvent(new CustomEvent("microwebstacks:nav-visibility", {
-            detail: {open: nav_el.classList.contains("open")}
+            detail: {open}
         }));
     }
 
-    resize_el.addEventListener("mousedown",(e)=>{
-        global_resize_state = true
-        x_down = e.x
-        start_width = nav_el.clientWidth
-        nav_el.style.transition = "none"
-    })
-    resize_el.addEventListener("mouseup",(e)=>{
-        finish_mouse()
-    })
-    document.addEventListener("mouseup",(e)=>{
-        if(global_resize_state == true){
-            finish_mouse()
+    resize_el.addEventListener("pointerdown",(event)=>{
+        if(event.button !== 0 || activePointerId !== null){ return; }
+        activePointerId = event.pointerId;
+        xDown = event.clientX;
+        startWidth = nav_el.clientWidth;
+        nav_el.style.transition = "none";
+        resize_el.classList.add("is-resizing");
+        document.body.classList.add("nav-resizing");
+        resize_el.setPointerCapture?.(event.pointerId);
+        event.preventDefault();
+    });
+    resize_el.addEventListener("pointermove",(event)=>{
+        if(event.pointerId !== activePointerId){ return; }
+        const desiredWidth = left_to_right
+            ? startWidth + event.clientX - xDown
+            : startWidth - event.clientX + xDown;
+        if(desiredWidth <= collapseWidth){
+            set_width(0);
+        }else if(desiredWidth < minimumWidth){
+            // Preserve the established snap band until collapse is crossed.
+        }else{
+            const maximumWidth = document.documentElement.clientWidth * maximumViewportRatio;
+            set_width(Math.min(desiredWidth, maximumWidth));
         }
-    })
-    document.addEventListener("mousemove",(e)=>{
-        if(global_resize_state == true){
-            const new_width = left_to_right?(start_width + e.x - x_down):(start_width - e.x + x_down)
-            if(new_width <= 60){//snap effect
-                nav_el.style.width = "0px"
-                nav_el.setAttribute("data-width","0px")
-            }else if(new_width < 160){
-                //do nothing here
-            }else if(new_width < (document.documentElement.clientWidth)*0.4){
-                nav_el.style.width = new_width+"px"
-                nav_el.setAttribute("data-width",new_width+"px")
-            }
-            e.preventDefault()
-        }
-    })
+        event.preventDefault();
+    });
+    resize_el.addEventListener("pointerup", finish_pointer);
+    resize_el.addEventListener("pointercancel", finish_pointer);
+    resize_el.addEventListener("lostpointercapture", finish_pointer);
+    window.addEventListener("blur", finish_pointer);
 }
 
 function menu_interactions_activation(){
@@ -181,8 +214,14 @@ function menu_interactions_activation(){
         configure_toggle(rightButton, toc_nav, 'right_open')
     }
 
-    configure_resize(document.getElementById("resize-left"),  pages_nav, true)
-    configure_resize(document.getElementById("resize-right"), toc_nav,   false)
+    configure_resize(document.getElementById("resize-left"), pages_nav, true, {
+        button: leftButton,
+        storageKey: "left_open"
+    })
+    configure_resize(document.getElementById("resize-right"), toc_nav, false, {
+        button: rightButton,
+        storageKey: "right_open"
+    })
 }
 
 document.addEventListener('DOMContentLoaded', menu_interactions_activation, false);

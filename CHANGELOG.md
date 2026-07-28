@@ -3,6 +3,38 @@
 Release notes for the `@microwebstacks/md-render` npm package. The VS Code
 extension has a separate changelog at `packages/vscode-extension/CHANGELOG.md`.
 
+## 0.0.22 - 2026-07-28
+
+### Changed
+
+- The app bar now fits one row at every width. Root sections are measured and
+  progressively moved into a `More` disclosure that keeps the active section
+  and Home reachable; at the narrowest widths the section region collapses to a
+  compact active-section selector listing every root. Previously the bar
+  wrapped at mid widths, and with many generated root folders the intrinsic
+  link widths pushed the right-side controls off-screen.
+- Secondary utility controls - external links, knowledge log, explore, graph,
+  runtime information, and preview lock - consolidate into a labeled `Tools`
+  disclosure below the existing 700px breakpoint. Pages, theme, and On this page
+  stay directly reachable. The disclosure moves the original DOM nodes rather
+  than copies, so each control keeps its state and event bindings.
+- The desktop sidebar resizers are now symmetric and pointer-captured. Both
+  sides clamp continuously at 40vw, suppress text selection while dragging,
+  clean up on pointer cancellation or window blur, and keep the owning app-bar
+  toggle and the persisted open state in sync when a drag opens or collapses a
+  menu.
+
+### Fixed
+
+- Fixed the app bar and sidebars being able to widen the document. Navigation,
+  the TOC, and the resize handles now have explicit shrink and clip boundaries,
+  so no app-bar state produces page-level horizontal scrolling.
+- Fixed the Pages wrapper lagging behind its divider during a resize drag. It
+  now uses the same non-shrinking flex contract as the TOC wrapper.
+- Fixed the Pages depth controls drifting horizontally as the pane widened.
+  They are left-anchored with fixed button widths, so narrowing clips the
+  trailing `All` control from the right without moving the leading `1`.
+
 ## 0.0.21 - 2026-07-27
 
 ### Fixed
