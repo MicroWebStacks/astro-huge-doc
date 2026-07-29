@@ -3,6 +3,21 @@
 Release notes for the `@microwebstacks/md-render` npm package. The VS Code
 extension has a separate changelog at `packages/vscode-extension/CHANGELOG.md`.
 
+## 0.0.23 - 2026-07-29
+
+### Fixed
+
+- Preserved ordered, unordered, and nested Markdown list structure through the
+  flat collected-item format so lists render as real `<ol>`, `<ul>`, and `<li>`
+  elements instead of flattened paragraphs.
+- Kept formatted text fragments beside links inline. Mixed paragraphs no
+  longer gain nested paragraph wrappers that visibly split one authored line
+  around a link.
+- Stopped percent-decoding already-resolved filesystem paths. Images, blobs,
+  and SVG text now load when a workspace directory contains spaces, a bare
+  percent sign, or percent-like pairs such as `%20`, while percent-encoded
+  authored asset targets continue to resolve normally.
+
 ## 0.0.22 - 2026-07-28
 
 ### Changed

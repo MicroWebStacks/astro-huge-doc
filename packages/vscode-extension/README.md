@@ -31,9 +31,9 @@ run it locally (see below) and even your diagrams stay home.
 
 - No system Node.js or npm is required on the normal install path. On first
   use the extension runs the bundled lite/json engine shipped inside the VSIX
-  and uses VS Code's own bundled runtime to execute its scripts. In `auto`
-  mode the npm registry is only a fallback path when the bundled payload is
-  unavailable; `registry` mode forces that published-engine path explicitly.
+  and uses VS Code's own bundled runtime to execute its scripts. Engine
+  acquisition is fully offline: the installed extension never contacts the
+  npm registry and fails clearly if its bundled payload is missing or corrupt.
 - No runtime flags need to be configured. The extension automatically probes
   VS Code's runtime with `ELECTRON_RUN_AS_NODE`; users should not set that
   variable themselves. On the rare VS Code/Electron build where this internal
@@ -94,9 +94,8 @@ repo root defines the same service - run `docker compose up -d` /
 `docker compose down` (or `pnpm kroki:up` / `pnpm kroki:down`) from there
 instead.
 
-> Advanced: `microwebstacks.preview.engineSource` and
-> `microwebstacks.preview.enginePath` control where the rendering engine is
-> loaded from. The defaults are fine for most users.
+> Advanced: `microwebstacks.preview.enginePath` can point development builds
+> at an astro-huge-doc checkout instead of the engine bundled in the VSIX.
 
 ## Corporate endpoint diagnostics
 

@@ -35,8 +35,15 @@ function get_next_uid(url,uid_list){
   return newUrl;
 }
 
+// `abs_path` is a real filesystem path, never a URL. Percent-decoding belongs
+// to the authored markdown target only (resolveDocumentAssetPath ->
+// decodeAssetPath in md_utils.js, which runs before the path is joined onto
+// contentdir/rootdir/outdir). Decoding again here re-interpreted the
+// workspace's OWN directory names: a root like 'Docs 100% Final' threw
+// URIError ("URI malformed") out of every page parse that touched an asset,
+// and a root like 'Docs%20Folder' silently resolved to a path that does not
+// exist, so the asset was dropped from the page with no error at all.
 async function exists_abs(abs_path) {
-  abs_path = decodeURIComponent(abs_path)
   try {
     await access(abs_path, fs_constants.F_OK);
     return true;
@@ -104,9 +111,10 @@ async function load_text(rel_path){
   return await load_text_abs(path)
 }
 
+// Same contract as exists_abs: the caller has already resolved the authored
+// target to a real filesystem path, so no percent-decoding happens here.
 async function load_text_abs(abs_path){
-  const filepath = decodeURIComponent(abs_path)//could be an image url
-  const text = await readFile(filepath,'utf-8')
+  const text = await readFile(abs_path,'utf-8')
   return text
 }
 

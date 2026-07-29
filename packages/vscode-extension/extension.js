@@ -4,7 +4,6 @@ const crypto = require('crypto');
 const fs = require('fs');
 const fsp = require('fs/promises');
 const http = require('http');
-const https = require('https');
 const net = require('net');
 const path = require('path');
 const zlib = require('zlib');
@@ -377,8 +376,8 @@ function exists(filePath) {
 
 // OS-level variables a spawned Node process needs to work at all (DNS/TLS on
 // Windows, temp dirs, PATH for anything the engine itself shells out to,
-// terminal/proxy config a corporate machine may require for the registry
-// download). Everything else in the host's process.env - other extensions'
+// terminal/proxy config the engine may require for optional remote services).
+// Everything else in the host's process.env - other extensions'
 // tokens, the user's shell customizations, unrelated app config - is
 // deliberately not passed through to the collect/diagrams/server children.
 const ENV_PASSTHROUGH_KEYS = process.platform === 'win32'
@@ -604,17 +603,6 @@ function hasBundledEnginePackage() {
   return exists(path.join(bundledRoot, BUNDLED_MANIFEST_FILE)) && exists(path.join(bundledRoot, BUNDLED_TARBALL_FILE));
 }
 
-// Each engine version gets its own prefix. In-place npm upgrades of a shared
-// 'engine' dir fail with EBUSY on Windows when an orphaned preview server
-// still holds the old folder; a fresh per-version folder never collides.
-function getEnginePrefix(context) {
-  return path.join(context.globalStorageUri.fsPath, `engine-${ENGINE_VERSION}`);
-}
-
-function getInstalledEngineRoot(context) {
-  return path.join(getEnginePrefix(context), 'node_modules', '@microwebstacks', 'md-render');
-}
-
 function getBundledEnginePrefix(context) {
   return path.join(context.globalStorageUri.fsPath, `bundled-engine-${ENGINE_VERSION}`);
 }
@@ -665,16 +653,8 @@ async function cleanupOldEngines(context) {
   }
 }
 
-function installedEngineVersion(engineRoot) {
-  try {
-    return JSON.parse(fs.readFileSync(path.join(engineRoot, 'package.json'), 'utf8')).version ?? null;
-  } catch {
-    return null;
-  }
-}
-
-// A previously installed engine is only reusable when it matches the version
-// this extension release expects; otherwise npm install updates it in place.
+// A cached bundled engine is reusable only when it matches the version this
+// extension release expects and still contains its vendored dependencies.
 function isUsableInstalledEngine(engineRoot) {
   if (!isEngineRoot(engineRoot)) {
     return false;
@@ -682,44 +662,14 @@ function isUsableInstalledEngine(engineRoot) {
   const pkg = readJson(path.join(engineRoot, 'package.json'));
   const version = pkg?.version ?? null;
   if (version !== ENGINE_VERSION) {
-    log(`Installed engine version ${version ?? 'unknown'} does not match expected ${ENGINE_VERSION}; reinstalling.`);
+    log(`Cached engine version ${version ?? 'unknown'} does not match expected ${ENGINE_VERSION}; reactivating the bundled copy.`);
     return false;
   }
   if (Object.keys(pkg?.dependencies ?? {}).length > 0 && !exists(path.join(engineRoot, 'node_modules'))) {
-    log(`Installed engine at ${engineRoot} is missing node_modules; reinstalling.`);
+    log(`Cached engine at ${engineRoot} is missing node_modules; reactivating the bundled copy.`);
     return false;
   }
   return true;
-}
-
-// Scoped package tarball convention: the scope stays in the path but is
-// dropped from the filename, e.g. @foo/bar@1.0.0 ->
-// https://registry.npmjs.org/@foo/bar/-/bar-1.0.0.tgz
-function engineTarballUrl(name, version) {
-  const shortName = name.includes('/') ? name.split('/')[1] : name;
-  return `https://registry.npmjs.org/${name}/-/${shortName}-${version}.tgz`;
-}
-
-function fetchBuffer(url, redirectsLeft = 5) {
-  return new Promise((resolve, reject) => {
-    const request = https.get(url, {headers: {'user-agent': `microwebstacks-docs-preview/${extensionPackage.version}`}}, (response) => {
-      if ([301, 302, 307, 308].includes(response.statusCode) && response.headers.location && redirectsLeft > 0) {
-        response.resume();
-        resolve(fetchBuffer(new URL(response.headers.location, url).toString(), redirectsLeft - 1));
-        return;
-      }
-      if (response.statusCode !== 200) {
-        response.resume();
-        reject(new Error(`request to ${url} failed with status ${response.statusCode}`));
-        return;
-      }
-      const chunks = [];
-      response.on('data', (chunk) => chunks.push(chunk));
-      response.on('end', () => resolve(Buffer.concat(chunks)));
-      response.on('error', reject);
-    });
-    request.on('error', reject);
-  });
 }
 
 function readTarString(block, start, length) {
@@ -948,13 +898,14 @@ async function activateWithStorageLock(context, kind, installedRoot, activate) {
   }
 }
 
-// Shared post-download work for both the bundled and registry tiers
-// (AD-003): extract into a fresh temporary sibling directory, validate the
-// extracted package before trusting it, then promote it into the versioned
-// install location. A partially extracted or mismatched directory is never
-// treated as a valid cached engine, and interrupted/failed extraction leaves
-// no usable partial install behind.
+// Extract the authenticated bundled archive into a fresh temporary sibling
+// directory, validate the package before trusting it, then promote it into the
+// versioned install location. A partially extracted or mismatched directory is
+// never treated as a valid cached engine, and interrupted/failed extraction
+// leaves no usable partial install behind.
 async function extractAndActivateEngine({tarballBuffer, expectedPackage, expectedVersion, installRoot, sourceLabel}) {
+  const startedAt = Date.now();
+  const timings = {extractMs: 0, validateMs: 0, activateMs: 0, totalMs: 0};
   const enginePrefix = path.resolve(installRoot, '..', '..', '..');
   const storageRoot = path.dirname(enginePrefix);
   // Keep extraction outside the versioned engine prefix. A still-running old
@@ -971,6 +922,7 @@ async function extractAndActivateEngine({tarballBuffer, expectedPackage, expecte
       activationStage = 'extract package';
       const extracted = await extractTarGz(tarballBuffer, tempRoot, {mapVendoredModules: true});
       vendoredDir = extracted.vendoredModulesDir;
+      timings.extractMs = Date.now() - startedAt;
     } catch (error) {
       const wrapped = new Error(`Could not extract ${sourceLabel} (${error.message}).`, {cause: error});
       wrapped.code = error.code;
@@ -996,12 +948,17 @@ async function extractAndActivateEngine({tarballBuffer, expectedPackage, expecte
     if (!isUsableInstalledEngine(tempRoot)) {
       throw new Error(`${sourceLabel} extracted but failed the usable-engine checks at ${tempRoot}.`);
     }
+    timings.validateMs = Date.now() - startedAt - timings.extractMs;
 
+    const activationStartedAt = Date.now();
     activationStage = 'replace previous engine';
     await retryFsOp(() => fsp.rm(installRoot, {recursive: true, force: true}));
     activationStage = 'activate extracted engine';
     await fsp.mkdir(path.dirname(installRoot), {recursive: true});
     await retryFsOp(() => fsp.rename(tempRoot, installRoot));
+    timings.activateMs = Date.now() - activationStartedAt;
+    timings.totalMs = Date.now() - startedAt;
+    return timings;
   } catch (error) {
     await runActivationDiagnostics({error, stage: activationStage, tempRoot, installRoot, vendoredModulesDir: vendoredDir}).catch((diagnosticError) => {
       log(`Engine activation diagnostics could not complete (${diagnosticError.code || diagnosticError.message}).`);
@@ -1011,47 +968,12 @@ async function extractAndActivateEngine({tarballBuffer, expectedPackage, expecte
   }
 }
 
-// Installs the engine with a plain HTTPS download of its published npm
-// tarball, extracted in-process - no npm (or system Node) involved (plans/
-// 2026-07/05-vscode-node-free-bootstrap OP-002). The tarball's production
-// dependencies are pre-vendored under a disguised directory name by
-// scripts/stage-engine.js (npm's packer always strips a real "node_modules"
-// out of a published tarball); extraction maps that path directly back to
-// node_modules without a post-extraction directory rename.
-async function installEngine(context) {
-  const enginePrefix = getEnginePrefix(context);
-  const url = engineTarballUrl(ENGINE_PACKAGE, ENGINE_VERSION);
-  log(`Installing ${ENGINE_PACKAGE}@${ENGINE_VERSION} from ${url} (this runs once and needs network access).`);
-
-  let buffer;
-  try {
-    buffer = await fetchBuffer(url);
-  } catch (error) {
-    throw new Error(`Could not download ${ENGINE_PACKAGE}@${ENGINE_VERSION} (${error.message}).`);
-  }
-
-  try {
-    await extractAndActivateEngine({
-      tarballBuffer: buffer,
-      expectedPackage: ENGINE_PACKAGE,
-      expectedVersion: ENGINE_VERSION,
-      installRoot: getInstalledEngineRoot(context),
-      sourceLabel: `${ENGINE_PACKAGE}@${ENGINE_VERSION} (registry)`
-    });
-  } catch (error) {
-    throw new Error(`Could not install ${ENGINE_PACKAGE}@${ENGINE_VERSION} (${error.message}).`);
-  }
-  log(`Installed ${ENGINE_PACKAGE}@${ENGINE_VERSION} into ${enginePrefix}.`);
-}
-
 // Reads and authenticates the bundled outer manifest.json + engine.tgz pair
-// (AD-001) before handing the exact tarball bytes to the same
-// extraction-and-activation path installEngine() uses. A manifest or tarball
-// that fails to parse, name the expected package/version, or match its own
-// declared digest is treated as corrupt bundled data and fails loudly here -
-// it is never silently reinterpreted as "no bundled engine" (that would
-// route through to the registry tier instead, masking a packaging bug).
+// (AD-001) before extracting it locally. A manifest or tarball that fails to
+// parse, name the expected package/version, or match its own declared digest
+// is treated as corrupt bundled data and fails loudly.
 async function hydrateBundledEngine(context) {
+  const hydrationStartedAt = Date.now();
   const bundledRoot = getBundledEnginePackageRoot();
   if (!hasBundledEnginePackage()) {
     throw new Error(`Bundled engine payload is missing at ${bundledRoot}. Repackage the extension.`);
@@ -1070,9 +992,14 @@ async function hydrateBundledEngine(context) {
   ) {
     throw new Error(`Bundled engine manifest at ${manifestPath} is invalid or does not describe ${ENGINE_PACKAGE}@${ENGINE_VERSION}. Repackage the extension.`);
   }
+  log(
+    `First-use bundled engine activation started ` +
+    `(${(manifest.byteLength / (1024 * 1024)).toFixed(1)} MB, local archive; no network request).`
+  );
 
   const tarballPath = path.join(bundledRoot, manifest.tarball);
   let tarballBuffer;
+  const readStartedAt = Date.now();
   try {
     tarballBuffer = await fsp.readFile(tarballPath);
   } catch (error) {
@@ -1081,12 +1008,15 @@ async function hydrateBundledEngine(context) {
   if (tarballBuffer.length !== manifest.byteLength) {
     throw new Error(`Bundled engine tarball at ${tarballPath} is ${tarballBuffer.length} bytes but the manifest expects ${manifest.byteLength}. Repackage the extension.`);
   }
+  const readMs = Date.now() - readStartedAt;
+  const verifyStartedAt = Date.now();
   const actualDigest = crypto.createHash('sha256').update(tarballBuffer).digest('hex');
   if (actualDigest !== manifest.sha256) {
     throw new Error(`Bundled engine tarball at ${tarballPath} failed digest verification (expected ${manifest.sha256}, got ${actualDigest}). Repackage the extension.`);
   }
+  const verifyMs = Date.now() - verifyStartedAt;
 
-  await extractAndActivateEngine({
+  const activationTimings = await extractAndActivateEngine({
     tarballBuffer,
     expectedPackage: manifest.package,
     expectedVersion: manifest.version,
@@ -1095,14 +1025,19 @@ async function hydrateBundledEngine(context) {
   });
 
   log(`Hydrated bundled ${ENGINE_PACKAGE}@${ENGINE_VERSION} into ${getBundledEnginePrefix(context)}.`);
+  log(
+    `First-use bundled engine timing: read ${readMs} ms; verify ${verifyMs} ms; ` +
+    `extract ${activationTimings.extractMs} ms; validate ${activationTimings.validateMs} ms; ` +
+    `activate ${activationTimings.activateMs} ms; total ${Date.now() - hydrationStartedAt} ms.`
+  );
 }
 
-// Resolves the engine root. The local workspace checkout remains the guaranteed
-// dev fallback, and installed VSIX builds can hydrate a bundled engine before
-// trying any registry install path.
+// Resolves the engine root. An explicit or inferred local workspace checkout
+// supports development; installed VSIX builds always use their bundled engine
+// and never acquire engine code over the network.
 async function resolveEngine(context, workspaceFolder) {
   const config = vscode.workspace.getConfiguration('microwebstacks.preview', workspaceFolder.uri);
-  const source = config.get('engineSource') || 'auto';
+  const resolutionStartedAt = Date.now();
 
   const configured = config.get('enginePath');
   if (configured) {
@@ -1113,40 +1048,29 @@ async function resolveEngine(context, workspaceFolder) {
     throw new Error(`microwebstacks.preview.enginePath is set to "${root}" but no engine was found there (missing server/server.js, scripts/collect.js, or config.js).`);
   }
 
-  if (source !== 'registry') {
-    for (const candidate of [path.resolve(__dirname, '..', '..'), path.resolve(__dirname)]) {
-      if (isEngineRoot(candidate)) {
-        return {root: candidate, label: `local workspace engine (${candidate})`};
-      }
-    }
-    if (source === 'local') {
-      throw new Error('engineSource is "local" but no local engine checkout was found. Set microwebstacks.preview.enginePath to an astro-huge-doc checkout, or switch engineSource to "auto".');
+  for (const candidate of [path.resolve(__dirname, '..', '..'), path.resolve(__dirname)]) {
+    if (isEngineRoot(candidate)) {
+      return {root: candidate, label: `local workspace engine (${candidate})`};
     }
   }
 
-  if (source === 'auto' && hasBundledEnginePackage()) {
-    const bundledInstalled = getBundledInstalledEngineRoot(context);
-    if (!isUsableInstalledEngine(bundledInstalled)) {
-      await activateWithStorageLock(context, 'bundled', bundledInstalled, () => hydrateBundledEngine(context));
-    }
-    if (isUsableInstalledEngine(bundledInstalled)) {
-      await cleanupOldEngines(context);
-      return {root: bundledInstalled, label: `bundled VSIX engine (${bundledInstalled})`};
-    }
-    throw new Error(`Bundled engine ${ENGINE_PACKAGE}@${ENGINE_VERSION} could not be activated at ${bundledInstalled}.`);
+  if (!hasBundledEnginePackage()) {
+    throw new Error(`Bundled engine payload is missing at ${getBundledEnginePackageRoot()}. Repackage the extension.`);
   }
-
-  const installed = getInstalledEngineRoot(context);
-  if (isUsableInstalledEngine(installed)) {
-    return {root: installed, label: `installed engine package (${installed})`};
+  const bundledInstalled = getBundledInstalledEngineRoot(context);
+  const cacheHit = isUsableInstalledEngine(bundledInstalled);
+  if (!cacheHit) {
+    await activateWithStorageLock(context, 'bundled', bundledInstalled, () => hydrateBundledEngine(context));
   }
-
-  await activateWithStorageLock(context, 'registry', installed, () => installEngine(context));
-  if (isUsableInstalledEngine(installed)) {
+  if (isUsableInstalledEngine(bundledInstalled)) {
     await cleanupOldEngines(context);
-    return {root: installed, label: `installed engine package (${installed})`};
+    log(
+      `${cacheHit ? 'Bundled engine cache hit' : 'First-use bundled engine resolution complete'}; ` +
+      `resolved locally in ${Date.now() - resolutionStartedAt} ms including old-engine cleanup.`
+    );
+    return {root: bundledInstalled, label: `bundled VSIX engine (${bundledInstalled})`};
   }
-  throw new Error(`Engine ${ENGINE_PACKAGE}@${ENGINE_VERSION} was installed but could not be located at ${installed}.`);
+  throw new Error(`Bundled engine ${ENGINE_PACKAGE}@${ENGINE_VERSION} could not be activated at ${bundledInstalled}.`);
 }
 
 function resolveDocsRoot(workspaceRoot, manifestPath, workspaceFolder) {
@@ -1176,7 +1100,6 @@ function workspaceKey(workspaceFolder) {
 function configurationSnapshot(workspaceFolder) {
   const config = vscode.workspace.getConfiguration('microwebstacks.preview', workspaceFolder.uri);
   return JSON.stringify({
-    engineSource: config.get('engineSource') || 'auto',
     enginePath: config.get('enginePath') || '',
     docsRoot: config.get('docsRoot') || '',
     krokiServer: config.get('krokiServer') || ''
@@ -1404,7 +1327,7 @@ async function ensureServer(context, session) {
   return vscode.window.withProgress(
     {location: vscode.ProgressLocation.Notification, title: 'MicroWebStacks Docs'},
     async (progress) => {
-      progress.report({message: 'resolving engine (first run may hydrate the bundled engine or download the pinned fallback)…'});
+      progress.report({message: 'resolving bundled engine (first run may take longer while it is activated locally)…'});
       const runtime = await buildRuntime(context, session.workspaceFolder);
       const port = await getFreePort();
       const env = createRuntimeEnv(runtime, port);
@@ -1810,7 +1733,6 @@ module.exports = {
 module.exports.__testInternals = {
     hasBundledEnginePackage,
     hydrateBundledEngine,
-    installEngine,
     extractAndActivateEngine,
     activateWithStorageLock,
     cleanupOldEngines,
@@ -1819,9 +1741,7 @@ module.exports.__testInternals = {
     isUsableInstalledEngine,
     isEngineRoot,
     getBundledEnginePackageRoot,
-    getEnginePrefix,
     getBundledEnginePrefix,
-    getInstalledEngineRoot,
     getBundledInstalledEngineRoot,
     getSessionSnapshots,
     disposePanel: disposeTestPanel

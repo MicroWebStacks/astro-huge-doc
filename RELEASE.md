@@ -33,7 +33,7 @@ If the OTP expires while the build runs, rerun with a fresh code:
 
 1. Bump `version` in `packages/vscode-extension/package.json` (strictly increasing, never reuse).
 2. Commit the release changes locally if you did not already do so for the engine release.
-3. Package (checks the pinned engine is on npm, stages the bundled lite/json engine fallback into the VSIX, builds the vsix with the current git commit stamped into it, and fails if the final archive does not actually contain `bundled-engine/`):
+3. Package (checks the pinned engine is on npm for standalone consumers, stages the bundled lite/json engine into the VSIX, builds the vsix with the current git commit stamped into it, and fails if the final archive does not actually contain `bundled-engine/`):
 
 ```powershell
 pnpm ext:release
@@ -53,24 +53,21 @@ exactly what to release:
 | Artifact | Source | Ships as | Ships to |
 |---|---|---|---|
 | **Engine** (the renderer) | `src/`, `server/`, `scripts/`, `config.js` | `@microwebstacks/md-render` (staged build artifact in `packages/md-render/`, gitignored) | npm registry |
-| **Extension** (VS Code launcher + bundled lite/json fallback) | `packages/vscode-extension/` (`extension.js`, `package.json`, `README.md`) | `markdown-site-preview.vsix` | VS Code Marketplace |
+| **Extension** (VS Code launcher + bundled lite/json engine) | `packages/vscode-extension/` (`extension.js`, `package.json`, `README.md`) | `markdown-site-preview.vsix` | VS Code Marketplace |
 | **Repo** | everything | git commits | GitHub (branch `main`) |
 
-The release VSIX now contains a bundled lite/json engine payload for offline
-and corporate-safe first run. In normal `auto` mode the installed extension:
+The release VSIX contains a bundled lite/json engine payload for offline and
+corporate-safe startup. The installed extension:
 
 1. uses `enginePath` when explicitly configured;
 2. uses a source checkout when the extension itself is running from one;
-3. hydrates the bundled engine into VS Code storage and runs that copy;
-4. falls back to an already installed published engine;
-5. only then downloads the pinned published engine package.
+3. hydrates the bundled engine into VS Code storage and runs that copy.
 
 So:
 
 - **npm publish** makes a new engine available.
 - **Marketplace upload** ships both the extension wrapper and its bundled
-  fallback, and also makes extensions ask for the pinned published engine when
-  the registry path is used.
+  engine. The extension does not acquire engine code from npm at runtime.
 - **git push** publishes neither; it is version control only.
 
 ## Decision rule
@@ -78,7 +75,7 @@ So:
 - Changed only `packages/vscode-extension/*` -> **extension release** (no npm publish).
 - Changed `src/`, `server/`, `scripts/`, or `config.js` -> **engine release**.
 - Follow with an **extension release** only when Marketplace users should
-  immediately receive that engine in the VSIX's bundled fallback. Action/CLI-only
+  immediately receive that engine in the VSIX's bundled payload. Action/CLI-only
   engine fixes can ship without a new extension version; the bumped
   `engineVersion` is then ready for the next extension release.
 - Docs/plans only -> just commit.
@@ -86,10 +83,10 @@ So:
 ## Order matters
 
 Always **npm publish the engine before uploading the extension** that pins it.
-The bundled VSIX fallback means first preview no longer depends on registry
-access, but explicit `engineSource=registry` usage and the network fallback path
-still depend on the pinned engine version existing on npm. `pnpm ext:release`
-enforces this check.
+The extension itself runs its bundled copy without registry access; publishing
+the same engine remains required for Action, CLI, Pages, and other standalone
+consumers. `pnpm ext:release` continues to enforce the coordinated release
+check.
 
 Recommended full release order:
 
@@ -135,9 +132,7 @@ this automatically.
   page.
 - Existing users receive updates via VS Code auto-update; on next preview start
   the extension hydrates the bundled engine into a fresh
-  `bundled-engine-<version>` folder (or installs the pinned published engine
-  into `engine-<version>` when the registry path is used) and cleans old ones
-  up best-effort.
+  `bundled-engine-<version>` folder and cleans old ones up best-effort.
 - README images must be absolute URLs reachable on `main` (vsce's relative-link
   rewrite drops the `repository.directory` prefix and would break them).
 

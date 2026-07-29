@@ -503,6 +503,9 @@ main{
 .article-slot :global(li + li){
 	margin-top: var(--space-1);
 }
+.article-slot :global(li > p:last-child){
+	margin-bottom: 0;
+}
 
 /* Inline code: subtle tinted chip, like GitHub. */
 .article-slot :global(:not(pre) > code){

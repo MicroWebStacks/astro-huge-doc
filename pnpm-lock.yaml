@@ -271,6 +271,9 @@ importers:
       unist-util-visit:
         specifier: ^5.0.0
         version: 5.1.0
+      xlsx:
+        specifier: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
+        version: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
 
   packages/vscode-extension: {}
 

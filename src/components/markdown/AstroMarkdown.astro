@@ -94,14 +94,12 @@ function paragraphStyle(node){
         return <Fragment>md.nan</Fragment>;
     }
 
-    // containerDirective items don't nest their children in the flat items
+    // Structural items don't nest their children in the flat items
     // array (see catalog.yaml: items are reading-order, not a tree) — the
-    // directive's own row is immediately followed by `childCount` rows that
-    // belong inside it (recursively, for directives nested inside other
-    // directives). Consume that run here instead of also rendering it again
-    // at the same level, otherwise the child content (e.g. a code block)
-    // ends up duplicated as a sibling outside the <details>, which is why
-    // collapsing the directive previously left it visible.
+    // parent row is immediately followed by `childCount` rows that belong
+    // inside it recursively. Consume that run here instead of rendering it
+    // at the same level, otherwise structural descendants are duplicated as
+    // siblings outside their directive or list.
     function renderRun(list){
         const out = [];
         let i = 0;
@@ -115,6 +113,25 @@ function paragraphStyle(node){
                         {renderRun(childItems)}
                     </ContainerDirective>
                 );
+                i += 1 + childCount;
+                continue;
+            }
+            if (item.type === 'list') {
+                const childCount = item.ast?.childCount ?? 0;
+                const childItems = list.slice(i + 1, i + 1 + childCount);
+                const children = renderRun(childItems);
+                out.push(
+                    item.ast?.ordered
+                        ? <ol start={item.ast?.start ?? undefined}>{children}</ol>
+                        : <ul>{children}</ul>
+                );
+                i += 1 + childCount;
+                continue;
+            }
+            if (item.type === 'listItem') {
+                const childCount = item.ast?.childCount ?? 0;
+                const childItems = list.slice(i + 1, i + 1 + childCount);
+                out.push(<li>{renderRun(childItems)}</li>);
                 i += 1 + childCount;
                 continue;
             }

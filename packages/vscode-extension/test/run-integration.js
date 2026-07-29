@@ -22,7 +22,6 @@ const workspaceFile = path.join(fixtureRoot, 'active-tracking.code-workspace');
 fs.writeFileSync(workspaceFile, JSON.stringify({
   folders: [{name: 'one', path: 'one'}, {name: 'two', path: 'two'}],
   settings: {
-    'microwebstacks.preview.engineSource': 'local',
     'microwebstacks.preview.enginePath': repoRoot,
     'microwebstacks.preview.docsRoot': 'docs'
   }

@@ -38,7 +38,8 @@ test('preview lock has no native VS Code button — it is a webview app-bar cont
 });
 
 test('restart-sensitive preview settings support workspace-folder scope', () => {
-    for (const name of ['engineSource', 'enginePath', 'docsRoot', 'krokiServer']) {
+    for (const name of ['enginePath', 'docsRoot', 'krokiServer']) {
         assert.equal(manifest.contributes.configuration.properties[`microwebstacks.preview.${name}`].scope, 'resource');
     }
+    assert.equal(manifest.contributes.configuration.properties['microwebstacks.preview.engineSource'], undefined);
 });

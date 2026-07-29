@@ -88,7 +88,9 @@ const ASSET_KEY_SEPARATOR = '::';
 // normalization that preserves URL-unreserved filename characters and case.
 // Version 10 takes the document title from frontmatter (display label only);
 // a v9 record's stored document row still carries the filename-derived title.
-const RECORD_VERSION = 10;
+// Version 11 preserves list/list-item rows and inline AST fragments around
+// links; older cached rows flattened both structures during collection.
+const RECORD_VERSION = 11;
 // Alt text marking the synthetic image appended for a frontmatter `image:`
 // path; the item is dropped after collection, only its asset/blob remain.
 const META_IMAGE_ALT = 'mws-meta-image';

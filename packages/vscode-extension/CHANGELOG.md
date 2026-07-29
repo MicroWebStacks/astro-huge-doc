@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.0.27 - 2026-07-29
+
+- Removed runtime engine downloads from the extension. Installed builds now
+  use only the engine bundled in the VSIX, so preview startup never waits on
+  npm registry access; `enginePath` remains as a development override.
+- First-use bundled engine activation now logs the local archive size and
+  separate read, digest verification, extraction, validation, activation, and
+  total timings. Cache hits are logged separately.
+- Markdown lists now preserve ordered, unordered, and nested structure, and
+  formatted text around links stays inline instead of breaking the paragraph
+  into separate blocks (engine 0.0.23).
+- Images and SVG text resolve correctly when the workspace path contains
+  spaces, bare percent signs, or percent-like character pairs such as `%20`
+  (engine 0.0.23).
+
 ## 0.0.26 - 2026-07-28
 
 - The preview app bar no longer wraps or scrolls the page sideways in a narrow

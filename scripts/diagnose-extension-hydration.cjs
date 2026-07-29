@@ -12,9 +12,16 @@ const outputLines = [];
 Module._load = function(request, parent, isMain) {
   if (request === 'vscode') {
     return {
-      window: {createOutputChannel: () => ({appendLine: (line) => outputLines.push(line), show() {}, dispose() {}})},
+      window: {
+        createOutputChannel: () => ({appendLine: (line) => outputLines.push(line), show() {}, dispose() {}}),
+        onDidChangeActiveTextEditor: () => ({dispose() {}})
+      },
       commands: {registerCommand: () => ({dispose() {}})},
-      workspace: {}
+      workspace: {
+        onDidChangeConfiguration: () => ({dispose() {}}),
+        onDidChangeWorkspaceFolders: () => ({dispose() {}})
+      },
+      ExtensionMode: {Production: 1}
     };
   }
   return originalLoad.call(this, request, parent, isMain);
@@ -73,9 +80,10 @@ async function main() {
   let ok = true;
   try {
     let activationCount = 0;
+    let activationTimings = null;
     const activate = async () => {
       activationCount += 1;
-      await internals.extractAndActivateEngine({tarballBuffer: payload, expectedPackage: pkg.name, expectedVersion: pkg.version, installRoot, sourceLabel: 'diagnostic engine'});
+      activationTimings = await internals.extractAndActivateEngine({tarballBuffer: payload, expectedPackage: pkg.name, expectedVersion: pkg.version, installRoot, sourceLabel: 'diagnostic engine'});
     };
     await Promise.all([
       internals.activateWithStorageLock(context, 'bundled', installRoot, activate),
@@ -86,19 +94,23 @@ async function main() {
     ok = report('direct node_modules extraction', fs.existsSync(path.join(installRoot, 'node_modules', 'diagnostic-package', 'index.js'))) && ok;
     ok = report('no vendored alias remains', !fs.existsSync(path.join(installRoot, '_modules'))) && ok;
     ok = report('usable engine validation', internals.isUsableInstalledEngine(installRoot)) && ok;
+    ok = report(
+      'activation timings returned',
+      ['extractMs', 'validateMs', 'activateMs', 'totalMs'].every((name) => Number.isFinite(activationTimings?.[name]))
+    ) && ok;
     ok = report('activation lock removed', !fs.existsSync(path.join(storageRoot, `.mws-engine-activation-lock-bundled-${pkg.version}`))) && ok;
     ok = report('activation temp removed', !(await fsp.readdir(storageRoot)).some((entry) => entry.startsWith('.mws-engine-activation-'))) && ok;
 
     await Promise.all([
       fsp.mkdir(path.join(storageRoot, 'engine'), {recursive: true}),
       fsp.mkdir(path.join(storageRoot, 'engine-0.0.7'), {recursive: true}),
-      fsp.mkdir(path.join(storageRoot, 'bundled-engine-0.0.9'), {recursive: true})
+      fsp.mkdir(path.join(storageRoot, 'bundled-engine-99.0.0'), {recursive: true})
     ]);
     await internals.cleanupOldEngines(context);
     ok = report('legacy engine cleanup', !fs.existsSync(path.join(storageRoot, 'engine'))) && ok;
     ok = report('older engine cleanup', !fs.existsSync(path.join(storageRoot, 'engine-0.0.7'))) && ok;
     ok = report('current engine preserved', fs.existsSync(path.join(storageRoot, `bundled-engine-${pkg.version}`))) && ok;
-    ok = report('newer engine preserved', fs.existsSync(path.join(storageRoot, 'bundled-engine-0.0.9'))) && ok;
+    ok = report('newer engine preserved', fs.existsSync(path.join(storageRoot, 'bundled-engine-99.0.0'))) && ok;
   } catch (error) {
     report('engine activation', false, error.code || error.message);
     ok = false;

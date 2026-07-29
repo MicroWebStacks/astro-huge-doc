@@ -35,18 +35,6 @@ const SHARP_DECODABLE_EXT = new Set([
     'jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'tif', 'tiff', 'svg'
 ]);
 
-function decodePathValue(pathValue){
-    if(!pathValue){
-        return pathValue
-    }
-    try{
-        return decodeURIComponent(pathValue)
-    }catch(error){
-        warn(`(X) failed to decode path '${pathValue}': ${error.message}`)
-        return pathValue
-    }
-}
-
 function cloneEntry(entry){
     return JSON.parse(JSON.stringify(entry))
 }
@@ -220,8 +208,13 @@ async function annotateAssets(assets,config){
         if(!asset || !Object.hasOwn(asset,"path")){
             continue
         }
+        // asset.path / asset.abs_path arrive already resolved: the authored
+        // markdown target was percent-decoded by resolveDocumentAssetPath()
+        // before it was joined onto contentdir/rootdir. Decoding the composed
+        // absolute path again here re-interpreted the workspace's own folder
+        // names, so a root like 'Docs 100% Final' or 'Docs%20Folder' lost
+        // every asset (see test/workspace-path-characters.test.js).
         if(asset.abs_path){
-            asset.abs_path = decodePathValue(asset.abs_path)
             if(!asset.ext && asset.path){
                 asset.ext = file_ext(asset.path)
             }
@@ -245,7 +238,7 @@ async function annotateAssets(assets,config){
         }
         if(asset_exist){
             asset.exists = asset_exist
-            asset.abs_path = decodePathValue(abs_path)
+            asset.abs_path = abs_path
             if(!asset.ext){
                 asset.ext = file_ext(asset.path)
             }

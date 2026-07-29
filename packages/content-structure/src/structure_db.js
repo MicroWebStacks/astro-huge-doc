@@ -703,6 +703,12 @@ function buildItemRows(doc, content, options = {}) {
             case 'paragraph':
                 handleParagraph(node);
                 return;
+            case 'list':
+                handleList(node);
+                return;
+            case 'listItem':
+                handleListItem(node);
+                return;
             case 'table':
                 handleTable(node);
                 return;
@@ -822,6 +828,71 @@ function buildItemRows(doc, content, options = {}) {
                     return;
                 }
         });
+    }
+
+    function handleList(node) {
+        const line = getNodeLine(node);
+        const level = getLevelForLine(line);
+        const listRow = {
+            version_id: versionId,
+            doc_sid: doc.sid,
+            slug: buildParagraphSlug(),
+            asset_uid: null,
+            type: 'list',
+            level: Number.isFinite(level) ? level : null,
+            order_index: orderIndex,
+            body_text: null,
+            ast: null
+        };
+        orderIndex += 1;
+        rows.push(listRow);
+        const rowCountBeforeChildren = rows.length;
+        if (Array.isArray(node.children)) {
+            node.children.forEach(processNode);
+        }
+        const childCount = rows.length - rowCountBeforeChildren;
+        try {
+            listRow.ast = JSON.stringify({
+                ordered: Boolean(node.ordered),
+                start: Number.isFinite(node.start) ? node.start : null,
+                spread: Boolean(node.spread),
+                childCount
+            });
+        } catch (error) {
+            warn(`(X) failed to serialize list metadata: ${error.message}`);
+        }
+    }
+
+    function handleListItem(node) {
+        const line = getNodeLine(node);
+        const level = getLevelForLine(line);
+        const listItemRow = {
+            version_id: versionId,
+            doc_sid: doc.sid,
+            slug: buildParagraphSlug(),
+            asset_uid: null,
+            type: 'listItem',
+            level: Number.isFinite(level) ? level : null,
+            order_index: orderIndex,
+            body_text: null,
+            ast: null
+        };
+        orderIndex += 1;
+        rows.push(listItemRow);
+        const rowCountBeforeChildren = rows.length;
+        if (Array.isArray(node.children)) {
+            node.children.forEach(processNode);
+        }
+        const childCount = rows.length - rowCountBeforeChildren;
+        try {
+            listItemRow.ast = JSON.stringify({
+                spread: Boolean(node.spread),
+                checked: typeof node.checked === 'boolean' ? node.checked : null,
+                childCount
+            });
+        } catch (error) {
+            warn(`(X) failed to serialize list-item metadata: ${error.message}`);
+        }
     }
 
     function handleTable(node) {
@@ -1039,6 +1110,18 @@ function buildItemRows(doc, content, options = {}) {
             }
         }
         flushBuffer();
+        // A formatted text run beside a link/image/directive is only one
+        // inline fragment of the authored paragraph. Serializing it as a
+        // paragraph would emit a nested <p> and visibly break that line.
+        // Root AST nodes retain strong/emphasis/code markup without adding a
+        // block wrapper. A standalone paragraph keeps its paragraph AST.
+        if (segments.length > 1) {
+            for (const segment of segments) {
+                if (segment.type === 'text' && segment.node?.type === 'paragraph') {
+                    segment.node.type = 'root';
+                }
+            }
+        }
         return segments;
     }
 
