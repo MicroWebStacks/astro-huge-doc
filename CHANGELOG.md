@@ -33,6 +33,10 @@ extension has a separate changelog at `packages/vscode-extension/CHANGELOG.md`.
 - Restored paragraph measure and spacing for collected runs of inline text,
   links, images, and inline directives without constraining block directives.
 - Resolved frontmatter image paths containing spaces in lite preview mode.
+- Pruned redundant vis-network distribution variants from staged engine
+  packages while retaining the standalone ESM entry used by the build. This
+  keeps the coordinated engine and VSIX artifacts below the release size
+  guard after adding the interactive graph.
 
 ## 0.0.23 - 2026-07-29
 

@@ -26,6 +26,14 @@
 - Repaired the local pnpm dependency tree from the frozen lockfile after the
   existing `glob` links proved incomplete.
 - Full tests and the isolated lite production build pass.
+- The first packaging attempt stopped at the staged-engine size guard: the new
+  vis-network package ships the same browser library in several build families,
+  raising the self-contained tree to 504.9 MB against a 460 MB limit.
+- Updated engine staging to retain the exact standalone ESM entry imported by
+  the graph while removing redundant UMD, peer, dist, esnext, declaration,
+  style, and source-map variants from the vendored copy.
+- Focused restaging reduced the engine tree to 427.5 MB and the retained
+  standalone ESM module imports successfully.
 
 ## Publication Boundary
 

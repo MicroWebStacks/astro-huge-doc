@@ -195,6 +195,32 @@ async function vendorWorkspaceLib(outDir) {
   });
 }
 
+// vis-network publishes the same browser library in several build families
+// (dist, esnext, peer, and standalone), including duplicate UMD/ESM variants
+// and source maps. The engine imports only `vis-network/standalone`, whose
+// export resolves to standalone/esm/vis-network.mjs. Keeping all published
+// variants adds roughly 80 MB to the self-contained engine and exceeds the
+// staging safety budget without adding a reachable runtime path.
+async function pruneVendoredVisNetwork(outDir) {
+  const packageDir = path.join(outDir, VENDOR_DIR_NAME, 'vis-network');
+  if (!fs.existsSync(packageDir)) {
+    return;
+  }
+
+  for (const directory of ['dist', 'esnext', 'peer', 'styles', 'declarations', path.join('standalone', 'umd')]) {
+    await fsp.rm(path.join(packageDir, directory), {recursive: true, force: true});
+  }
+
+  const esmDir = path.join(packageDir, 'standalone', 'esm');
+  for (const entry of await fsp.readdir(esmDir, {withFileTypes: true})) {
+    if (entry.isFile() && entry.name !== 'vis-network.mjs') {
+      await fsp.rm(path.join(esmDir, entry.name), {force: true});
+    }
+  }
+
+  console.log('Pruned redundant vis-network bundles; kept standalone/esm/vis-network.mjs.');
+}
+
 async function readJson(file) {
   return JSON.parse(await fsp.readFile(file, 'utf8'));
 }
@@ -336,6 +362,7 @@ async function main() {
     vendorDependencies(outDir);
     await hideVendoredModules(outDir);
     await vendorWorkspaceLib(outDir);
+    await pruneVendoredVisNetwork(outDir);
     console.log(`Vendored dependencies (incl. workspace ${WORKSPACE_LIB_NAME}) into ${path.join(outDir, VENDOR_DIR_NAME)}.`);
     await assertStagedSizeWithinBudget(outDir);
   } else {
