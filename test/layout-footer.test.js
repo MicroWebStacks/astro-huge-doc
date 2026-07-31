@@ -8,6 +8,7 @@ const layoutSource = readFileSync(join(root, 'src/layout/Layout.astro'), 'utf8')
 const footerSource = readFileSync(join(root, 'src/layout/RelationsFooter.astro'), 'utf8');
 const previewSource = readFileSync(join(root, 'src/layout/link_preview.js'), 'utf8');
 const appBarSource = readFileSync(join(root, 'src/layout/AppBar.astro'), 'utf8');
+const graphModalSource = readFileSync(join(root, 'src/layout/GraphModal.astro'), 'utf8');
 const indexBarSource = readFileSync(join(root, 'src/layout/LiteRelationIndexer.astro'), 'utf8');
 
 test('short articles push the relations footer to the viewport bottom', () => {
@@ -44,8 +45,18 @@ test('the neighborhood graph opens from the app bar, with its modal in the same 
     assert.match(appBarSource, /class="nav-toggle" data-action="open-graph"/);
     const entry = appBarSource.match(/<li class="nav-toggle-item graph-entry"(.*?)<\/li>/s);
     assert.ok(entry, 'expected the graph entry to be one <li>');
-    assert.match(entry[1], /graph-render-target/);
-    assert.match(entry[1], /<PanZoomModal/);
+    assert.match(entry[1], /<GraphModal/);
+    assert.doesNotMatch(entry[1], /PanZoomModal|graph-render-target/);
+    assert.match(graphModalSource, /data-graph-modal/);
+    assert.match(graphModalSource, /data-graph-viewport/);
+    assert.match(graphModalSource, /data-action="graph-depth-slider"/);
+    assert.match(graphModalSource, /data-graph-depth-ticks/);
+    assert.match(graphModalSource, /data-graph-visible-count/);
+    assert.match(graphModalSource, /data-action="clear-graph-local"/);
+    assert.doesNotMatch(graphModalSource, /graph-depth-less|graph-depth-more|graph-depth-all/);
+    assert.match(graphModalSource, /data-action="fit-graph"/);
+    assert.match(graphModalSource, /data-action="reset-graph"/);
+    assert.doesNotMatch(graphModalSource, /data-graph-engine|graph-node-index|data-graph-node-list/);
     assert.match(layoutSource, /graphSid=\{graphSid\}/);
 });
 

@@ -65,6 +65,29 @@ When a directory-style Markdown document resolves to the directory route, that
 route belongs to the directory node itself. The menu must not create a
 duplicate `README.md` child for that same route.
 
+## Default Open State
+
+The rail's open/closed state is a persisted reader preference, restored on every
+page load, with one override:
+
+- A section whose tree holds **one page or none** starts **closed on every
+  visit**, whatever the stored preference says. That page is already on screen,
+  so the tree has nothing to navigate to.
+- A section with **two or more pages** restores the stored preference as usual.
+
+Counting rule: only entries carrying a route are pages. Folder ancestors without
+a document of their own do not count, so a lone document nested under folders
+still reads as a single-page section.
+
+The override never rewrites the stored preference — a reader who left the rail
+open keeps it open in every multi-page section. Toggling a single-page tree open
+by hand holds for that page visit; the next load re-applies the rule.
+
+Both profiles obey this. In the full profile `SideMenu.astro` decides it at
+render time; in the lite profile the rail arrives after first paint, so
+`lazy_navigation.js` decides it from the fetched items and the menu script
+re-applies the state then.
+
 ## Ordering
 
 - Folders sort before files within the same parent.

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {computeNeighbors, MAX_RING1, MAX_RING2} from '../src/libs/graph.js';
+import {computeGraphUniverse, computeNeighbors, MAX_RING1, MAX_RING2} from '../src/libs/graph.js';
 
 /* Fake structure-db backend: computeNeighbors only ever calls getDocument /
    getOutgoing / getBacklinks, so a tiny in-memory graph exercises the same
@@ -17,6 +17,7 @@ function makeBackend(docs, edges) {
         incomingByTarget.get(edge.target).push(edge);
     }
     return {
+        getDocumentsFull: () => docs,
         getDocument: ({sid}) => docBySid.get(sid) ?? null,
         getOutgoing: (sid) => (outgoingBySource.get(sid) ?? []).map((edge) => ({
             target_sid: edge.target,
@@ -36,6 +37,43 @@ function makeBackend(docs, edges) {
             }))
     };
 }
+
+test('computeGraphUniverse emits every document and resolved relation once', () => {
+    const docs = [
+        {sid: 'A', url: 'a', title: 'Alpha', type: 'concept'},
+        {sid: 'B', url: 'b', title: 'Bravo', type: 'concept'},
+        {sid: 'C', url: 'c', title: 'Charlie', type: 'concept'}
+    ];
+    const backend = makeBackend(docs, [
+        {source: 'A', target: 'B'},
+        {source: 'B', target: 'C'},
+        {source: 'A', target: 'C', status: 'unresolved'}
+    ]);
+
+    const graph = computeGraphUniverse(backend);
+
+    assert.deepEqual(graph.nodes.map((node) => node.sid), ['A', 'B', 'C']);
+    assert.deepEqual(graph.edges.map((edge) => `${edge.source}->${edge.target}`).sort(), ['A->B', 'B->C']);
+    assert.deepEqual(graph.nodes.map((node) => node.neighborCount), [1, 2, 1]);
+});
+
+test('computeGraphUniverse falls back to lite file-tree documents when full documents are empty', () => {
+    const docs = [
+        {sid: 'A', url: 'a', title: 'Alpha', type: 'concept'},
+        {sid: 'B', url: 'b', title: 'Bravo', type: 'concept'}
+    ];
+    const backend = makeBackend(docs, [{source: 'A', target: 'B'}]);
+    backend.getDocumentsFull = () => [];
+    backend.getDocuments = () => docs.map(({url, title}) => ({url, title}));
+    backend.getDocument = ({sid, url}) => (
+        docs.find((doc) => doc.sid === sid || doc.url === url) ?? null
+    );
+
+    const graph = computeGraphUniverse(backend);
+
+    assert.deepEqual(graph.nodes.map((node) => node.sid), ['A', 'B']);
+    assert.deepEqual(graph.edges.map((edge) => `${edge.source}->${edge.target}`), ['A->B']);
+});
 
 test('computeNeighbors returns null for an unknown center', () => {
     const backend = makeBackend([], []);

@@ -46,9 +46,11 @@ const resourceIsUrl = /^https?:\/\//i.test(resource)
 const meta = (data?.meta_data && typeof data.meta_data === 'object' && !Array.isArray(data.meta_data))
     ? data.meta_data
     : {}
-// `image` drives card thumbnails and is rewritten to an asset uid at collect
-// time; showing it as metadata would leak an internal identifier.
-const HIDDEN_META_KEYS = new Set(['image'])
+// Render directives, not document metadata: `image` drives card thumbnails and
+// is rewritten to an asset uid at collect time (showing it would leak an
+// internal identifier), and `toc` switches the outline pane the reader can
+// already see (specification/frontmatter-metadata/spec.md).
+const HIDDEN_META_KEYS = new Set(['image', 'toc'])
 const metaEntries = Object.entries(meta).filter(([key]) => !HIDDEN_META_KEYS.has(key))
 
 function formatValue(value){

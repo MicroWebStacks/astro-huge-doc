@@ -17,6 +17,7 @@ const images_uids = model.map((item)=>(item.uid));
 const imagesInfo = images_uids.map((uid)=>{
     const info = getImageInfo(uid);
     return {
+        uid,
         url: getAssetUrl(uid, config.collect.version_id),
         ...info,
         ...calculate_span(info.ratio)
@@ -30,13 +31,14 @@ if(mas == null){
 
 ---
 
-<div class={`pswp-gallery container ${mas?'masonry':'grid'}`} id="my-gallery">
+<div class={`pswp-gallery container ${mas?'masonry':'grid'}`}>
     {imagesInfo.map((image)=>(
         <a  href={image.url}
             class={`item  ${mas?'masonry':'grid'}`}
             style={`grid-area: span ${image.spanHeight} / span ${image.spanWidth};`}
             itemscope
             itemtype="http://schema.org/ImageGallery"
+            data-gallery-image={image.uid}
             data-pswp-width={image.width} 
             data-pswp-height={image.height} >
                 <img src={image.url} />

@@ -974,7 +974,9 @@ async function parseDocumentRecord(doc, rawText, hash) {
             ? join(config.collect.rootdir ?? '', 'public', metaImage)
             : join(contentDir(), posix.dirname(doc.path), metaImage);
         if (existsSync(metaImageAbs)) {
-            body = `${body}\n\n![${META_IMAGE_ALT}](${metaImage})\n`;
+            // Angle brackets make paths containing spaces valid CommonMark
+            // destinations while preserving the original path for collection.
+            body = `${body}\n\n![${META_IMAGE_ALT}](<${metaImage}>)\n`;
             metaImageAppended = true;
         }
     }

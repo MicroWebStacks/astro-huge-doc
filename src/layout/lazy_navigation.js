@@ -12,6 +12,19 @@ function maxDepth(items, level = 1) {
     return max;
 }
 
+/* Mirrors SideMenu.astro's countPages: only linked entries are pages, folder
+   nodes without a route are not. */
+function countPages(items) {
+    let count = 0;
+    for (const item of items ?? []) {
+        if (item.link) {
+            count += 1;
+        }
+        count += countPages(item.items);
+    }
+    return count;
+}
+
 function hasActive(item) {
     return Boolean(item.active || item.items?.some(hasActive));
 }
@@ -86,6 +99,14 @@ function populate(nav, items) {
     nav.dataset.maxLevel = String(depth);
     nav.setAttribute('aria-busy', 'false');
     nav.classList.remove('loading');
+    // Single-page sections keep the rail closed on every visit; the flag is
+    // what menu_interactions_activation.js reads when it re-runs its restore on
+    // the navigation-ready event below.
+    if (countPages(items) <= 1 && nav.dataset.navToggled !== 'true') {
+        nav.dataset.singlePage = 'true';
+    } else {
+        delete nav.dataset.singlePage;
+    }
 
     if (depth > 1) {
         nav.append(depthControls());

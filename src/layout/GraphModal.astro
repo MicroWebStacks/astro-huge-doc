@@ -1,0 +1,111 @@
+<div class="graph-modal" data-graph-modal hidden>
+    <section class="graph-dialog" role="dialog" aria-modal="true" aria-label="Neighborhood graph">
+        <header class="graph-toolbar">
+            <span class="graph-status" data-graph-status role="status">Loading graph.</span>
+            <div class="graph-toolbar-actions">
+                <div class="graph-depth-control" data-graph-depth-control>
+                    <span class="graph-control-label">Depth</span>
+                    <div class="graph-depth-scale">
+                        <input type="range" class="graph-depth-slider" data-action="graph-depth-slider"
+                            min="0" max="1" value="1" step="1" disabled
+                            aria-label="Visible relationship depth" />
+                        <div class="graph-depth-ticks" data-graph-depth-ticks aria-hidden="true">
+                            <span>&hellip;</span>
+                        </div>
+                    </div>
+                </div>
+                <span class="graph-visible-count" data-graph-visible-count>&hellip; visible</span>
+                <button type="button" class="graph-local-clear" data-action="clear-graph-local" hidden>Clear local</button>
+                <span class="graph-toolbar-divider" aria-hidden="true"></span>
+                <button type="button" class="graph-tool-button graph-fixed-tool" data-action="fit-graph" title="Fit graph to viewport">Fit</button>
+                <button type="button" class="graph-tool-button graph-fixed-tool" data-action="reset-graph" title="Reset node positions">Reset</button>
+                <button type="button" class="graph-tool-button graph-close" data-action="close-graph" aria-label="Close graph">&times;</button>
+            </div>
+        </header>
+        <div class="graph-stage">
+            <div class="graph-viewport" data-graph-viewport tabindex="0"
+                aria-label="Interactive neighborhood graph"></div>
+        </div>
+    </section>
+</div>
+
+<style>
+.graph-modal{position:fixed;z-index:1000;inset:0;padding:5vh 5vw;background:var(--lightbox-overlay-color)}
+.graph-modal[hidden]{display:none}
+.graph-dialog{
+    width:100%;height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden;
+    border:1px solid var(--soft-border-color);border-radius:var(--radius-sm);
+    background:var(--content-bg-color);color:var(--content-color)
+}
+.graph-toolbar{
+    flex:none;display:flex;align-items:center;justify-content:flex-end;
+    min-height:48px;padding:4px var(--space-2);
+    border-bottom:1px solid var(--soft-border-color);background:var(--surface-2-bg)
+}
+.graph-status{
+    position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0,0,0,0);white-space:nowrap;border:0
+}
+.graph-toolbar-actions{display:flex;align-items:center;gap:6px;min-width:0}
+.graph-depth-control{
+    display:flex;align-items:center;gap:7px;min-width:0;padding:3px 7px;
+    border:1px solid var(--soft-border-color);border-radius:calc(var(--radius-sm) - 2px)
+}
+.graph-control-label,.graph-visible-count{
+    color:var(--content-color);font-size:var(--text-small);white-space:nowrap
+}
+.graph-depth-scale{position:relative;width:260px;height:34px;flex:none}
+.graph-depth-slider{
+    position:absolute;inset:0 0 auto;width:100%;height:18px;margin:0;cursor:pointer;accent-color:var(--front-blue)
+}
+.graph-depth-slider:disabled{opacity:.45;cursor:default}
+.graph-depth-ticks{
+    position:absolute;left:4px;right:4px;bottom:0;display:flex;justify-content:space-between;
+    color:var(--content-color-faint);font-size:10px;line-height:1;pointer-events:none
+}
+.graph-depth-ticks span{min-width:0;white-space:nowrap;text-align:center;transform:translateX(0)}
+.graph-depth-ticks span[data-current="true"]{color:var(--content-color);font-weight:700}
+.graph-visible-count{
+    width:190px;flex:none;text-align:right;color:var(--content-color-faint);overflow:hidden;text-overflow:ellipsis
+}
+.graph-local-clear{
+    width:108px;flex:none;min-height:27px;padding:.15rem .45rem;border:1px solid var(--front-blue);
+    border-radius:calc(var(--radius-sm) - 2px);background:transparent;color:var(--content-color);
+    cursor:pointer;font:inherit;font-size:var(--text-small);white-space:nowrap
+}
+.graph-local-clear[hidden]{display:block;visibility:hidden;pointer-events:none}
+.graph-toolbar-divider{align-self:stretch;width:1px;margin:1px 2px;background:var(--soft-border-color)}
+.graph-tool-button{
+    min-height:27px;padding:.15rem .5rem;border:1px solid transparent;
+    border-radius:calc(var(--radius-sm) - 2px);background:transparent;
+    color:var(--content-color-faint);cursor:pointer;font:inherit;font-size:var(--text-small)
+}
+.graph-tool-button:disabled{opacity:.4;cursor:default}
+.graph-fixed-tool{min-width:48px;border-color:var(--soft-border-color)}
+.graph-tool-button:hover{
+    background:var(--menu-span-hover-color);color:var(--content-color)
+}
+.graph-tool-button:focus-visible,.graph-viewport:focus-visible{
+    outline:2px solid var(--front-blue);outline-offset:2px
+}
+.graph-close{min-width:29px;padding-inline:.35rem;font-size:1.15rem;line-height:1}
+.graph-stage{position:relative;flex:1;min-width:0;min-height:0}
+.graph-viewport{
+    position:absolute;inset:0;overflow:hidden;background:var(--content-bg-color);touch-action:none
+}
+.graph-viewport[aria-busy="true"]{cursor:progress}
+@media only screen and (max-width:700px){
+    .graph-modal{padding:0}
+    .graph-dialog{border:0;border-radius:0}
+    .graph-toolbar{padding:4px var(--space-2)}
+    .graph-depth-scale{width:180px}
+    .graph-visible-count{display:none}
+    .graph-local-clear{min-width:66px;font-size:11px}
+}
+@media (prefers-reduced-motion:reduce){
+    .graph-modal *,.graph-modal *::before,.graph-modal *::after{
+        scroll-behavior:auto !important;transition-duration:0.01ms !important;
+        animation-duration:0.01ms !important;animation-iteration-count:1 !important
+    }
+}
+</style>

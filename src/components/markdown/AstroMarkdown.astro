@@ -30,6 +30,23 @@ function renderAstToHtml(astNode){
     }
 }
 
+// An authored paragraph that contains an inline link, image or directive is
+// stored as several sibling rows — "text | link | text" — because links and
+// directives are indexable items in their own right (structure_db
+// splitParagraphSegments). Those fragments carry no block wrapper, so rendered
+// as-is they escape the prose measure and lose the paragraph gap. A whole
+// paragraph keeps a `paragraph` AST (or none, when it is plain text); a
+// fragment is either AST-less or a bare `root` run of inline markup.
+function isInlineFragment(item){
+    if(item?.type === 'link' || item?.type === 'textDirective'){
+        return true;
+    }
+    if(item?.type !== 'paragraph'){
+        return false;
+    }
+    return item.ast ? item.ast.type === 'root' : true;
+}
+
 function paragraphStyle(node){
     if(node.type !== 'paragraph'){
         return 'paragraph';
@@ -133,6 +150,23 @@ function paragraphStyle(node){
                 const childItems = list.slice(i + 1, i + 1 + childCount);
                 out.push(<li>{renderRun(childItems)}</li>);
                 i += 1 + childCount;
+                continue;
+            }
+            if (isInlineFragment(item)) {
+                // Re-close the authored paragraph around its fragments so the
+                // run reads as one block again. A lone directive is skipped:
+                // :details / :iframe are block components that size
+                // themselves, and a paragraph wrapper would clamp them.
+                const start = i;
+                while (i < list.length && isInlineFragment(list[i])) {
+                    i += 1;
+                }
+                const run = list.slice(start, i);
+                if (run.length === 1 && run[0].type === 'textDirective') {
+                    out.push(renderItem(run[0]));
+                    continue;
+                }
+                out.push(<div class="paragraph">{run.map((fragment) => renderItem(fragment))}</div>);
                 continue;
             }
             out.push(renderItem(item));

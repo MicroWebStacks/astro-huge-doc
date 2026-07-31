@@ -67,12 +67,14 @@ const hasContent = Boolean(prev || next);
     color: var(--menu-text-color);
     box-sizing: border-box;
 }
+/* Full band width, not the prose measure: these are chrome, not prose, so
+   "previous" sits at the far left edge and "next" at the far right, aligned
+   with the band's own padding rather than with the text column. */
 .prev-next{
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
-    max-width: var(--prose-measure);
 }
 .prev-next a{
     display: flex;

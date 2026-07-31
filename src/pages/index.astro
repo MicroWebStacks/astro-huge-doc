@@ -13,7 +13,7 @@ if(!found){
     throw new Error("entry not found for home page")
 }
 ---
-<Layout title={title} headings={headings} graphSid={data?.sid ?? null} >
+<Layout title={title} headings={headings} graphSid={data?.sid ?? null} toc={data?.toc} >
     {found&&
         <>
             <div class="page-chrome">

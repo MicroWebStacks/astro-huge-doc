@@ -2,7 +2,7 @@
 import './colors.css';
 import Icon from "@/components/icon.astro"
 import ThemeToggle from './ThemeToggle.astro';
-import PanZoomModal from '@/components/panzoom/panzoommodal.astro';
+import GraphModal from './GraphModal.astro';
 import { buildAppBarMenu } from './layout_utils.js';
 import { basePrefix } from '@/libs/blob-files.js';
 import { config } from '@/config';
@@ -144,7 +144,7 @@ const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.ali
             </li>
         }
         {graphSid &&
-            <li class="nav-toggle-item graph-entry" data-secondary-utility data-panzoom-root="true" data-name="graph"
+            <li class="nav-toggle-item graph-entry" data-secondary-utility data-name="graph"
                 data-graph-root data-graph-sid={graphSid} data-graph-prefix={prefix}>
                 <button type="button" class="nav-toggle" data-action="open-graph"
                     title="Neighborhood graph" aria-label="Show neighborhood graph">
@@ -157,8 +157,7 @@ const right_side = menu.filter((item)=>(Object.hasOwn(item,"align") && (item.ali
                     </svg>
                     <span class="utility-menu-label">Neighborhood graph</span>
                 </button>
-                <div class="graph-render-target" hidden></div>
-                <PanZoomModal sourceSelector=".graph-render-target svg" />
+                <GraphModal />
             </li>
         }
         {showRuntimeInfo &&
@@ -482,33 +481,14 @@ a.chrome-link{
 }
 /* Neighborhood graph (OKF plan TP-13/DD-11, ruling R-16): a public discovery
    affordance, so it lives with the other chrome icons instead of behind a
-   click in the footer. The button is a plain nav-toggle; the render target and
-   its modal ride along in the same <li> because graph_entry.js binds them as
-   one root. */
+   click in the footer. The dedicated live modal stays inside the same root so
+   graph_entry.js can own the renderer lifecycle without static SVG cloning. */
 .graph-entry{
     position:relative;
 }
 .graph-entry .nav-toggle[aria-busy="true"]{
     opacity:0.6;
     cursor:progress;
-}
-/* The shared lightbox surface is deliberately "always light" (photos, static
-   diagrams carry their own dark ink). The graph SVG is client-rendered with
-   theme tokens instead — like mermaid/plantuml — so its modal must follow the
-   active theme or dark-mode ink lands on a light surface (unreadable).
-   Scoped to this entry: the diagram/image lightboxes keep their light look. */
-.graph-entry :global(.modal-background .modal){
-    background-color: var(--content-bg-color);
-    border-color: var(--soft-border-color);
-}
-.graph-entry :global(.modal-background .close-x){
-    color: var(--content-color-faint);
-}
-.graph-entry :global(.modal-background .modal-header:hover){
-    background: var(--surface-2-bg);
-}
-.graph-entry :global(.modal-background .modal-header:hover > span.close-x){
-    color: var(--content-color);
 }
 /* Preview lock toggle (webview-only): shackle swaps open/closed and the
    keyhole dot accents blue when locked, mirroring the menu-toggle pattern. */

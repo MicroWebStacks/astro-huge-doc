@@ -16,6 +16,22 @@ let { items, category, initialOpen = true, loading = false } = Astro.props;
 const open_class = (items.length > 0 && initialOpen)?"open":"closed"
 const data_width = (items.length > 0 || loading)?"20vw":"0vw"
 
+/* A section whose tree holds a single page has nothing to navigate to: the one
+   file is already on screen. Such a tree stays collapsed on every visit, so the
+   flag travels to menu_interactions_activation.js as a data attribute rather
+   than being re-derived from the DOM. Folder nodes without a route are not
+   pages, so only linked entries count. */
+function countPages(entries) {
+  let count = 0;
+  for (const entry of entries ?? []) {
+    if (entry.link) {
+      count += 1;
+    }
+    count += countPages(entry.items);
+  }
+  return count;
+}
+
 function getMaxDepth(entries, level = 1) {
   let max = level;
   for (const entry of entries ?? []) {
@@ -59,8 +75,11 @@ const state_scope = createHash('sha1')
   .digest('hex')
   .slice(0, 12);
 const state_key = `microwebstacks:${state_scope}:${category}`;
+// Decided on the server for the rendered tree; a lazily loaded rail carries no
+// flag until lazy_navigation.js has its items.
+const single_page = category !== "toc_menu" && !loading && countPages(items) <= 1;
 ---
-<nav class={`${open_class} ${category}${loading ? " loading" : ""}`} data-width={data_width} data-max-level={max_level} data-default-level={default_level} data-state-key={state_key} data-lazy-navigation={loading ? "true" : undefined} aria-busy={loading ? "true" : undefined}>
+<nav class={`${open_class} ${category}${loading ? " loading" : ""}`} data-width={data_width} data-max-level={max_level} data-default-level={default_level} data-state-key={state_key} data-single-page={single_page ? "true" : undefined} data-lazy-navigation={loading ? "true" : undefined} aria-busy={loading ? "true" : undefined}>
     <div class="menu-title">{category === "toc_menu" ? "On this page" : "Pages"}</div>
     {loading &&
       <div class="menu-skeleton" aria-label="Loading pages" role="status">

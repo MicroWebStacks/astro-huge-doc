@@ -70,6 +70,7 @@
     "shiki": "^3.15.0",
     "three": "^0.172.0",
     "unist-util-visit": "^5.0.0",
+    "vis-network": "^10.1.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "engines": {

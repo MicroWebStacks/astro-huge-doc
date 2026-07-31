@@ -9,6 +9,11 @@
 // read from the "#__preview" iframe src). init() checks that flag first and
 // returns before arming any hover listeners inside a previewed frame.
 
+import {
+	PREVIEW_GALLERY_MESSAGE,
+	withGalleryImage
+} from '../libs/gallery-deep-link.js';
+
 const PREVIEW_FLAG = '__preview';
 const PARAM = 'preview';
 const INTENT_DELAY_MS = 150;      // AD-003: ignore drive-by pointer passes
@@ -613,6 +618,27 @@ function wireModalChrome() {
 	});
 }
 
+function wirePreviewGalleryHandoff() {
+	window.addEventListener('message', (event) => {
+		if (event.origin !== window.location.origin
+			|| event.data?.type !== PREVIEW_GALLERY_MESSAGE
+			|| !session?.iframe
+			|| event.source !== session.iframe.contentWindow) {
+			return;
+		}
+
+		const imageUid = event.data.imageUid;
+		if (typeof imageUid !== 'string' || !imageUid) {
+			return;
+		}
+
+		// Build from the parent's canonical target rather than accepting a URL
+		// from framed content. Only the stable image UID crosses the boundary.
+		const target = withGalleryImage(session.canonicalTarget, imageUid);
+		window.location.assign(target);
+	});
+}
+
 function init() {
 	attemptSectionScroll();
 	if (isPreviewModeDoc()) {
@@ -622,6 +648,7 @@ function init() {
 		return;
 	}
 	wireModalChrome();
+	wirePreviewGalleryHandoff();
 	wireHoverDelegation();
 	const param = readPreviewParam();
 	if (param) {

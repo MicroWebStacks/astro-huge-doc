@@ -13,6 +13,11 @@ tree navigation menus rendered by `SideMenu.astro`:
 It defines the compact depth toolbar, auto-expansion, manual-expansion,
 persistence, and cross-highlight behavior.
 
+Whether the toc menu is rendered at all is decided before any of this applies:
+a page with no headings, or one whose frontmatter sets `toc: false`, has no toc
+rail, no app bar toggle for it, and no resize handle. See
+`specification/frontmatter-metadata/spec.md`.
+
 ## Control Cluster
 
 Each menu has a visible surface label: **Pages** for document navigation and

@@ -112,11 +112,34 @@ function toc_list_to_tree(headings) {
     return tree.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 }
 
+/* Frontmatter `toc:` is an opt-out switch for the On this page outline
+   (specification/frontmatter-metadata/spec.md). Absent means "show it when the
+   page has headings"; only an explicitly false value suppresses the pane. YAML
+   yields a real boolean, but authored content also arrives as the string forms
+   other generators accept, so those are honored rather than read as truthy. */
+const TOC_DISABLED_VALUES = new Set(['false', 'no', 'off', '0']);
+
+function toc_meta_enabled(value) {
+    if (value === undefined || value === null || value === '') {
+        return true;
+    }
+    if (typeof value === 'boolean') {
+        return value;
+    }
+    if (typeof value === 'number') {
+        return value !== 0;
+    }
+    if (typeof value === 'string') {
+        return !TOC_DISABLED_VALUES.has(value.trim().toLowerCase());
+    }
+    return true;
+}
+
 /** headings start at Sidemenu
  *
  */
-function process_toc_list(headings) {
-    if (!Array.isArray(headings) || headings.length === 0) {
+function process_toc_list(headings, toc_meta) {
+    if (!toc_meta_enabled(toc_meta) || !Array.isArray(headings) || headings.length === 0) {
         return {items: [], visible: false};
     }
     const tree = toc_list_to_tree(headings);
@@ -487,6 +510,7 @@ function section_from_pathname(pathname){
 
 export {
     process_toc_list,
+    toc_meta_enabled,
     buildNavigationMenus,
     buildAppBarMenu,
     buildSectionMenu,

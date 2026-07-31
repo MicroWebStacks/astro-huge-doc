@@ -17,14 +17,19 @@ export interface Props {
 	headings: Array<Object>;
 	/** Concept id of the page in view; drives the app bar's graph icon. */
 	graphSid?: string | null;
+	/** Raw frontmatter `toc:` value; false suppresses the outline pane. */
+	toc?: unknown;
 }
 
 const { headings, graphSid = null } = Astro.props;
-const rawTitle = ((Astro.props as any).frontmatter || Astro.props).title;
+const pageMeta = ((Astro.props as any).frontmatter || Astro.props);
+const rawTitle = pageMeta.title;
 // The root content doc carries "." as its title; show "Home" instead
 // (mirrors homeLabel() used for the nav).
 const title = (!rawTitle || rawTitle === '.') ? 'Home' : rawTitle;
-const toc_menu_items = process_toc_list(headings)
+// `toc: false` is an author opt-out of the whole right-hand rail — pane, app
+// bar toggle and resize handle (specification/frontmatter-metadata/spec.md).
+const toc_menu_items = process_toc_list(headings, (Astro.props as any).toc ?? pageMeta.toc)
 // Single gate shared with the /__lite/* endpoints (src/middleware.js): the UI
 // this flag emits and the endpoints it relies on must switch together, in
 // every run mode. Never read the env var directly here — see
@@ -186,9 +191,9 @@ const liveReloadPolling = liveReload && Boolean(process.env.MICROWEBSTACKS_LAUNC
 						<slot/>
 					</div>
 				</article>
-				<div id="resize-right" class="nav-resize active"/>
+				{toc_menu_items.visible && <div id="resize-right" class="nav-resize active"/>}
 				<div id="toc-nav-div">
-					{toc_menu_items.visible && 
+					{toc_menu_items.visible &&
 						<SideMenu items={toc_menu_items.items} category="toc_menu" initialOpen={false}/>
 					}
 				</div>
@@ -471,9 +476,11 @@ main{
 }
 
 /* Body paragraphs: capped measure for legibility, even block spacing.
-   Standalone paragraphs render as <p>; text that flows around inline links
-   stays as loose nodes and inherits the article line-height. */
-.article-slot :global(p){
+   Standalone paragraphs render as <p>; a paragraph that was split around an
+   inline link or directive comes back as .paragraph (AstroMarkdown regroups
+   the fragments), so both carry the same measure and rhythm. */
+.article-slot :global(p),
+.article-slot :global(.paragraph){
 	max-width: var(--prose-measure);
 	margin-block: 0 var(--space-4);
 	line-height: var(--leading-body);
@@ -503,7 +510,8 @@ main{
 .article-slot :global(li + li){
 	margin-top: var(--space-1);
 }
-.article-slot :global(li > p:last-child){
+.article-slot :global(li > p:last-child),
+.article-slot :global(li > .paragraph:last-child){
 	margin-bottom: 0;
 }
 
