@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.0.28 - 2026-07-31
+
+- Gallery lightboxes now have stable, shareable image URLs, and selecting an
+  image from a link preview opens that exact image on the full page
+  (engine 0.0.24).
+- The neighborhood graph is now an interactive physics layout with dragging,
+  depth and branch expansion, hover emphasis, fit/reset controls, and direct
+  page-opening actions (engine 0.0.24).
+- Single-page sections keep the Pages rail closed by default, and `toc: false`
+  suppresses the On this page outline (engine 0.0.24).
+- Resizing a preview across the mobile breakpoint now rebinds both navigation
+  toggles to the visible rail or drawer and restores that mode's saved state
+  (engine 0.0.24).
+- Fixed spacing around collected inline fragments and frontmatter images whose
+  paths contain spaces in lite preview mode (engine 0.0.24).
+
 ## 0.0.27 - 2026-07-29
 
 - Removed runtime engine downloads from the extension. Installed builds now

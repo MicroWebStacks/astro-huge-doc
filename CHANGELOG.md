@@ -3,6 +3,37 @@
 Release notes for the `@microwebstacks/md-render` npm package. The VS Code
 extension has a separate changelog at `packages/vscode-extension/CHANGELOG.md`.
 
+## 0.0.24 - 2026-07-31
+
+### Added
+
+- Added stable image-gallery deep links through the `gallery-image` URL
+  parameter. Opening or changing a slide keeps the shareable URL current,
+  closing the lightbox removes only that parameter, and gallery clicks inside
+  link previews now open the selected image on the full page.
+- Replaced the static neighborhood graph lightbox with a lazy-loaded,
+  interactive vis-network view. The graph now supports physics layout,
+  dragging and session pinning, depth-based expansion with exact counts,
+  per-branch expand/collapse controls, hover emphasis, fit/reset actions, and
+  explicit page navigation.
+
+### Changed
+
+- Single-page sections now keep the Pages rail closed by default while still
+  allowing readers to open it explicitly.
+- Frontmatter `toc: false` (including common string and numeric false forms)
+  now suppresses the On this page outline. The control field is no longer
+  repeated in the visible metadata panel.
+
+### Fixed
+
+- Rebound Pages and outline toggles when a preview crosses the mobile
+  breakpoint, so resizing an editor pane no longer leaves a toggle controlling
+  a hidden desktop rail or mobile drawer.
+- Restored paragraph measure and spacing for collected runs of inline text,
+  links, images, and inline directives without constraining block directives.
+- Resolved frontmatter image paths containing spaces in lite preview mode.
+
 ## 0.0.23 - 2026-07-29
 
 ### Fixed
