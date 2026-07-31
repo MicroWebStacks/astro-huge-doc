@@ -2,7 +2,7 @@
 
 ## Progress
 
-[##-] Phase 2/3 - versions, notes, tests, and isolated build complete; packaging next.
+[###] Done - release source committed, upload-ready VSIX packaged and verified, and release evidence recorded.
 
 ## Release Pair
 
@@ -34,6 +34,18 @@
   style, and source-map variants from the vendored copy.
 - Focused restaging reduced the engine tree to 427.5 MB and the retained
   standalone ESM module imports successfully.
+
+## Source And Packaging
+
+- Release source commits:
+  - `78e2041` (`Prepare engine 0.0.24 and extension 0.0.28`)
+  - `3d177db` (`Keep release engine below staging budget`)
+- Final artifact provenance is clean and identifies commit `3d177db`.
+- Artifact: `packages/vscode-extension/markdown-site-preview.vsix`
+  (112,802,996 bytes / 107.58 MiB).
+- Verified extension 0.0.28, bundled engine 0.0.24, two bundled-engine VSIX
+  entries, a 112,722,279-byte authenticated `engine.tgz`, 27,332 vendored
+  dependency files, and 22 total VSIX entries.
 
 ## Publication Boundary
 

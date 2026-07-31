@@ -25,5 +25,21 @@
 - A direct ESM import of the retained
   `_modules/vis-network/standalone/esm/vis-network.mjs` passed before the
   disposable staging tree was removed.
-- Final VSIX packaging and archive verification will be recorded after the
-  staging prune is committed so the artifact carries clean commit provenance.
+- Final `corepack pnpm ext:package` passed from clean commit `3d177db`:
+  - extension 0.0.28 and bundled engine 0.0.24;
+  - staged engine 427.5 MB across 27,859 files;
+  - authenticated `engine.tgz` 112,722,279 bytes;
+  - 27,332 vendored dependency files;
+  - 22 VSIX entries, including the two expected bundled-engine entries.
+
+## Artifact
+
+- Path: `packages/vscode-extension/markdown-site-preview.vsix`
+- Size: 112,802,996 bytes (107.58 MiB)
+- SHA-256:
+  `22225E9044465BB76148F263E383D08E1B3B25D0DD0C9C976448AD94A5DFE0A0`
+
+## Not Performed
+
+- No npm engine publication.
+- No Marketplace upload or installed-extension manual smoke test.
