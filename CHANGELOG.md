@@ -3,6 +3,43 @@
 Release notes for the `@microwebstacks/md-render` npm package. The VS Code
 extension has a separate changelog at `packages/vscode-extension/CHANGELOG.md`.
 
+## 0.0.25 - 2026-08-28
+
+### Added
+
+- Added `md-render preview [workspace]`, which renders an arbitrary Markdown
+  folder as the full website and serves it on localhost, so a folder of notes
+  can be read in a normal browser without a checkout, a manifest, a `content/`
+  directory, or SQLite. The workspace defaults to the current directory, the
+  browser opens by default, and Ctrl+C stops the server and removes the
+  temporary artifact. Options: `--docs-root`, `--manifest`, `--host`,
+  `--port` (`0` binds any free port), `--no-open`, and `--keep`.
+- Added `md-render --help`, and per-command usage on an argument error.
+
+### Changed
+
+- `build` and `preview` now share one pipeline. `prepareStaticSite()` owns
+  workspace and engine resolution, the isolated temporary build root, config
+  probing, content validation, and the collect/diagrams/astro-build steps;
+  `build` copies the artifact to `--out-dir` and `preview` serves it in place.
+  `md-render build` behaviour is unchanged.
+- Collection now skips dependency and build directories from the common
+  ecosystems - `node_modules`, `dist`, `build`, `out`, `target`, `vendor`,
+  `venv`, `site-packages`, `__pycache__`, and `coverage` - because a preview
+  content root is often an ordinary project folder rather than a curated
+  `content/` directory. Hidden directories were already skipped. Override the
+  list per workspace with `collect.ignore` in the manifest.
+
+### Fixed
+
+- Fixed the published package being unusable from `npm install` and `npx`.
+  `content-structure` is a private workspace package that ships inside the
+  tarball's `_modules/` directory; only the VS Code extension renamed that
+  tree, so every other consumer hit an unresolvable
+  `content-structure/src/identity.js` during the Astro build. A postinstall
+  step now places it in the engine's own `node_modules`. This affected
+  `md-render build` as much as the new preview command.
+
 ## 0.0.24 - 2026-07-31
 
 ### Added

@@ -19,7 +19,7 @@
     "site",
     "kroki"
   ],
-  "engineVersion": "0.0.24",
+  "engineVersion": "0.0.25",
   "publisher": "microwebstacks",
   "private": false,
   "license": "MIT",
