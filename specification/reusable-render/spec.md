@@ -9,7 +9,9 @@ using `@microwebstacks/md-render`, and the thin GitHub Action that wraps it.
 It covers:
 
 - the static-generation strategy the engine uses (`output=static`);
-- the consumer-facing command surface and its argument/error contract;
+- the consumer-facing command surface and its argument/error contract, for
+  both producing a static artifact (`build`) and serving one locally
+  (`preview`);
 - the deployment profile fixed for this contract (`backend=json`,
   `profile=full`);
 - base-path and canonical-site handling for static output.
@@ -96,7 +98,7 @@ SSR always serves at root; base-path/site support only applies to
   `config.base` away from `/`. Should SSR ever need a non-root base, this
   middleware would need the same treatment `blobFileUrl` already has.
 
-## Command contract
+## Build command contract
 
 ```text
 md-render build --workspace <path> --out-dir <path> \
@@ -115,9 +117,9 @@ shape above matches the provisional design as-written, no changes needed.
   `DOCS_PROFILE=full`. The command does not expose `lite` or `server` as
   Action-facing options.
 - Stable failure categories, each a `BuildError.category` and printed as
-  `md-render build: <category>: <message>`: `invalid_configuration`,
+  `md-render <command>: <category>: <message>`: `invalid_configuration`,
   `missing_content`, `collection_failed`, `diagram_failed`, `build_failed`,
-  `unsafe_output_path`.
+  `unsafe_output_path`, and `port_in_use` (`preview` only).
 - Isolated output/store directories (a fresh `mkdtemp` build root per
   invocation); incomplete output is cleaned up on failure without touching
   consumer source. `--out-dir` is only ever written once, at the end, after
@@ -125,6 +127,55 @@ shape above matches the provisional design as-written, no changes needed.
 - Requires Node 22+ (OP-007); the command checks this itself and fails with
   `invalid_configuration` on older runtimes rather than failing obscurely
   partway through a stage.
+
+## Local preview contract
+
+```text
+md-render preview [workspace]
+
+  --docs-root <path>   content root inside the workspace
+  --manifest <path>    manifest to use
+  --host <host>        default 127.0.0.1
+  --port <port>        default 4321; 0 binds any free port
+  --open / --no-open   open a browser (default: open)
+  --keep               retain the temporary artifact and print its location
+```
+
+Implemented in `bin/md-render.js` / `src/libs/render-preview.js`. It renders
+the same website `build` produces and serves it from a local HTTP server, so a
+consumer can read an arbitrary Markdown folder as the full site without a
+checkout, a manifest, or a static host.
+
+- Same fixed axes as `build`: `output=static`, `DOCS_BACKEND=json`,
+  `DOCS_PROFILE=full`. Local preview is not a reason to reach for the SQLite
+  SSR deployment; rendering capability and storage backend are separate axes.
+- Both commands run one pipeline. `prepareStaticSite()` in
+  `src/libs/render-build.js` owns workspace/engine resolution, the temp build
+  root, config probing, content validation, and the collect / diagrams /
+  astro-build steps; `build` copies its artifact to `--out-dir` and `preview`
+  serves it in place.
+- The workspace argument is positional and defaults to the current directory.
+  The content root resolves as: `--docs-root`, else a manifest whose named
+  folder exists, else the workspace root itself. This convenience is scoped to
+  `preview`; `build` keeps requiring an explicit `--workspace`/`--out-dir` and
+  resolves content exactly as before.
+- Nothing is written into the consumer's workspace. The dataset, blobs, and
+  built site live in a `mkdtemp` root that is removed on `SIGINT`/`SIGTERM`,
+  on a failure to bind, and after a failed build - unless `--keep` is given,
+  which retains it and prints the path (including when the build itself
+  failed).
+- The server is Node's built-in `http`, serving only the generated artifact:
+  directory routes resolve to `index.html`, requests that escape the artifact
+  are refused with 403, and an occupied port fails with the `port_in_use`
+  category rather than a stack trace. No production dependency is added, which
+  keeps the excluded-dependency list (`express`, `better-sqlite3`, `sharp`,
+  ...) intact.
+- Browser launch is best-effort per platform and never fatal; the URL is
+  printed regardless, and `--no-open` suppresses the launch for CI, remote
+  shells, and containers.
+- The command adds no rendering behaviour of its own. Galleries, diagrams,
+  navigation, and hydration are whatever the shared full client bundle does;
+  a failure there is a shared-render regression, not a CLI concern.
 
 ## GitHub Action contract
 
@@ -184,7 +235,7 @@ outputs:
 | Surface | Owns | Must not own |
 | --- | --- | --- |
 | Shared engine | Collection, diagrams, routes, components, themes, assets, export orchestration | GitHub permissions, deployment, extension UI |
-| Render command | Arguments, isolated configuration, lifecycle, artifact production | A second collection or rendering implementation |
+| Render command | Arguments, isolated configuration, lifecycle, artifact production, local preview server and its shutdown | A second collection or rendering implementation, or any rendering behaviour of its own |
 | GitHub Action | Runtime setup, command invocation, output path | Rendering logic or Pages deployment policy |
 | VS Code extension | Engine acquisition, preview lifecycle, webview integration | Static export or Action behavior |
 | Consumer repository | Content, manifest, site/base, workflow, upload, deployment, version pin | Renderer source or internals |
@@ -197,3 +248,7 @@ outputs:
 - Restructuring the static artifact's physical layout to nest it under
   `base` — that is the hosting step's responsibility.
 - Changing the VS Code extension's lite/json SSR startup path.
+- Watch/rebuild-on-change or live reload in `md-render preview`; the command
+  builds once and serves that artifact.
+- A long-lived SQLite SSR server command. That is a separate deployment
+  concern and would be its own contract.

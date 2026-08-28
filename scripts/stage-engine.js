@@ -331,6 +331,12 @@ async function main() {
     license: rootPkg.license ?? 'UNLICENSED',
     files: stagedFiles,
     bin: {'md-render': 'bin/md-render.js'},
+    // npm/npx consumers get their registry dependencies installed for them,
+    // but content-structure is a private workspace package that only exists
+    // inside the vendored tree; this lifts it into place so the Astro build
+    // can resolve it (see scripts/postinstall-content-structure.js). The VS
+    // Code extension never runs npm and keeps its own _modules rename.
+    ...(args.vendor ? {scripts: {postinstall: 'node scripts/postinstall-content-structure.js'}} : {}),
     dependencies,
     engines: {node: '>=22'},
     // Tells the VS Code extension's installer (extension.js installEngine)

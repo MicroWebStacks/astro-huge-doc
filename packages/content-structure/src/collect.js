@@ -9,6 +9,27 @@ import { getStructureSchema } from './structure_db.js'
 import {parseMarkdownFrontmatter} from './frontmatter.js';
 import {identityForPath} from './identity.js';
 
+// Directories that are never authored content, whatever ecosystem the folder
+// belongs to. This matters because the content root is not always a curated
+// `content/` directory: `md-render preview` points it at an arbitrary folder,
+// which for most people sits inside a repository with dependency and build
+// output trees beside the notes. Hidden directories (.git, .venv, .tox,
+// .next, .svelte-kit, .gradle, .idea) need no rule here - glob's default
+// dot:false already skips them - so this list is the non-hidden ones.
+// Override per workspace with `collect.ignore` in the manifest.
+const DEFAULT_IGNORE = [
+    '**/node_modules/**',
+    '**/__pycache__/**',
+    '**/site-packages/**',
+    '**/venv/**',
+    '**/target/**',
+    '**/vendor/**',
+    '**/dist/**',
+    '**/build/**',
+    '**/out/**',
+    '**/coverage/**'
+]
+
 let config = {
     rootdir: process.cwd(),
     contentdir: join(process.cwd(), "content"),
@@ -57,10 +78,12 @@ async function* get_all_files(ext_list){
     const globPattern = (ext_list.length === 1)
         ? `**/${filter}`
         : `**/{${filter}}`
+    const ignore = config.ignore ?? DEFAULT_IGNORE
     const stream = globStream(globPattern,{
         cwd: config.contentdir,
         absolute: true,
-        nodir: true
+        nodir: true,
+        ignore
     })
     for await (const filePath of stream){
         const normalized = relative(config.contentdir,resolve(filePath)).split(sep).join('/')
@@ -441,6 +464,7 @@ function get_config(){
 export{
     check_add_assets,
     set_config,
+    DEFAULT_IGNORE,
     get_config,
     shortMD5,
     iterate_documents,

@@ -128,6 +128,71 @@ cache libraries considerations :
 - interactive islands will be hydrated on the client with the shipped page js assets
 
 # Usage
+## preview any Markdown folder
+
+Point the renderer at a folder of Markdown and read it as the full website in
+your normal browser. No clone, no `manifest.yaml`, no `content/` directory, no
+SQLite:
+
+```powershell
+cd path/to/markdown
+npx @microwebstacks/md-render preview
+```
+
+Or install it once and keep it:
+
+```powershell
+npm install -g @microwebstacks/md-render
+cd path/to/markdown
+md-render preview
+```
+
+Both fetch the same package. `npx` installs nothing permanently but pays the
+download on a cold cache; the global install pays it once. Either way the
+first run also has to build the site, so give it a moment - the command prints
+`building full site...` and then the URL.
+
+What it does and does not do:
+
+- **Node 22+** is the only prerequisite.
+- The folder you are standing in is the content root. Markdown may sit
+  directly in it; subfolders become the navigation tree.
+- Rendering is the **full** profile with the **json** backend and **static**
+  output - the same website a static deployment produces, including the file
+  tree, TOC, code highlighting, client Mermaid/PlantUML, and PhotoSwipe
+  galleries. No native/SQLite dependency is involved.
+- Everything generated (dataset, blobs, built site) goes to a temporary
+  directory **outside your folder**. Nothing is written next to your notes.
+- `Ctrl+C` stops the server and removes the temporary files.
+- Dependency and build directories beside your notes (`node_modules/`,
+  `dist/`, `build/`, `out/`, `target/`, `vendor/`, `venv/`, `__pycache__/`,
+  `coverage/`, and any hidden directory) are never collected. Override with
+  `collect.ignore` in a `manifest.yaml` if your documents really do live in
+  one of them.
+
+```text
+md-render preview [workspace]
+
+  --docs-root <path>   content root inside the workspace (default: the workspace itself)
+  --manifest <path>    manifest to use
+  --host <host>        default 127.0.0.1
+  --port <port>        default 4321 (0 picks any free port)
+  --no-open            do not open a browser - for CI, remote shells, and containers
+  --keep               keep the temporary artifact and print its location
+```
+
+The content root is resolved in this order: `--docs-root`, then a
+`manifest.yaml` in the workspace if the folder it names exists, then the
+workspace itself. A workspace that is already a configured astro-huge-doc
+project therefore still renders what its manifest points at.
+
+To produce a static artifact instead of serving one, use `md-render build`
+(see `specification/reusable-render/spec.md`):
+
+```powershell
+npx @microwebstacks/md-render build --workspace . --out-dir ./dist
+```
+
 ## configuration
 
 The engine can be configured from four places:

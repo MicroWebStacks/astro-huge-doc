@@ -1,9 +1,10 @@
-// Public "build" command lifecycle: parse arguments, resolve isolated
-// paths, orchestrate the existing collect / diagrams / astro-build entry
-// points as subprocesses (each gets a fresh env-driven config.js import),
-// and copy the finished static artifact into the caller's --out-dir.
+// Shared static-render mechanics for the public CLI: resolve isolated paths,
+// orchestrate the existing collect / diagrams / astro-build entry points as
+// subprocesses (each gets a fresh env-driven config.js import), and leave the
+// finished artifact in an isolated temp root. `build` copies that artifact to
+// the caller's --out-dir; `preview` (src/libs/render-preview.js) serves it.
 //
-// Contract: specification/reusable-render/spec.md. Fixed for this command:
+// Contract: specification/reusable-render/spec.md. Fixed for both commands:
 // output=static, DOCS_BACKEND=json, DOCS_PROFILE=full.
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -103,7 +104,7 @@ function assertSafeOutDir(outDirAbs, protectedPaths) {
 // process env so PATH/HOME/etc. survive. MICROWEBSTACKS_DOTENV_OVERRIDE=false
 // makes these explicit values win over a workspace's own .env (see
 // src/libs/load-env.js) instead of being silently clobbered by it.
-function buildEnv({ workspaceAbs, engineRoot, manifestAbs, storeAbs, dbPathAbs, outDirAbs, site, base }) {
+function buildEnv({ workspaceAbs, engineRoot, manifestAbs, docsRoot, storeAbs, dbPathAbs, outDirAbs, site, base }) {
   return {
     ...process.env,
     DOCS_BACKEND: 'json',
@@ -116,6 +117,9 @@ function buildEnv({ workspaceAbs, engineRoot, manifestAbs, storeAbs, dbPathAbs, 
     MICROWEBSTACKS_STORE_PATH: storeAbs,
     MICROWEBSTACKS_DB_PATH: dbPathAbs,
     ...(manifestAbs ? { MICROWEBSTACKS_MANIFEST_PATH: manifestAbs } : {}),
+    // Only `preview` sets this, to make the workspace root its own content
+    // root when nothing else configured one (see render-preview.js).
+    ...(docsRoot ? { MICROWEBSTACKS_DOCS_ROOT: docsRoot } : {}),
     ...(site ? { MICROWEBSTACKS_SITE: site } : {}),
     ...(base ? { MICROWEBSTACKS_BASE: base } : {})
   };
@@ -217,59 +221,138 @@ function resolveEngineRoot() {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 }
 
-async function runBuildCommand(argv, { log = () => {}, steps = defaultBuildSteps, nodeVersion = process.version } = {}) {
-  checkNodeVersion(nodeVersion);
-  const args = parseBuildArgs(argv);
+// Read-only answer to "which content root would a build use here?", using the
+// same probe a real build runs so there is one resolution rule, not two. The
+// store/out paths are throwaway: config.js only resolves them, nothing is
+// created. `preview` needs this before committing to a build, to decide
+// whether a workspace's own manifest actually points anywhere.
+function probeContentRoot({ workspaceAbs, manifestAbs, docsRoot }) {
+  const engineRoot = resolveEngineRoot();
+  const probeRoot = path.join(os.tmpdir(), 'md-render-probe');
+  const env = buildEnv({
+    workspaceAbs,
+    engineRoot,
+    manifestAbs,
+    docsRoot,
+    storeAbs: path.join(probeRoot, 'store'),
+    dbPathAbs: path.join(probeRoot, 'store', 'content.db'),
+    outDirAbs: path.join(probeRoot, 'dist')
+  });
+  return probeConfig(engineRoot, env).contentPath;
+}
 
-  const workspaceAbs = path.resolve(args.workspace);
+// Everything `build` and `preview` have in common: resolve the consumer
+// workspace and the engine root, stage an isolated temp build root, probe the
+// env-resolved config, and run collect / diagrams / astro build into that
+// temp root. What happens to the finished artifact is the caller's business -
+// `build` copies it to --out-dir, `preview` serves it where it lies - so this
+// hands back the paths plus a cleanup() the caller owns. On any failure it
+// removes the temp root itself, since there is nothing to hand back.
+//
+// onResolved() runs after the content root is known and before any step, which
+// is where `build` gets to reject an unsafe --out-dir without having paid for
+// a build first.
+async function prepareStaticSite({
+  workspace,
+  docsRoot,
+  manifest,
+  site,
+  base,
+  log = () => {},
+  logPrefix = 'md-render',
+  steps = defaultBuildSteps,
+  tempPrefix = 'md-render-build-',
+  cleanupOnFailure = true,
+  onResolved
+} = {}) {
+  const workspaceAbs = path.resolve(workspace);
   if (!existsSync(workspaceAbs)) {
     throw new BuildError('missing_content', `workspace not found: ${workspaceAbs}`);
   }
-  const outDirAbs = path.resolve(args.outDir);
-  const manifestAbs = args.manifest ? path.resolve(args.manifest) : undefined;
+  const manifestAbs = manifest ? path.resolve(manifest) : undefined;
   if (manifestAbs && !existsSync(manifestAbs)) {
     throw new BuildError('invalid_configuration', `manifest not found: ${manifestAbs}`);
   }
 
   const engineRoot = resolveEngineRoot();
-  const buildRoot = mkdtempSync(path.join(os.tmpdir(), 'md-render-build-'));
-  const storeAbs = path.join(buildRoot, 'store');
-  const dbPathAbs = path.join(storeAbs, 'content.db');
-  const stagedOutDirAbs = path.join(buildRoot, 'dist');
+  const buildRoot = mkdtempSync(path.join(os.tmpdir(), tempPrefix));
+  const cleanup = () => fsp.rm(buildRoot, { recursive: true, force: true });
 
   try {
+    const storeAbs = path.join(buildRoot, 'store');
+    const outDirAbs = path.join(buildRoot, 'dist');
     const env = buildEnv({
       workspaceAbs,
       engineRoot,
       manifestAbs,
+      docsRoot,
       storeAbs,
-      dbPathAbs,
-      outDirAbs: stagedOutDirAbs,
-      site: args.site,
-      base: args.base
+      dbPathAbs: path.join(storeAbs, 'content.db'),
+      outDirAbs,
+      site,
+      base
     });
 
     const resolved = probeConfig(engineRoot, env);
     assertContentPresent(resolved.contentPath);
-    assertSafeOutDir(outDirAbs, [workspaceAbs, resolved.contentPath, engineRoot]);
+    onResolved?.({ workspaceRoot: workspaceAbs, contentRoot: resolved.contentPath, engineRoot });
 
     for (const step of steps) {
-      log(`md-render build: running ${step.name}...`);
+      log(`${logPrefix}: running ${step.name}...`);
       step.run({ engineRoot, env, buildRoot });
     }
 
-    if (!existsSync(stagedOutDirAbs)) {
-      throw new BuildError('build_failed', `astro build did not produce an output directory at ${stagedOutDirAbs}`);
+    if (!existsSync(outDirAbs)) {
+      throw new BuildError('build_failed', `astro build did not produce an output directory at ${outDirAbs}`);
     }
 
+    return {
+      engineRoot,
+      workspaceRoot: workspaceAbs,
+      contentRoot: resolved.contentPath,
+      buildRoot,
+      outDir: outDirAbs,
+      cleanup
+    };
+  } catch (error) {
+    if (cleanupOnFailure) {
+      await cleanup();
+    } else {
+      // `preview --keep` wants the half-built temp root precisely when the
+      // build failed; the caller reports where it is.
+      error.buildRoot = buildRoot;
+    }
+    throw error;
+  }
+}
+
+async function runBuildCommand(argv, { log = () => {}, steps = defaultBuildSteps, nodeVersion = process.version } = {}) {
+  checkNodeVersion(nodeVersion);
+  const args = parseBuildArgs(argv);
+  const outDirAbs = path.resolve(args.outDir);
+
+  const prepared = await prepareStaticSite({
+    workspace: args.workspace,
+    manifest: args.manifest,
+    site: args.site,
+    base: args.base,
+    log,
+    logPrefix: 'md-render build',
+    steps,
+    onResolved: ({ workspaceRoot, contentRoot, engineRoot }) => {
+      assertSafeOutDir(outDirAbs, [workspaceRoot, contentRoot, engineRoot]);
+    }
+  });
+
+  try {
     await fsp.rm(outDirAbs, { recursive: true, force: true });
     await fsp.mkdir(path.dirname(outDirAbs), { recursive: true });
-    await fsp.cp(stagedOutDirAbs, outDirAbs, { recursive: true });
+    await fsp.cp(prepared.outDir, outDirAbs, { recursive: true });
 
     log(`md-render build: artifact written to ${outDirAbs}`);
     return { outDir: outDirAbs };
   } finally {
-    await fsp.rm(buildRoot, { recursive: true, force: true });
+    await prepared.cleanup();
   }
 }
 
@@ -283,5 +366,7 @@ export {
   assertContentPresent,
   defaultBuildSteps,
   resolveEngineRoot,
+  probeContentRoot,
+  prepareStaticSite,
   runBuildCommand
 };

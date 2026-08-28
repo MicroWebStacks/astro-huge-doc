@@ -18,6 +18,7 @@
     "bench:lite": "node scripts/bench-lite.js",
     "test": "node --test \"test/**/*.test.js\"",
     "test:extension": "node packages/vscode-extension/test/run-integration.js",
+    "test:preview-gallery": "node scripts/check-preview-gallery.js",
     "diagnose:extension-hydration": "node scripts/diagnose-extension-hydration.cjs",
     "clean:diagrams": "node scripts/clean-diagrams.js",
     "kroki:up": "docker compose up -d",
