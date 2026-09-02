@@ -66,60 +66,115 @@ const DEFAULT_MANIFEST = {
     }
 };
 
-function mergeManifest(manifest = {}) {
+// Every merge below assumes a section is a plain mapping. A hand-edited
+// manifest can put anything there (`output:` left dangling reads as null, a
+// stray value reads as a string, a mis-indented block reads as a list), and
+// spreading those produces nonsense keys or throws. Sections that are not a
+// mapping are dropped in favour of the defaults, so a typo in one section can
+// never take the renderer down or corrupt another.
+function section(value) {
+    return (value && typeof value === 'object' && !Array.isArray(value)) ? value : {};
+}
+
+// exclude_paths is walked with array methods downstream (server/cache); a
+// single path written without a list marker must not iterate as characters.
+function stringList(value, fallback) {
+    if (Array.isArray(value)) {
+        return value.filter((entry) => typeof entry === 'string');
+    }
+    return typeof value === 'string' ? [value] : fallback;
+}
+
+function mergeManifest(rawManifest = {}) {
+    const manifest = section(rawManifest);
+    const diagram = section(manifest.diagram);
+    const renderers = section(diagram.renderers);
+    const render = section(manifest.render);
+    const htmlCache = section(manifest.html_cache);
     return {
         ...DEFAULT_MANIFEST,
         ...manifest,
-        output: {...DEFAULT_MANIFEST.output, ...(manifest.output ?? {})},
-        server: {...DEFAULT_MANIFEST.server, ...(manifest.server ?? {})},
-        kroki: {...DEFAULT_MANIFEST.kroki, ...(manifest.kroki ?? {})},
+        output: {...DEFAULT_MANIFEST.output, ...section(manifest.output)},
+        server: {...DEFAULT_MANIFEST.server, ...section(manifest.server)},
+        kroki: {...DEFAULT_MANIFEST.kroki, ...section(manifest.kroki)},
         diagram: {
             ...DEFAULT_MANIFEST.diagram,
-            ...(manifest.diagram ?? {}),
+            ...diagram,
             renderers: {
                 ...DEFAULT_MANIFEST.diagram.renderers,
-                ...(manifest.diagram?.renderers ?? {}),
+                ...renderers,
                 kroki: {
                     ...DEFAULT_MANIFEST.diagram.renderers.kroki,
-                    server: manifest.kroki?.server ?? DEFAULT_MANIFEST.diagram.renderers.kroki.server,
-                    ...(manifest.diagram?.renderers?.kroki ?? {})
+                    server: section(manifest.kroki).server ?? DEFAULT_MANIFEST.diagram.renderers.kroki.server,
+                    ...section(renderers.kroki)
                 }
             },
             languages: {
                 ...DEFAULT_MANIFEST.diagram.languages,
-                ...(manifest.diagram?.languages ?? {})
+                ...section(diagram.languages)
             },
             aliases: {
                 ...DEFAULT_MANIFEST.diagram.aliases,
-                ...(manifest.diagram?.aliases ?? {})
+                ...section(diagram.aliases)
             }
         },
-        collect: {...DEFAULT_MANIFEST.collect, ...(manifest.collect ?? {})},
+        collect: {...DEFAULT_MANIFEST.collect, ...section(manifest.collect)},
         render: {
             ...DEFAULT_MANIFEST.render,
-            ...(manifest.render ?? {}),
+            ...render,
             highlighter: {
                 ...DEFAULT_MANIFEST.render.highlighter,
-                ...(manifest.render?.highlighter ?? {})
+                ...section(render.highlighter)
             }
         },
-        html_cache: {...DEFAULT_MANIFEST.html_cache, ...(manifest.html_cache ?? {})}
+        html_cache: {
+            ...DEFAULT_MANIFEST.html_cache,
+            ...htmlCache,
+            exclude_paths: stringList(htmlCache.exclude_paths, DEFAULT_MANIFEST.html_cache.exclude_paths)
+        }
     };
 }
 
-async function loadManifest(manifestPath) {
+// Returns the manifest document as authored (a mapping), never merged. An
+// absent, empty or unusable manifest reads as `{}` so callers can still tell
+// "the author configured nothing" from "the author configured this", which is
+// what the docs-root fallback below turns on.
+//
+// An *empty* manifest is not an error: a freshly created file, a file of
+// comments, or one whose keys are all commented out are all legal YAML that
+// parse to null/undefined and mean "use the defaults". Only a genuine syntax
+// error is fatal — unlike document YAML, the manifest controls where and how
+// the renderer runs, so a broken one cannot safely be guessed at.
+async function readManifestDocument(manifestPath) {
     if (!manifestPath || !existsSync(manifestPath)) {
-        return mergeManifest();
+        return {};
     }
-    const raw = await fsp.readFile(manifestPath, "utf8");
+    let raw;
     try {
-        return mergeManifest(yaml.load(raw));
+        raw = await fsp.readFile(manifestPath, "utf8");
     } catch (error) {
-        // Unlike document YAML, the manifest controls where and how the
-        // renderer runs, so it cannot safely be ignored. Name the exact file
-        // and failure plainly so the extension output never looks blank.
+        console.warn(`Ignoring unreadable manifest '${manifestPath}': ${error.message}`);
+        return {};
+    }
+    let parsed;
+    try {
+        parsed = yaml.load(raw);
+    } catch (error) {
+        // Name the exact file and failure plainly so the extension output
+        // never looks blank.
         throw new Error(`Cannot start preview: invalid YAML in manifest '${manifestPath}': ${error.message}`, {cause: error});
     }
+    if (parsed === null || parsed === undefined) {
+        return {};
+    }
+    if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+        // Syntactically valid YAML that is not a settings mapping (a bare
+        // scalar, a list). The defaults still render the folder, so say what
+        // was ignored rather than refusing to start.
+        console.warn(`Ignoring manifest '${manifestPath}': expected a YAML mapping of settings, found ${Array.isArray(parsed) ? 'a list' : typeof parsed}.`);
+        return {};
+    }
+    return parsed;
 }
 
 function resolvePath(basePath, targetPath) {
@@ -160,7 +215,8 @@ const engineRoot = resolve(process.env.MICROWEBSTACKS_ENGINE_ROOT ?? process.cwd
 const manifestPath = process.env.MICROWEBSTACKS_MANIFEST_PATH
     ? resolve(process.env.MICROWEBSTACKS_MANIFEST_PATH)
     : join(workspaceRoot, "manifest.yaml");
-const manifest = await loadManifest(manifestPath);
+const manifestDocument = await readManifestDocument(manifestPath);
+const manifest = mergeManifest(manifestDocument);
 
 // Deployment profile + data backend (env-only; needed before version resolution).
 //   DOCS_PROFILE: 'full' (local website/warehouse) | 'lite' (VS Code extension engine)
@@ -185,10 +241,28 @@ const krokiServer = process.env.MICROWEBSTACKS_KROKI_SERVER
 // Relative env-provided paths anchor to the workspace root (the engine may run
 // with a cwd far away from the docs, e.g. the VS Code extension's globalStorage);
 // absolute values pass through unchanged. The SSR outDir belongs to the engine.
-const manifestDocsRoot = manifest.render?.folder ?? manifest.output.render ?? manifest.output.content;
+//
+// Only what the manifest *authored* counts as a declaration: DEFAULT_MANIFEST
+// always carries `output.content: content`, so reading the merged manifest here
+// would make every workspace look like it had asked for a `content/` folder.
+const declaredDocsRoot = section(manifestDocument.render).folder
+    ?? section(manifestDocument.output).render
+    ?? section(manifestDocument.output).content;
+// A manifest that says nothing about where the docs live — an empty file, or
+// one that only configures the server — describes a plain folder of Markdown.
+// Defaulting it to `content/` used to point the renderer at a directory that
+// does not exist, and every page 404'd with "entry not found for home page";
+// the workspace root is the honest answer, and it is the same fallback
+// `md-render preview` already applies to a bare folder.
+function resolveDefaultDocsRoot() {
+    const conventional = resolvePath(workspaceRoot, DEFAULT_MANIFEST.output.content);
+    return existsSync(conventional) ? conventional : workspaceRoot;
+}
 const docsRoot = process.env.MICROWEBSTACKS_DOCS_ROOT
     ? resolvePath(workspaceRoot, process.env.MICROWEBSTACKS_DOCS_ROOT)
-    : resolvePath(workspaceRoot, manifestDocsRoot);
+    : (typeof declaredDocsRoot === 'string' && declaredDocsRoot.trim()
+        ? resolvePath(workspaceRoot, declaredDocsRoot)
+        : resolveDefaultDocsRoot());
 const outDir = process.env.MICROWEBSTACKS_OUTDIR
     ? resolvePath(engineRoot, process.env.MICROWEBSTACKS_OUTDIR)
     : resolvePath(engineRoot, manifest.output.ssr);

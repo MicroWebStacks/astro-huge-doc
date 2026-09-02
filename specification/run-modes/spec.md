@@ -130,6 +130,46 @@ Rules:
   Belt and braces: the server answers honestly *and* the client refuses to
   guess — either alone regresses silently when the other is edited.
 
+### Files the user authors are parsed defensively
+
+Every file the engine reads from a workspace — the manifest, and every document
+— is authored by hand and will eventually be wrong. The rules are graded by how
+much of the run each file decides:
+
+- **Empty of settings is not an error.** A manifest that is blank, is comments
+  only, or has every key commented out is legal YAML that parses to
+  `null`/`undefined`. It means *use the defaults*. Reporting it as invalid YAML
+  is a false accusation, and merging it as if it were a mapping crashes.
+- **A manifest that says nothing about the docs root describes a plain folder.**
+  `config.js` falls back to the conventional `content/` only when that folder
+  exists; otherwise the workspace root is the content root. The built-in default
+  is not a declaration, so only what the *authored* document names counts — an
+  explicitly declared folder is honoured even when it is missing, so a typo
+  stays visible instead of being silently corrected.
+- **A wrong shape degrades section by section.** A dangling key (`diagram:`), a
+  scalar or a list where a mapping belongs, or a bare string where a list
+  belongs, falls back to that section's defaults and leaves every other section
+  intact. One typo may not take the renderer down or corrupt an unrelated
+  setting.
+- **Only a genuine YAML syntax error in the manifest is fatal**, because the
+  manifest decides where and how the renderer runs. It must fail naming the file
+  and quoting the parser's own message — never as a `TypeError` raised further
+  down by code that assumed the parse succeeded.
+- **Nothing in a document is ever fatal.** Malformed frontmatter, broken
+  embedded `yaml cards`/`model`/`gallery` blocks, and unterminated fences
+  degrade to rendered text; the body always reaches the page
+  (`packages/content-structure/src/frontmatter.js` recovers the fields that
+  precede the parse error).
+
+Learned 2026-09-02: an *empty* `manifest.yaml` in a docs folder took the VS Code
+preview down. The extension stops passing `MICROWEBSTACKS_DOCS_ROOT` as soon as
+a manifest exists, so the built-in `output.content: content` default pointed the
+renderer at a `content/` directory that did not exist; the walk found zero
+documents and the home page threw `entry not found for home page` and served a
+404. A manifest of *comments only* was worse: it parsed to `null`, the merge
+threw `Cannot read properties of null`, and the catch mislabelled a perfectly
+valid file as invalid YAML. Regression cover: `test/lite-malformed-inputs.test.js`.
+
 ## Environment variable strategy
 
 Precedence (highest wins), implemented in `src/libs/load-env.js`:

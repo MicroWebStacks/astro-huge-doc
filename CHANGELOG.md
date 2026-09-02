@@ -3,6 +3,38 @@
 Release notes for the `@microwebstacks/md-render` npm package. The VS Code
 extension has a separate changelog at `packages/vscode-extension/CHANGELOG.md`.
 
+## 0.0.26 - 2026-09-02
+
+### Fixed
+
+- Fixed an empty `manifest.yaml` in a docs folder taking the preview down. An
+  empty file is legal YAML, so the built-in `output.content: content` default
+  took over and pointed the renderer at a `content/` directory that does not
+  exist in a plain folder of Markdown; the walk found no documents and the home
+  page failed with `entry not found for home page` and served a 404. A manifest
+  that names no content root now falls back to the conventional `content/` only
+  when it exists, and otherwise to the workspace root - the same rule
+  `md-render preview` already applied to a bare folder. A folder the manifest
+  *does* name is still used as written, even when it is missing, so a typo stays
+  visible.
+- Fixed a manifest of comments only (or any file whose keys are all commented
+  out) being rejected as invalid YAML. It parses to `null`, which crashed the
+  merge with `Cannot read properties of null`, and the error handler reported
+  that crash as a YAML syntax error in a perfectly valid file. An empty manifest
+  now means "use the defaults".
+
+### Changed
+
+- Manifest sections are now merged defensively. A dangling key (`diagram:`), a
+  scalar or list where a mapping belongs, or a whole manifest that is not a
+  mapping falls back to the defaults for that section and leaves the other
+  sections intact, with a warning naming what was ignored, instead of producing
+  nonsense keys or throwing. `html_cache.exclude_paths` written as a single
+  string is read as a one-item list rather than iterating as characters. A
+  genuine YAML *syntax* error in the manifest is still fatal - the manifest
+  decides where and how the renderer runs - and still names the file and the
+  parser's message.
+
 ## 0.0.25 - 2026-08-28
 
 ### Added

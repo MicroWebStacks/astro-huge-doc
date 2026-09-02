@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.0.29 - 2026-09-02
+
+- Fixed the preview failing with a 404 and `entry not found for home page` in a
+  folder containing an empty `manifest.yaml`. The extension hands the docs-root
+  decision to the engine as soon as a manifest exists, and an empty one made the
+  engine look for a `content/` subfolder that was not there. A manifest that
+  names no content root now previews the folder it sits in (engine 0.0.26).
+- A manifest of comments only is no longer reported as invalid YAML, and a
+  mistyped manifest section (a dangling key, or a value of the wrong shape) now
+  falls back to that section's defaults instead of taking preview startup down.
+  Genuinely broken YAML still stops the preview, naming the file and the parse
+  error (engine 0.0.26).
+
 ## 0.0.28 - 2026-07-31
 
 - Gallery lightboxes now have stable, shareable image URLs, and selecting an

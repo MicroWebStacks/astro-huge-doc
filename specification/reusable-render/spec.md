@@ -155,10 +155,15 @@ checkout, a manifest, or a static host.
   astro-build steps; `build` copies its artifact to `--out-dir` and `preview`
   serves it in place.
 - The workspace argument is positional and defaults to the current directory.
-  The content root resolves as: `--docs-root`, else a manifest whose named
-  folder exists, else the workspace root itself. This convenience is scoped to
-  `preview`; `build` keeps requiring an explicit `--workspace`/`--out-dir` and
-  resolves content exactly as before.
+  The content root resolves as: `--docs-root`, else a folder the manifest
+  actually names, else the workspace root itself. The last step is no longer a
+  `preview` convenience: `config.js` applies it for every caller (see
+  `specification/run-modes/spec.md`, Invariant 3), so the VS Code extension and
+  the CLI agree on what a manifest that says nothing about content means.
+  `preview` keeps its own copy of the check because it must decide before the
+  probe whether to pass `MICROWEBSTACKS_DOCS_ROOT` at all. `build` keeps
+  requiring an explicit `--workspace`/`--out-dir` and resolves content exactly
+  as before.
 - Nothing is written into the consumer's workspace. The dataset, blobs, and
   built site live in a `mkdtemp` root that is removed on `SIGINT`/`SIGTERM`,
   on a failure to bind, and after a failed build - unless `--keep` is given,
