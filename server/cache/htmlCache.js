@@ -34,7 +34,7 @@ function shouldBypassCache(req, excludePaths = []) {
     return true;
   }
   const url = req.originalUrl || req.url || '';
-  if (url.startsWith('/blobs/')) {
+  if (url.startsWith('/blobs/') || /\/(?:image-previews)\//.test(url)) {
     return true;
   }
   return excludePaths.some((pathPrefix) => url.startsWith(pathPrefix));

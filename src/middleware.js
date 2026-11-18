@@ -4,6 +4,7 @@ import {basename, join} from 'node:path';
 import {config} from '../config.js';
 import {file_mime} from './libs/utils.js';
 import {resolveBlobsSourceDir} from './libs/blob-files.js';
+import {previewDirectory, previewFileName} from './libs/image-previews.js';
 import {extensionPreviewEnabled, navigationPayload, sourceRoutePayload, runtimePayload, statsPayload, versionPayload, indexStatusPayload, indexControlPayload} from './libs/extension-preview.js';
 
 const blobsDir = resolveBlobsSourceDir(config);
@@ -75,16 +76,17 @@ export const onRequest = defineMiddleware(async (context, next) => {
         return jsonResponse(await indexControlPayload(action));
     }
 
-    if (!pathname.startsWith('/blobs/') || (method !== 'GET' && method !== 'HEAD')) {
+    const previewName = previewFileName(pathname, config.base);
+    if ((!pathname.startsWith('/blobs/') && !previewName) || (method !== 'GET' && method !== 'HEAD')) {
         return next();
     }
 
-    const blobName = safeBlobName(pathname);
+    const blobName = previewName ?? safeBlobName(pathname);
     if (!blobName) {
         return next();
     }
 
-    const filePath = join(blobsDir, blobName);
+    const filePath = join(previewName ? previewDirectory(config) : blobsDir, blobName);
     let fileStat;
     try {
         fileStat = await stat(filePath);

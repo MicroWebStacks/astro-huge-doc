@@ -43,11 +43,13 @@ const resolvedCards = entries
 ---
 <div class="cards container">
     {
-        resolvedCards.map(({entry,config})=>(
+        resolvedCards.map(({entry,config}, index)=>(
             <div class="card" style={`width:${config.width_rem}rem`}>
                 {/* title/url/tags are document columns, never meta_data
                     fields; merge them so the card has its heading and link. */}
-                <CardMeta data={{title: entry.title, url: entry.url, tags: entry.tags, uid: entry.uid, ...entry.meta_data}} />
+                <CardMeta data={{title: entry.title, url: entry.url, tags: entry.tags, uid: entry.uid, ...entry.meta_data}}
+                    previewSizes={`(max-width: ${Number(config.width_rem) > 0 ? Number(config.width_rem) : 15}rem) 100vw, ${Number(config.width_rem) > 0 ? Number(config.width_rem) : 15}rem`}
+                    loading={index === 0 ? 'eager' : 'lazy'} />
             </div>
         ))
     }

@@ -2,6 +2,8 @@
 import {calculate_span,select_masonry} from './grid_utils.js'
 import {getAssetUrl, getImageInfo} from '../../libs/structure-db.js';
 import { config } from '@/config';
+import ResponsivePreview from '../markdown/image/ResponsivePreview.astro';
+import {imagePreview} from '../../libs/image-previews.js';
 
 interface GalleryItem {
     uid: string;
@@ -15,10 +17,14 @@ export interface Props {
 const { model, masonry=null } = Astro.props as Props;
 const images_uids = model.map((item)=>(item.uid));
 const imagesInfo = images_uids.map((uid)=>{
-    const info = getImageInfo(uid);
+    const originalInfo = getImageInfo(uid) ?? {};
+    const url = getAssetUrl(uid, config.collect.version_id);
+    const preview = imagePreview(url, config);
+    const info = preview ? {...originalInfo, width: preview.width, height: preview.height,
+        ratio: preview.width / preview.height} : originalInfo;
     return {
         uid,
-        url: getAssetUrl(uid, config.collect.version_id),
+        url,
         ...info,
         ...calculate_span(info.ratio)
     }
@@ -41,7 +47,9 @@ if(mas == null){
             data-gallery-image={image.uid}
             data-pswp-width={image.width} 
             data-pswp-height={image.height} >
-                <img src={image.url} />
+                <ResponsivePreview src={image.url} width={image.width} height={image.height}
+                    alt={image.alt ?? image.title ?? image.name ?? ''}
+                    sizes={mas ? '(max-width: 40rem) 100vw, 20rem' : `(max-width: 48rem) 100vw, ${Math.max(1, image.spanWidth) * 10}rem`} />
         </a>
     ))}
 </div>
@@ -53,7 +61,7 @@ if(mas == null){
     grid-auto-rows: 10rem;
     grid-gap: var(--space-3);
 }
-img{
+.container :global(img){
     width: 100%;
     height: 100%;
     object-fit:cover;

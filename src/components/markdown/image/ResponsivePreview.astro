@@ -1,0 +1,13 @@
+---
+import {imagePreview} from '@/libs/image-previews.js';
+import {config} from '@/config';
+
+const {src, alt = '', sizes = '100vw', loading = 'lazy', width, height, title} = Astro.props;
+const preview = imagePreview(src, config);
+const variants = preview?.variants ?? [];
+---
+<img src={variants[0]?.url ?? src}
+    srcset={variants.length ? variants.map((item) => `${item.url} ${item.width}w`).join(', ') : undefined}
+    sizes={variants.length ? (loading === 'lazy' ? `auto, ${sizes}` : sizes) : undefined}
+    width={preview?.width ?? width} height={preview?.height ?? height}
+    alt={alt} title={title} loading={loading} decoding="async" />

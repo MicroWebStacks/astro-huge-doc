@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { baseAstroConfig } from './astro.config.shared.mjs';
 import { config } from './config.js';
 import { resolveBlobsSourceDir } from './src/libs/blob-files.js';
+import {exportImagePreviews} from './src/libs/image-previews.js';
 
 // True Astro static output: no Node adapter, every route prerendered.
 // [...url].astro supplies getStaticPaths() (via getDocuments()) so the
@@ -19,6 +20,7 @@ function staticBlobsIntegration() {
     name: 'md-render-static-blobs',
     hooks: {
       'astro:build:done': async ({ dir }) => {
+        await exportImagePreviews(config, fileURLToPath(new URL('image-previews/', dir)));
         if (!existsSync(sourceDir)) {
           console.warn(`astro.config.static: no blobs directory at ${sourceDir}; skipping copy.`);
           return;

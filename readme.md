@@ -442,6 +442,19 @@ pnpm dev
     - `external_storage_kb` : threshold to manage blobs in folders and not in db
     - `inline_compression_kb` : threshold above which db blobs get compressed
 - Run `pnpm collect` to parse the `content` directory Markdown and referenced assets and store them in `dataset/content.db`
+- Full collection also prepares responsive card/gallery previews in the generated
+  store's `image-previews/` directory (normally `dataset/image-previews/`). Existing
+  matching previews are reused; missing or changed previews are generated. A few
+  summary lines report generated/regenerated/reused files, skipped/failed sources,
+  total current preview size and elapsed time. Originals remain available.
+  Run collection before a direct Astro build. `md-render build`/`preview` and the
+  GitHub Action already collect automatically in an isolated temporary store and
+  export previews to `dist/image-previews/`. Neither originals nor previews are
+  changed in Git; generated files are not committed. Separate fresh builds do
+  not share a persistent preview cache. Lite uses originals without Sharp;
+  full registry builds install optional Sharp (do not omit optional dependencies
+  when image optimization is wanted). Unsupported images or generation failures
+  retain originals with an aggregate warning for failures.
 
 ## GitHub Action
 

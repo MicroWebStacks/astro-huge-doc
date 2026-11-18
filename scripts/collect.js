@@ -1,6 +1,7 @@
 import fsp from 'node:fs/promises';
 import {join} from 'node:path';
 import { config } from '../config.js';
+import {prepareCollectedImagePreviews} from './image-previews.js';
 
 async function loadCollector() {
   try {
@@ -53,6 +54,7 @@ async function main() {
 
   console.log(`content-structure: starting collect() [format: ${collectConfig.format ?? 'sqlite'}]`);
   collectConfig.version_id = await collect(collectConfig);
+  await prepareCollectedImagePreviews(config);
   console.log(`content-structure: collect() finished (version: ${collectConfig.version_id})`);
 
   if ((collectConfig.format ?? 'sqlite') === 'json') {

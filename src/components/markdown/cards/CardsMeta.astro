@@ -2,6 +2,7 @@
 import Button from '@/components/markdown/directive/ButtonDirective.astro'
 import { getAssetUrl } from '@/libs/structure-db';
 import { config } from '@/config';
+import ResponsivePreview from '../image/ResponsivePreview.astro';
 
 export interface Props {
   data: {
@@ -14,6 +15,7 @@ export interface Props {
 }
 
 const { data } = Astro.props as Props;
+const {previewSizes = '100vw', loading = 'lazy'} = Astro.props;
 
 let isSvg = false
 let isImg = false
@@ -49,7 +51,7 @@ let hasTags = Object.hasOwn(data,"tags") && (data.tags.length > 0)
                 <object data={asseturl} name={data.title} data-alt={data.title} />
             }
             {isImg&&
-                <img src={asseturl} title={data.title} alt={data.title} />
+                <ResponsivePreview src={asseturl} title={data.title} alt={data.title} sizes={previewSizes} loading={loading} />
             }
         </div>
         {hasFeatures&&
@@ -96,8 +98,9 @@ object{
     max-height: 100%;
     max-width: 100%;
 }
-img{
+.itemimage :global(img){
     pointer-events: none;
+    height: auto;
     max-height: 100%;
     max-width: 100%;
 }

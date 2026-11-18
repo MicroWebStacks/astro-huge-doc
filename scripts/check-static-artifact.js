@@ -118,7 +118,7 @@ function analyze(distDir) {
     const composition = {};
     for (const file of files) {
         const top = file.includes('/') ? file.split('/')[0] : '(root)';
-        const key = top.startsWith('_astro') || ['blobs', 'images', 'data', 'design'].includes(top) ? top : '(pages)';
+        const key = top.startsWith('_astro') || ['blobs', 'image-previews', 'images', 'data', 'design'].includes(top) ? top : '(pages)';
         composition[key] = composition[key] ?? {files: 0, bytes: 0};
         composition[key].files += 1;
         try { composition[key].bytes += fs.statSync(path.join(distDir, file)).size; } catch { /* raced */ }

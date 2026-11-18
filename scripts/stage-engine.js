@@ -338,6 +338,10 @@ async function main() {
     // Code extension never runs npm and keeps its own _modules rename.
     ...(args.vendor ? {scripts: {postinstall: 'node scripts/postinstall-content-structure.js'}} : {}),
     dependencies,
+    // Full collection prepares image previews. Registry consumers install Sharp
+    // with platform binaries; extension vendoring uses --omit=optional and never
+    // loads it in lite. Keep it outside the required dependency tree.
+    optionalDependencies: {sharp: rootPkg.dependencies.sharp},
     engines: {node: '>=22'},
     // Tells the VS Code extension's installer (extension.js installEngine)
     // this tarball has its production dependencies vendored under this name
